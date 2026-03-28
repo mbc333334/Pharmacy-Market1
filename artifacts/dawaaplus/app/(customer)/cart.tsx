@@ -1,0 +1,302 @@
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import React, { useState } from "react";
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  TextInput, Alert, Platform,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Colors from "@/constants/colors";
+import { useCart, CartItem } from "@/contexts/CartContext";
+
+const DELIVERY_FEE = 15.00;
+const PROMO_CODES: Record<string, number> = {
+  SUGAR20: 0.2,
+  DAWAA10: 0.1,
+  WELCOME: 0.15,
+};
+
+export default function CartScreen() {
+  const insets = useSafeAreaInsets();
+  const { items, totalPrice, updateQuantity, removeItem, clearCart } = useCart();
+  const [promoCode, setPromoCode] = useState("");
+  const [discount, setDiscount] = useState(0);
+  const [promoApplied, setPromoApplied] = useState(false);
+  const [promoError, setPromoError] = useState("");
+
+  const topInset = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const bottomInset = insets.bottom + (Platform.OS === "web" ? 34 : 0);
+
+  const discountAmount = totalPrice * discount;
+  const finalTotal = totalPrice + DELIVERY_FEE - discountAmount;
+
+  const applyPromo = () => {
+    const code = promoCode.toUpperCase().trim();
+    if (PROMO_CODES[code]) {
+      setDiscount(PROMO_CODES[code]);
+      setPromoApplied(true);
+      setPromoError("");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      setPromoError("كود الخصم غير صالح");
+      setPromoApplied(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
+
+  const handleCheckout = () => {
+    Alert.alert(
+      "تأكيد الطلب ✅",
+      `إجمالي طلبك: ${finalTotal.toFixed(2)} ر.س\nسيتم التواصل معك لتأكيد التوصيل`,
+      [
+        { text: "إلغاء", style: "cancel" },
+        {
+          text: "تأكيد الطلب",
+          onPress: () => {
+            clearCart();
+            Alert.alert("تم الطلب! 🎉", "طلبك في طريقه إليك");
+          },
+        },
+      ]
+    );
+  };
+
+  if (items.length === 0) {
+    return (
+      <View style={[styles.container, styles.emptyContainer, { paddingTop: topInset }]}>
+        <View style={styles.emptyIcon}>
+          <Ionicons name="cart-outline" size={64} color={Colors.border} />
+        </View>
+        <Text style={styles.emptyTitle}>سلتك فارغة</Text>
+        <Text style={styles.emptyText}>أضف أدوية ومنتجات من قسم التصفح</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { paddingTop: topInset }]}>
+      <View style={styles.header}>
+        <Text style={styles.headerSub}>{items.length} منتجات</Text>
+        <Text style={styles.headerTitle}>سلة التسوق 🛒</Text>
+      </View>
+
+      <FlatList
+        data={items}
+        keyExtractor={i => i.id}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        renderItem={({ item }) => (
+          <CartRow
+            item={item}
+            onIncrease={() => updateQuantity(item.medicineId, item.quantity + 1)}
+            onDecrease={() => updateQuantity(item.medicineId, item.quantity - 1)}
+            onRemove={() => removeItem(item.medicineId)}
+          />
+        )}
+        ListFooterComponent={() => (
+          <View style={styles.footer}>
+            {/* Promo Code */}
+            <View style={styles.promoSection}>
+              <Text style={styles.promoLabel}>كود الخصم</Text>
+              <View style={styles.promoRow}>
+                <TouchableOpacity
+                  style={[styles.promoBtn, promoApplied && styles.promoBtnDone]}
+                  onPress={applyPromo}
+                  disabled={promoApplied}
+                >
+                  <Text style={[styles.promoBtnText, promoApplied && { color: Colors.success }]}>
+                    {promoApplied ? "مطبّق ✓" : "تطبيق"}
+                  </Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={[styles.promoInput, promoApplied && styles.promoInputApplied]}
+                  placeholder="أدخل كود الخصم"
+                  value={promoCode}
+                  onChangeText={setPromoCode}
+                  textAlign="right"
+                  autoCapitalize="characters"
+                  placeholderTextColor={Colors.textMuted}
+                  editable={!promoApplied}
+                />
+              </View>
+              {promoError ? <Text style={styles.promoError}>{promoError}</Text> : null}
+              {promoApplied ? (
+                <Text style={styles.promoSuccess}>
+                  🎉 تم تطبيق خصم {Math.round(discount * 100)}%
+                </Text>
+              ) : null}
+              <Text style={styles.promoHint}>جرّب: SUGAR20 · DAWAA10 · WELCOME</Text>
+            </View>
+
+            {/* Order Summary */}
+            <View style={styles.summary}>
+              <Text style={styles.summaryTitle}>ملخص الطلب</Text>
+              <SummaryRow label="المجموع الفرعي" value={`${totalPrice.toFixed(2)} ر.س`} />
+              <SummaryRow label="رسوم التوصيل" value={`${DELIVERY_FEE.toFixed(2)} ر.س`} />
+              {promoApplied && (
+                <SummaryRow
+                  label={`خصم ${Math.round(discount * 100)}%`}
+                  value={`-${discountAmount.toFixed(2)} ر.س`}
+                  highlight
+                />
+              )}
+              <View style={styles.totalRow}>
+                <Text style={styles.totalValue}>{finalTotal.toFixed(2)} ر.س</Text>
+                <Text style={styles.totalLabel}>الإجمالي</Text>
+              </View>
+            </View>
+
+            <View style={{ height: 120 + bottomInset }} />
+          </View>
+        )}
+      />
+
+      {/* Checkout Bar */}
+      <View style={[styles.checkoutBar, { paddingBottom: bottomInset + 12 }]}>
+        <TouchableOpacity style={styles.checkoutBtn} onPress={handleCheckout}>
+          <Text style={styles.checkoutPrice}>{finalTotal.toFixed(2)} ر.س</Text>
+          <Text style={styles.checkoutText}>إتمام الطلب</Text>
+          <Ionicons name="arrow-back" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+function CartRow({
+  item, onIncrease, onDecrease, onRemove,
+}: {
+  item: CartItem;
+  onIncrease: () => void;
+  onDecrease: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <View style={styles.cartRow}>
+      <TouchableOpacity onPress={onRemove} style={styles.deleteBtn}>
+        <Ionicons name="trash-outline" size={18} color={Colors.error} />
+      </TouchableOpacity>
+      <View style={styles.cartRowContent}>
+        <Text style={styles.cartItemName} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.cartItemBrand}>{item.brand} • {item.pharmacyName}</Text>
+        <View style={styles.cartRowBottom}>
+          <Text style={styles.cartItemPrice}>{(item.price * item.quantity).toFixed(2)} ر.س</Text>
+          <View style={styles.qtyControl}>
+            <TouchableOpacity style={styles.qtyBtn} onPress={onIncrease}>
+              <Ionicons name="add" size={16} color={Colors.primary} />
+            </TouchableOpacity>
+            <Text style={styles.qtyText}>{item.quantity}</Text>
+            <TouchableOpacity style={styles.qtyBtn} onPress={onDecrease}>
+              <Ionicons name="remove" size={16} color={Colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+      <View style={[styles.cartItemIcon, { backgroundColor: item.color + "18" }]}>
+        <Ionicons name="medkit" size={28} color={item.color} />
+      </View>
+    </View>
+  );
+}
+
+function SummaryRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <View style={styles.summaryRow}>
+      <Text style={[styles.summaryValue, highlight && { color: Colors.success }]}>{value}</Text>
+      <Text style={styles.summaryLabel}>{label}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  emptyContainer: { alignItems: "center", justifyContent: "center", gap: 12 },
+  emptyIcon: { marginBottom: 8 },
+  emptyTitle: { fontSize: 20, fontWeight: "700", color: Colors.textSecondary },
+  emptyText: { fontSize: 14, color: Colors.textMuted, textAlign: "center" },
+  header: {
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  headerTitle: { fontSize: 22, fontWeight: "800", color: Colors.textPrimary, textAlign: "right" },
+  headerSub: { fontSize: 13, color: Colors.textMuted, textAlign: "right" },
+  list: { padding: 16, gap: 12 },
+  cartRow: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: Colors.surface, borderRadius: 16,
+    padding: 14, gap: 12,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+  },
+  cartItemIcon: { width: 60, height: 60, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  cartRowContent: { flex: 1 },
+  cartItemName: { fontSize: 14, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
+  cartItemBrand: { fontSize: 12, color: Colors.textMuted, textAlign: "right", marginBottom: 8 },
+  cartRowBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  cartItemPrice: { fontSize: 15, fontWeight: "800", color: Colors.primary },
+  qtyControl: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: Colors.primaryLight, borderRadius: 10, overflow: "hidden",
+  },
+  qtyBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  qtyText: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, paddingHorizontal: 8 },
+  deleteBtn: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: Colors.errorLight, alignItems: "center", justifyContent: "center",
+  },
+  footer: { paddingHorizontal: 16, gap: 16 },
+  promoSection: {
+    backgroundColor: Colors.surface, borderRadius: 16, padding: 16,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+  },
+  promoLabel: { fontSize: 14, fontWeight: "700", color: Colors.textPrimary, textAlign: "right", marginBottom: 8 },
+  promoRow: { flexDirection: "row", gap: 8 },
+  promoInput: {
+    flex: 1, backgroundColor: Colors.surfaceAlt,
+    borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: Colors.textPrimary,
+  },
+  promoInputApplied: { borderColor: Colors.success, backgroundColor: Colors.successLight },
+  promoBtn: {
+    backgroundColor: Colors.primary, borderRadius: 12,
+    paddingHorizontal: 16, justifyContent: "center",
+  },
+  promoBtnDone: { backgroundColor: Colors.successLight },
+  promoBtnText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+  promoError: { color: Colors.error, fontSize: 12, textAlign: "right", marginTop: 6 },
+  promoSuccess: { color: Colors.success, fontSize: 12, textAlign: "right", marginTop: 6, fontWeight: "600" },
+  promoHint: { fontSize: 11, color: Colors.textMuted, textAlign: "right", marginTop: 6 },
+  summary: {
+    backgroundColor: Colors.surface, borderRadius: 16, padding: 16,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+  },
+  summaryTitle: { fontSize: 16, fontWeight: "800", color: Colors.textPrimary, textAlign: "right", marginBottom: 12 },
+  summaryRow: {
+    flexDirection: "row", justifyContent: "space-between",
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  summaryLabel: { fontSize: 14, color: Colors.textSecondary },
+  summaryValue: { fontSize: 14, fontWeight: "600", color: Colors.textPrimary },
+  totalRow: {
+    flexDirection: "row", justifyContent: "space-between",
+    paddingTop: 12, marginTop: 4,
+  },
+  totalLabel: { fontSize: 16, fontWeight: "800", color: Colors.textPrimary },
+  totalValue: { fontSize: 20, fontWeight: "800", color: Colors.primary },
+  checkoutBar: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    backgroundColor: Colors.surface, paddingHorizontal: 20, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  checkoutBtn: {
+    backgroundColor: Colors.primary, borderRadius: 16,
+    paddingVertical: 16, flexDirection: "row",
+    alignItems: "center", justifyContent: "center", gap: 10,
+  },
+  checkoutText: { fontSize: 16, fontWeight: "700", color: "#fff", flex: 1, textAlign: "center" },
+  checkoutPrice: {
+    fontSize: 14, fontWeight: "800", color: "rgba(255,255,255,0.85)",
+    backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 4,
+  },
+});

@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "دواء+ — متجر الصيادلة"
+version = "1.0.0"
+id = "artifacts/dawaaplus"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 24945
+
+[services.development]
+run = "pnpm --filter @workspace/dawaaplus run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/dawaaplus", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/dawaaplus", "run", "serve" ]
+
+[services.env]
+PORT = "24945"
+BASE_PATH = "/"
