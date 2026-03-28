@@ -1,81 +1,133 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSettings } from "@/contexts/SettingsContext";
+import { LANGUAGES, COUNTRIES } from "@/data/locales";
+import { LanguageSelector, CountrySelector } from "@/components/LocaleSelector";
 
 export default function PharmacySettingsScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const { language, country, setLanguage, setCountry } = useSettings();
   const topInset = insets.top + (Platform.OS === "web" ? 67 : 0);
   const pharmacy = user?.pharmacy;
   const initials = pharmacy?.pharmacyName?.[0] ?? "ص";
 
+  const [showLanguage, setShowLanguage] = useState(false);
+  const [showCountry, setShowCountry] = useState(false);
+
   return (
-    <ScrollView
-      style={[styles.container, { paddingTop: topInset }]}
-      contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Pharmacy Header */}
-      <View style={styles.profileHeader}>
-        <TouchableOpacity style={styles.editBtn}>
-          <Ionicons name="pencil-outline" size={16} color={Colors.primary} />
-          <Text style={styles.editBtnText}>تعديل</Text>
+    <>
+      <ScrollView
+        style={[styles.container, { paddingTop: topInset }]}
+        contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Pharmacy Header */}
+        <View style={styles.profileHeader}>
+          <TouchableOpacity style={styles.editBtn}>
+            <Ionicons name="pencil-outline" size={16} color={Colors.primary} />
+            <Text style={styles.editBtnText}>تعديل</Text>
+          </TouchableOpacity>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+          <Text style={styles.pharmacyName}>{pharmacy?.pharmacyName}</Text>
+          <Text style={styles.pharmacyCity}>{pharmacy?.city} • ترخيص: {pharmacy?.licenseNumber}</Text>
+          <View style={styles.verifiedBadge}>
+            <Ionicons name="shield-checkmark" size={14} color={Colors.primary} />
+            <Text style={styles.verifiedText}>صيدلية موثّقة</Text>
+          </View>
+        </View>
+
+        {/* Quick Stats */}
+        <View style={styles.statsRow}>
+          <StatBox label="المبيعات الشهرية" value="4,820 ر.س" icon="trending-up" color={Colors.primary} />
+          <StatBox label="معدل التقييم" value="4.8 / 5" icon="star" color="#D69E2E" />
+        </View>
+
+        <MenuSection title="الصيدلية" items={[
+          { icon: "storefront-outline", label: "معلومات الصيدلية" },
+          { icon: "time-outline", label: "ساعات العمل" },
+          { icon: "location-outline", label: "العنوان والخريطة" },
+          { icon: "images-outline", label: "صور الصيدلية" },
+        ]} />
+
+        <MenuSection title="الحساب والمدفوعات" items={[
+          { icon: "card-outline", label: "بيانات الحساب البنكي" },
+          { icon: "receipt-outline", label: "سجل المدفوعات" },
+          { icon: "document-text-outline", label: "الفواتير والتقارير" },
+        ]} />
+
+        {/* Language & Country */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>اللغة والمنطقة</Text>
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.localeRow} onPress={() => setShowLanguage(true)}>
+              <Ionicons name="chevron-back" size={16} color={Colors.textMuted} />
+              <View style={styles.localeRight}>
+                <Text style={styles.localeValue}>{language.flag}  {language.nativeName}</Text>
+                <Text style={styles.localeLabel}>اللغة المعروضة</Text>
+              </View>
+              <View style={[styles.menuIcon, { backgroundColor: Colors.primaryLight }]}>
+                <Ionicons name="language-outline" size={18} color={Colors.primary} />
+              </View>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.localeRow} onPress={() => setShowCountry(true)}>
+              <Ionicons name="chevron-back" size={16} color={Colors.textMuted} />
+              <View style={styles.localeRight}>
+                <Text style={styles.localeValue}>{country.flag}  {country.nameAr}</Text>
+                <Text style={styles.localeLabel}>البلد • {country.dialCode}</Text>
+              </View>
+              <View style={[styles.menuIcon, { backgroundColor: Colors.primaryLight }]}>
+                <Ionicons name="globe-outline" size={18} color={Colors.primary} />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <MenuSection title="الإشعارات" items={[
+          { icon: "notifications-outline", label: "إشعارات الطلبات الجديدة" },
+          { icon: "alert-circle-outline", label: "تنبيهات المخزون" },
+          { icon: "megaphone-outline", label: "العروض والإعلانات" },
+        ]} />
+
+        <MenuSection title="الدعم والمساعدة" items={[
+          { icon: "chatbubble-outline", label: "تواصل مع الدعم" },
+          { icon: "book-outline", label: "دليل البائع" },
+          { icon: "star-outline", label: "قيّم تجربتك" },
+          { icon: "shield-outline", label: "الشروط وسياسة الخصوصية" },
+        ]} />
+
+        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+          <Text style={styles.logoutText}>تسجيل الخروج</Text>
+          <Ionicons name="log-out-outline" size={20} color={Colors.error} />
         </TouchableOpacity>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
-        </View>
-        <Text style={styles.pharmacyName}>{pharmacy?.pharmacyName}</Text>
-        <Text style={styles.pharmacyCity}>{pharmacy?.city} • ترخيص: {pharmacy?.licenseNumber}</Text>
-        <View style={styles.verifiedBadge}>
-          <Ionicons name="shield-checkmark" size={14} color={Colors.primary} />
-          <Text style={styles.verifiedText}>صيدلية موثّقة</Text>
-        </View>
-      </View>
 
-      {/* Quick Stats */}
-      <View style={styles.statsRow}>
-        <StatBox label="المبيعات الشهرية" value="4,820 ر.س" icon="trending-up" color={Colors.primary} />
-        <StatBox label="معدل التقييم" value="4.8 / 5" icon="star" color="#D69E2E" />
-      </View>
+        <Text style={styles.version}>دواء+ • الإصدار 1.0.0</Text>
+      </ScrollView>
 
-      <MenuSection title="الصيدلية" items={[
-        { icon: "storefront-outline", label: "معلومات الصيدلية" },
-        { icon: "time-outline", label: "ساعات العمل" },
-        { icon: "location-outline", label: "العنوان والخريطة" },
-        { icon: "images-outline", label: "صور الصيدلية" },
-      ]} />
-
-      <MenuSection title="الحساب والمدفوعات" items={[
-        { icon: "card-outline", label: "بيانات الحساب البنكي" },
-        { icon: "receipt-outline", label: "سجل المدفوعات" },
-        { icon: "document-text-outline", label: "الفواتير والتقارير" },
-      ]} />
-
-      <MenuSection title="الإشعارات" items={[
-        { icon: "notifications-outline", label: "إشعارات الطلبات الجديدة" },
-        { icon: "alert-circle-outline", label: "تنبيهات المخزون" },
-        { icon: "megaphone-outline", label: "العروض والإعلانات" },
-      ]} />
-
-      <MenuSection title="الدعم والمساعدة" items={[
-        { icon: "chatbubble-outline", label: "تواصل مع الدعم" },
-        { icon: "book-outline", label: "دليل البائع" },
-        { icon: "star-outline", label: "قيّم تجربتك" },
-        { icon: "shield-outline", label: "الشروط وسياسة الخصوصية" },
-      ]} />
-
-      <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-        <Text style={styles.logoutText}>تسجيل الخروج</Text>
-        <Ionicons name="log-out-outline" size={20} color={Colors.error} />
-      </TouchableOpacity>
-
-      <Text style={styles.version}>دواء+ • الإصدار 1.0.0</Text>
-    </ScrollView>
+      <LanguageSelector
+        visible={showLanguage}
+        onClose={() => setShowLanguage(false)}
+        data={LANGUAGES}
+        selected={language}
+        onSelect={setLanguage}
+      />
+      <CountrySelector
+        visible={showCountry}
+        onClose={() => setShowCountry(false)}
+        data={COUNTRIES}
+        selected={country}
+        onSelect={setCountry}
+      />
+    </>
   );
 }
 
@@ -152,6 +204,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderRadius: 16, overflow: "hidden",
     shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
+  localeRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
+  localeRight: { flex: 1, alignItems: "flex-end" },
+  localeLabel: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  localeValue: { fontSize: 15, fontWeight: "600", color: Colors.textPrimary },
   menuRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
   menuIcon: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   menuLabel: { flex: 1, fontSize: 15, color: Colors.textPrimary, textAlign: "right", fontWeight: "500" },

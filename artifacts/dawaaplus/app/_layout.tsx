@@ -16,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -72,11 +73,13 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
-              <AuthProvider>
-                <CartProvider>
-                  <RootLayoutNav />
-                </CartProvider>
-              </AuthProvider>
+              <SettingsProvider>
+                <AuthProvider>
+                  <CartProvider>
+                    <RootLayoutNav />
+                  </CartProvider>
+                </AuthProvider>
+              </SettingsProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
