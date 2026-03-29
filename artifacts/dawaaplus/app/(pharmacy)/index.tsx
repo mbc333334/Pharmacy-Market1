@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { SAMPLE_ORDERS } from "@/data/sampleData";
+import { RAWAKID } from "@/data/rawakidData";
+import { router } from "expo-router";
 
 export default function PharmacyDashboard() {
   const insets = useSafeAreaInsets();
@@ -49,6 +51,30 @@ export default function PharmacyDashboard() {
         <StatCard icon="cash" value={`${todayRevenue.toFixed(0)} ر.س`} label="مبيعات الشهر" color="#D69E2E" />
         <StatCard icon="star" value="4.8" label="التقييم" color="#805AD5" />
       </ScrollView>
+
+      {/* Rawakid Banner */}
+      {(() => {
+        const urgentCount = RAWAKID.filter(r => r.daysLeft <= 60).length;
+        const totalCount = RAWAKID.length;
+        return (
+          <TouchableOpacity
+            style={styles.rawakidBanner}
+            onPress={() => router.push("/(pharmacy)/rawakid")}
+          >
+            <View style={styles.rawakidLeft}>
+              <View style={styles.rawakidBadge}>
+                <Text style={styles.rawakidBadgeText}>{urgentCount} عاجل</Text>
+              </View>
+              <Text style={styles.rawakidBtnText}>تصفح السوق</Text>
+              <Ionicons name="arrow-back" size={16} color="#fff" />
+            </View>
+            <View style={styles.rawakidRight}>
+              <Text style={styles.rawakidTitle}>🔖 سوق الرواكد</Text>
+              <Text style={styles.rawakidSub}>{totalCount} عرض متاح بخصومات تصل إلى 72%</Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })()}
 
       {/* Quick Actions */}
       <View style={styles.section}>
@@ -242,6 +268,24 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderRadius: 16, overflow: "hidden",
     shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
+  rawakidBanner: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    marginHorizontal: 16, marginBottom: 16, borderRadius: 18, overflow: "hidden",
+    backgroundColor: "#0D7A54",
+    paddingHorizontal: 16, paddingVertical: 14,
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
+  },
+  rawakidRight: { alignItems: "flex-end", gap: 4 },
+  rawakidTitle: { fontSize: 17, fontWeight: "800", color: "#fff" },
+  rawakidSub: { fontSize: 12, color: "rgba(255,255,255,0.85)" },
+  rawakidLeft: { alignItems: "center", gap: 8 },
+  rawakidBadge: {
+    backgroundColor: Colors.error, borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 4,
+  },
+  rawakidBadgeText: { fontSize: 11, fontWeight: "800", color: "#fff" },
+  rawakidBtnText: { fontSize: 12, color: "rgba(255,255,255,0.9)", fontWeight: "600" },
   orderRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 10 },
   orderRight: { alignItems: "flex-start" },
   orderInfo: { flex: 1 },
