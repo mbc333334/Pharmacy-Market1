@@ -7,6 +7,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { SAMPLE_MEDICINES, Medicine, CATEGORIES } from "@/data/sampleData";
+import BarcodeScanner, { ScannedMedicine } from "@/components/BarcodeScanner";
 
 export default function PharmacyMedicinesScreen() {
   const insets = useSafeAreaInsets();
@@ -17,7 +18,7 @@ export default function PharmacyMedicinesScreen() {
 
   const filtered = medicines.filter(m => !query || m.name.includes(query) || m.brand.includes(query));
 
-  const handleAddMedicine = (med: Partial<Medicine>) => {
+  const handleAddMedicine = (med: Partial<Medicine> & { barcode?: string }) => {
     const newMed: Medicine = {
       id: Date.now().toString(),
       name: med.name ?? "",
@@ -87,7 +88,6 @@ export default function PharmacyMedicinesScreen() {
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 
-      {/* Add Medicine Modal */}
       <AddMedicineModal
         visible={showAdd}
         onClose={() => setShowAdd(false)}
@@ -132,22 +132,30 @@ function AddMedicineModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  onSave: (data: Partial<Medicine>) => void;
+  onSave: (data: Partial<Medicine> & { barcode?: string }) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
+  const [barcode, setBarcode] = useState("");
+  const [barcodeSource, setBarcodeSource] = useState<string | undefined>();
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [category, setCategory] = useState(CATEGORIES[1]);
   const [description, setDescription] = useState("");
   const [requiresPrescription, setRequiresPrescription] = useState(false);
   const [active, setActive] = useState(true);
+  const [showScanner, setShowScanner] = useState(false);
+
+  const resetForm = () => {
+    setName(""); setBrand(""); setBarcode(""); setBarcodeSource(undefined);
+    setPrice(""); setStock(""); setDescription(""); setRequiresPrescription(false);
+  };
 
   const handleSave = () => {
     if (!name || !price || !stock) return;
     onSave({
-      name, brand,
+      name, brand, barcode,
       price: parseFloat(price),
       stock: parseInt(stock, 10),
       categoryId: category.id,
@@ -155,57 +163,115 @@ function AddMedicineModal({
       description,
       requiresPrescription,
     });
-    setName(""); setBrand(""); setPrice(""); setStock(""); setDescription("");
+    resetForm();
+  };
+
+  const handleClose = () => { resetForm(); onClose(); };
+
+  const handleScanned = (result: ScannedMedicine) => {
+    setShowScanner(false);
+    setBarcode(result.barcode);
+    setBarcodeSource(result.source);
+    if (result.name && !name) setName(result.name);
+    if (result.brand && !brand) setBrand(result.brand);
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <View style={[styles.modal, { paddingTop: insets.top + 16 }]}>
-        <View style={styles.modalHeader}>
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            <Text style={styles.saveBtnText}>نشر</Text>
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>إضافة دواء جديد</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={Colors.textPrimary} />
-          </TouchableOpacity>
-        </View>
+    <>
+      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+        <View style={[styles.modal, { paddingTop: insets.top + 16 }]}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+              <Text style={styles.saveBtnText}>نشر</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>إضافة دواء جديد</Text>
+            <TouchableOpacity onPress={handleClose}>
+              <Ionicons name="close" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
 
-        <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-          <ModalField label="اسم الدواء *" value={name} onChangeText={setName} placeholder="باراسيتامول 500mg" />
-          <ModalField label="العلامة التجارية" value={brand} onChangeText={setBrand} placeholder="بانادول" />
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
 
-          <Text style={styles.modalLabel}>الفئة العلاجية</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16 }}>
-            {CATEGORIES.slice(1).map(cat => (
+            {/* Barcode Scanner Section */}
+            <View style={styles.barcodeSection}>
               <TouchableOpacity
-                key={cat.id}
-                style={[styles.catChip, cat.id === category.id && styles.catChipActive]}
-                onPress={() => setCategory(cat)}
+                style={styles.scanButton}
+                onPress={() => setShowScanner(true)}
               >
-                <Text style={[styles.catChipText, cat.id === category.id && { color: "#fff" }]}>{cat.name}</Text>
+                <Ionicons name="scan" size={22} color="#fff" />
+                <Text style={styles.scanButtonText}>مسح باركود الدواء</Text>
               </TouchableOpacity>
-            ))}
+
+              {barcode ? (
+                <View style={styles.barcodeResult}>
+                  <TouchableOpacity
+                    style={styles.barcodeClear}
+                    onPress={() => { setBarcode(""); setBarcodeSource(undefined); }}
+                  >
+                    <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+                  </TouchableOpacity>
+                  <View style={styles.barcodeInfo}>
+                    {barcodeSource && (
+                      <View style={styles.sourceBadge}>
+                        <Text style={styles.sourceBadgeText}>✓ {barcodeSource}</Text>
+                      </View>
+                    )}
+                    <Text style={styles.barcodeValue}>{barcode}</Text>
+                  </View>
+                  <Ionicons name="barcode" size={28} color={Colors.primary} />
+                </View>
+              ) : (
+                <View style={styles.barcodeEmpty}>
+                  <Text style={styles.barcodeEmptyText}>
+                    امسح الباركود لجلب بيانات الدواء تلقائياً
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.divider} />
+
+            <ModalField label="اسم الدواء (علمي) *" value={name} onChangeText={setName} placeholder="Paracetamol 500mg" />
+            <ModalField label="العلامة التجارية" value={brand} onChangeText={setBrand} placeholder="بانادول" />
+
+            <Text style={styles.modalLabel}>الفئة العلاجية</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16 }}>
+              {CATEGORIES.slice(1).map(cat => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[styles.catChip, cat.id === category.id && styles.catChipActive]}
+                  onPress={() => setCategory(cat)}
+                >
+                  <Text style={[styles.catChipText, cat.id === category.id && { color: "#fff" }]}>{cat.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.rowFields}>
+              <ModalField label="السعر (ر.س) *" value={price} onChangeText={setPrice} placeholder="0.00" keyboardType="decimal-pad" style={{ flex: 1 }} />
+              <ModalField label="الكمية المتوفرة *" value={stock} onChangeText={setStock} placeholder="0" keyboardType="number-pad" style={{ flex: 1 }} />
+            </View>
+
+            <ModalField label="الوصف" value={description} onChangeText={setDescription} placeholder="الاستخدامات والتحذيرات..." multiline />
+
+            <View style={styles.toggleRow}>
+              <Switch value={requiresPrescription} onValueChange={setRequiresPrescription} trackColor={{ true: Colors.primary }} />
+              <Text style={styles.toggleLabel}>يحتاج وصفة طبية (Rx)</Text>
+            </View>
+            <View style={styles.toggleRow}>
+              <Switch value={active} onValueChange={setActive} trackColor={{ true: Colors.primary }} />
+              <Text style={styles.toggleLabel}>متاح للبيع الآن</Text>
+            </View>
           </ScrollView>
+        </View>
+      </Modal>
 
-          <View style={styles.rowFields}>
-            <ModalField label="السعر (ر.س) *" value={price} onChangeText={setPrice} placeholder="0.00" keyboardType="decimal-pad" style={{ flex: 1 }} />
-            <ModalField label="الكمية المتوفرة *" value={stock} onChangeText={setStock} placeholder="0" keyboardType="number-pad" style={{ flex: 1 }} />
-          </View>
-
-          <ModalField label="الوصف" value={description} onChangeText={setDescription} placeholder="الاستخدامات والتحذيرات..." multiline />
-
-          <View style={styles.toggleRow}>
-            <Switch value={requiresPrescription} onValueChange={setRequiresPrescription} trackColor={{ true: Colors.primary }} />
-            <Text style={styles.toggleLabel}>يحتاج وصفة طبية (Rx)</Text>
-          </View>
-          <View style={styles.toggleRow}>
-            <Switch value={active} onValueChange={setActive} trackColor={{ true: Colors.primary }} />
-            <Text style={styles.toggleLabel}>متاح للبيع الآن</Text>
-          </View>
-        </ScrollView>
-      </View>
-    </Modal>
+      <BarcodeScanner
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScanned={handleScanned}
+      />
+    </>
   );
 }
 
@@ -293,6 +359,37 @@ const styles = StyleSheet.create({
   },
   saveBtnText: { fontSize: 14, fontWeight: "700", color: "#fff" },
   modalContent: { padding: 20, gap: 4, paddingBottom: 60 },
+  barcodeSection: { marginBottom: 4, gap: 10 },
+  scanButton: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+    backgroundColor: Colors.primary, borderRadius: 14,
+    paddingVertical: 14,
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+  },
+  scanButtonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  barcodeResult: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: Colors.primaryLight, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderWidth: 1, borderColor: Colors.primary + "40",
+  },
+  barcodeClear: { padding: 2 },
+  barcodeInfo: { flex: 1, alignItems: "flex-end", gap: 4 },
+  barcodeValue: { fontSize: 13, fontWeight: "600", color: Colors.textPrimary, letterSpacing: 1 },
+  sourceBadge: {
+    backgroundColor: Colors.primary, borderRadius: 6,
+    paddingHorizontal: 8, paddingVertical: 3,
+    alignSelf: "flex-end",
+  },
+  sourceBadgeText: { fontSize: 10, fontWeight: "700", color: "#fff" },
+  barcodeEmpty: {
+    backgroundColor: Colors.surfaceAlt, borderRadius: 12,
+    paddingVertical: 12, paddingHorizontal: 16,
+    borderWidth: 1, borderColor: Colors.border, borderStyle: "dashed",
+    alignItems: "center",
+  },
+  barcodeEmptyText: { fontSize: 12, color: Colors.textMuted, textAlign: "center", lineHeight: 20 },
+  divider: { height: 1, backgroundColor: Colors.border, marginVertical: 16 },
   fieldGroup: { marginBottom: 12 },
   modalLabel: { fontSize: 14, fontWeight: "600", color: Colors.textPrimary, textAlign: "right", marginBottom: 6 },
   modalInput: {

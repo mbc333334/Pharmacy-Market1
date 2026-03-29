@@ -17,7 +17,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.dawaaplus.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "لرفع صورة الوصفة الطبية",
+        "NSCameraUsageDescription": "لمسح باركود الدواء ورفع صورة الوصفة الطبية",
         "NSPhotoLibraryUsageDescription": "لرفع صورة الترخيص"
       }
     },
@@ -43,7 +43,8 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-camera"
     ],
     "experiments": {
       "typedRoutes": true
