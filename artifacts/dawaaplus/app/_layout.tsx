@@ -79,6 +79,7 @@ export default function RootLayout() {
                   <CartProvider>
                     <RootLayoutNav />
                   </CartProvider>
+                </integrationprovider>
                 </AuthProvider>
               </SettingsProvider>
             </KeyboardProvider>
