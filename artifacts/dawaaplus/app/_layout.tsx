@@ -33,11 +33,14 @@ function RootLayoutNav() {
     const inAuth = segments[0] === "(auth)";
     const inPharmacy = segments[0] === "(pharmacy)";
     const inCustomer = segments[0] === "(customer)";
+    const inWarehouse = segments[0] === "(warehouse)";
 
     if (!user) {
       if (!inAuth) router.replace("/(auth)/welcome");
     } else if (user.type === "pharmacy") {
       if (!inPharmacy) router.replace("/(pharmacy)/");
+    } else if (user.type === "warehouse") {
+      if (!inWarehouse) router.replace("/(warehouse)/");
     } else {
       if (!inCustomer) router.replace("/(customer)/");
     }
@@ -48,6 +51,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(customer)" />
       <Stack.Screen name="(pharmacy)" />
+      <Stack.Screen name="(warehouse)" />
     </Stack>
   );
 }
@@ -76,10 +80,11 @@ export default function RootLayout() {
             <KeyboardProvider>
               <SettingsProvider>
                 <AuthProvider>
-                  <CartProvider>
-                    <RootLayoutNav />
-                  </CartProvider>
-                  <IntegrationProvider children={undefined} />
+                  <IntegrationProvider>
+                    <CartProvider>
+                      <RootLayoutNav />
+                    </CartProvider>
+                  </IntegrationProvider>
                 </AuthProvider>
               </SettingsProvider>
             </KeyboardProvider>

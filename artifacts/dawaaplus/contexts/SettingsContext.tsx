@@ -9,7 +9,7 @@ interface SettingsContextType {
 }
 
 const DEFAULT_LANGUAGE = LANGUAGES.find(l => l.code === "ar")!;
-const DEFAULT_COUNTRY = COUNTRIES.find(c => c.code === "SA")!;
+const DEFAULT_COUNTRY = COUNTRIES.find(c => c.code === "IQ")!;
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
 

@@ -1,8 +1,23 @@
-# Workspace
+# داواپلاس (DawaPlus) Workspace
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+pnpm workspace monorepo using TypeScript. داواپلاس is a pharmacy & medicine platform for Kurdistan Region and Iraq, supporting pharmacies, customers, and warehouses.
+
+## App Features
+
+- **App Name**: داواپلاس (DawaPlus) — "داوا" = medicine in Kurdish, similar to دواء in Arabic
+- **3 Languages**: Arabic (العربية), Kurdish (کوردی), English — switchable from welcome screen
+- **User Types**: Customer, Pharmacy, Warehouse
+- **Pharmacy Database Integration**: CSV/Excel import, REST API, MySQL/PostgreSQL, WooCommerce, Odoo
+- **Warehouse Accounts**: Linked only to participating pharmacies, full dashboard with inventory/orders/pharmacies management
+- **Default Region**: Iraq (العراق, +964)
+
+## i18n System
+
+- Translations: `artifacts/dawaaplus/i18n/translations.ts` — all keys in ar/ku/en
+- Hook: `artifacts/dawaaplus/i18n/index.ts` — `useTranslation()` returns `t()` and `isRTL`
+- Languages: `artifacts/dawaaplus/data/locales.ts` — trimmed to 3 core languages
 
 ## Stack
 
