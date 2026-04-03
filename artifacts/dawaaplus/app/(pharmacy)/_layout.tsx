@@ -15,7 +15,8 @@ const URGENT_COUNT = RAWAKID.filter(r => r.daysLeft <= 60).length;
 const PHARMACY_TABS = [
   { name: "index", title: "لوحتي", icon: "grid", iconOff: "grid-outline" },
   { name: "medicines", title: "أدويتي", icon: "medkit", iconOff: "medkit-outline" },
-  { name: "rawakid", title: "الرواكد", icon: "pricetag", iconOff: "pricetag-outline", badge: URGENT_COUNT },
+  { name: "offers", title: "العروض", icon: "pricetag", iconOff: "pricetag-outline" },
+  { name: "rawakid", title: "الرواكد", icon: "alert-circle", iconOff: "alert-circle-outline", badge: URGENT_COUNT },
   { name: "orders", title: "الطلبات", icon: "cube", iconOff: "cube-outline" },
   { name: "settings", title: "إعداداتي", icon: "settings", iconOff: "settings-outline" },
 ];
@@ -142,12 +143,21 @@ export default function PharmacyTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="offers"
+        options={{
+          title: "العروض",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "pricetag" : "pricetag-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="rawakid"
         options={{
           title: "الرواكد",
           tabBarIcon: ({ color, focused }) => (
             <View>
-              <Ionicons name={focused ? "pricetag" : "pricetag-outline"} size={24} color={color} />
+              <Ionicons name={focused ? "alert-circle" : "alert-circle-outline"} size={24} color={color} />
               {URGENT_COUNT > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{URGENT_COUNT}</Text>

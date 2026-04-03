@@ -105,7 +105,51 @@ export type TranslationKey =
   | "urgent"
   | "availableOffers"
   | "discountsUpTo"
-  | "address";
+  | "address"
+  | "admin"
+  | "adminDashboard"
+  | "subscriptions"
+  | "advertisements"
+  | "offers"
+  | "createOffer"
+  | "activeOffers"
+  | "expiredOffers"
+  | "discountPercent"
+  | "validUntil"
+  | "totalRevenue"
+  | "subscribedPharmacies"
+  | "subscribedWarehouses"
+  | "createAd"
+  | "adTitle"
+  | "adTarget"
+  | "allPharmacies"
+  | "freePlan"
+  | "standardPlan"
+  | "premiumPlan"
+  | "subscriptionStatus"
+  | "monthlyRevenue"
+  | "totalSubscribers"
+  | "demoLoginPharmacy"
+  | "demoLoginWarehouse"
+  | "demoLoginCustomer"
+  | "demoLoginAdmin"
+  | "orDemoLogin"
+  | "offerName"
+  | "selectMedicine"
+  | "addOffer"
+  | "noOffers"
+  | "currentPlan"
+  | "upgradePlan"
+  | "planFeatures"
+  | "monthlyPrice"
+  | "adViews"
+  | "adClicks"
+  | "adActive"
+  | "adPaused"
+  | "noAds"
+  | "totalPharmacies"
+  | "totalWarehouses"
+  | "appRevenue";
 
 type Translations = Record<LangCode, Record<TranslationKey, string>>;
 
@@ -216,6 +260,50 @@ const t: Translations = {
     availableOffers: "عرض متاح بخصومات تصل إلى",
     discountsUpTo: "72%",
     address: "العنوان",
+    admin: "المدير",
+    adminDashboard: "لوحة الإدارة",
+    subscriptions: "الاشتراكات",
+    advertisements: "الإعلانات",
+    offers: "العروض",
+    createOffer: "إنشاء عرض",
+    activeOffers: "العروض النشطة",
+    expiredOffers: "العروض المنتهية",
+    discountPercent: "نسبة الخصم",
+    validUntil: "صالح حتى",
+    totalRevenue: "إجمالي الإيرادات",
+    subscribedPharmacies: "الصيدليات المشتركة",
+    subscribedWarehouses: "المذاخر المشتركة",
+    createAd: "إنشاء إعلان",
+    adTitle: "عنوان الإعلان",
+    adTarget: "الجمهور المستهدف",
+    allPharmacies: "جميع الصيادلة",
+    freePlan: "مجاني",
+    standardPlan: "أساسي",
+    premiumPlan: "مميز",
+    subscriptionStatus: "حالة الاشتراك",
+    monthlyRevenue: "إيرادات الشهر",
+    totalSubscribers: "إجمالي المشتركين",
+    demoLoginPharmacy: "دخول سريع — صيدلي",
+    demoLoginWarehouse: "دخول سريع — مذخر",
+    demoLoginCustomer: "دخول سريع — عميل",
+    demoLoginAdmin: "دخول سريع — مدير",
+    orDemoLogin: "أو جرّب مباشرة",
+    offerName: "اسم العرض",
+    selectMedicine: "اختر الدواء",
+    addOffer: "إضافة عرض",
+    noOffers: "لا توجد عروض حالياً",
+    currentPlan: "باقتك الحالية",
+    upgradePlan: "ترقية الباقة",
+    planFeatures: "مميزات الباقة",
+    monthlyPrice: "السعر الشهري",
+    adViews: "المشاهدات",
+    adClicks: "النقرات",
+    adActive: "نشط",
+    adPaused: "موقوف",
+    noAds: "لا توجد إعلانات",
+    totalPharmacies: "إجمالي الصيدليات",
+    totalWarehouses: "إجمالي المذاخر",
+    appRevenue: "إيرادات التطبيق",
   },
   ku: {
     appName: "دواء +",
@@ -323,6 +411,50 @@ const t: Translations = {
     availableOffers: "ئۆفەری بەردەست بە داشکاندنی",
     discountsUpTo: "72%",
     address: "ناونیشان",
+    admin: "بەڕێوەبەر",
+    adminDashboard: "داشبۆردی بەڕێوەبەری",
+    subscriptions: "بەشداریکردنەکان",
+    advertisements: "ڕیکلامەکان",
+    offers: "ئۆفەرەکان",
+    createOffer: "ئۆفەر دروست بکە",
+    activeOffers: "ئۆفەری چالاک",
+    expiredOffers: "ئۆفەری بەسەرچووە",
+    discountPercent: "ڕێژەی داشکاندن",
+    validUntil: "بەردەستە تا",
+    totalRevenue: "کۆی داهات",
+    subscribedPharmacies: "دەرمانخانە بەشداربووەکان",
+    subscribedWarehouses: "کۆگا بەشداربووەکان",
+    createAd: "ڕیکلام دروست بکە",
+    adTitle: "سەردێڕی ڕیکلام",
+    adTarget: "ئامانجی ڕیکلام",
+    allPharmacies: "هەموو دەرمانخانەکان",
+    freePlan: "خۆڕایی",
+    standardPlan: "بنچینەیی",
+    premiumPlan: "تایبەتمەند",
+    subscriptionStatus: "دۆخی بەشداریکردن",
+    monthlyRevenue: "داهاتی مانگ",
+    totalSubscribers: "کۆی بەشداربووان",
+    demoLoginPharmacy: "چوونەژوورەوەی خێرا — دەرمانخانە",
+    demoLoginWarehouse: "چوونەژوورەوەی خێرا — کۆگا",
+    demoLoginCustomer: "چوونەژوورەوەی خێرا — کڕیار",
+    demoLoginAdmin: "چوونەژوورەوەی خێرا — بەڕێوەبەر",
+    orDemoLogin: "یان ڕاستەوخۆ تاقی بکەرەوە",
+    offerName: "ناوی ئۆفەر",
+    selectMedicine: "دەرمان هەڵبژێرە",
+    addOffer: "ئۆفەر زیاد بکە",
+    noOffers: "ئۆفەری نییە ئێستا",
+    currentPlan: "پاکێجەکەت",
+    upgradePlan: "باشترکردنی پاکێج",
+    planFeatures: "تایبەتمەندییەکانی پاکێج",
+    monthlyPrice: "نرخی مانگانە",
+    adViews: "بینینەکان",
+    adClicks: "کلیکەکان",
+    adActive: "چالاک",
+    adPaused: "وەستاوە",
+    noAds: "ڕیکلامی نییە",
+    totalPharmacies: "کۆی دەرمانخانەکان",
+    totalWarehouses: "کۆی کۆگاکان",
+    appRevenue: "داهاتی ئەپ",
   },
   en: {
     appName: "Dawa +",
@@ -430,6 +562,50 @@ const t: Translations = {
     availableOffers: "offers available with discounts up to",
     discountsUpTo: "72%",
     address: "Address",
+    admin: "Admin",
+    adminDashboard: "Admin Dashboard",
+    subscriptions: "Subscriptions",
+    advertisements: "Advertisements",
+    offers: "Offers",
+    createOffer: "Create Offer",
+    activeOffers: "Active Offers",
+    expiredOffers: "Expired Offers",
+    discountPercent: "Discount %",
+    validUntil: "Valid Until",
+    totalRevenue: "Total Revenue",
+    subscribedPharmacies: "Subscribed Pharmacies",
+    subscribedWarehouses: "Subscribed Warehouses",
+    createAd: "Create Ad",
+    adTitle: "Ad Title",
+    adTarget: "Target Audience",
+    allPharmacies: "All Pharmacies",
+    freePlan: "Free",
+    standardPlan: "Standard",
+    premiumPlan: "Premium",
+    subscriptionStatus: "Subscription Status",
+    monthlyRevenue: "Monthly Revenue",
+    totalSubscribers: "Total Subscribers",
+    demoLoginPharmacy: "Quick Login — Pharmacy",
+    demoLoginWarehouse: "Quick Login — Warehouse",
+    demoLoginCustomer: "Quick Login — Customer",
+    demoLoginAdmin: "Quick Login — Admin",
+    orDemoLogin: "Or try directly",
+    offerName: "Offer Name",
+    selectMedicine: "Select Medicine",
+    addOffer: "Add Offer",
+    noOffers: "No offers yet",
+    currentPlan: "Your Plan",
+    upgradePlan: "Upgrade Plan",
+    planFeatures: "Plan Features",
+    monthlyPrice: "Monthly Price",
+    adViews: "Views",
+    adClicks: "Clicks",
+    adActive: "Active",
+    adPaused: "Paused",
+    noAds: "No advertisements",
+    totalPharmacies: "Total Pharmacies",
+    totalWarehouses: "Total Warehouses",
+    appRevenue: "App Revenue",
   },
 };
 

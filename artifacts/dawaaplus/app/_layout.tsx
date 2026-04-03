@@ -35,9 +35,12 @@ function RootLayoutNav() {
     const inPharmacy = seg0 === "(pharmacy)";
     const inCustomer = seg0 === "(customer)";
     const inWarehouse = seg0 === "(warehouse)";
+    const inAdmin = seg0 === "(admin)";
 
     if (!user) {
       if (!inAuth) router.replace("/(auth)/welcome");
+    } else if (user.type === "admin") {
+      if (!inAdmin) router.replace("/(admin)");
     } else if (user.type === "pharmacy") {
       if (!inPharmacy) router.replace("/(pharmacy)");
     } else if (user.type === "warehouse") {
@@ -53,6 +56,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(customer)" />
       <Stack.Screen name="(pharmacy)" />
       <Stack.Screen name="(warehouse)" />
+      <Stack.Screen name="(admin)" />
     </Stack>
   );
 }

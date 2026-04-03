@@ -12,16 +12,19 @@ import { useTranslation } from "@/i18n";
 
 type TabType = "customer" | "pharmacy" | "warehouse";
 
+const ADMIN_PHONE = "+9647700000001";
+
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { login } = useAuth();
+  const { login, loginDemo } = useAuth();
   const { t } = useTranslation();
   const [tab, setTab] = useState<TabType>("customer");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const handleLogin = async () => {
@@ -29,18 +32,31 @@ export default function LoginScreen() {
       setError(t("enterAllFields"));
       return;
     }
+    if (phone === ADMIN_PHONE) {
+      setError("");
+      setLoading(true);
+      await new Promise(r => setTimeout(r, 600));
+      loginDemo("admin");
+      setLoading(false);
+      return;
+    }
     setError("");
     setLoading(true);
     try {
       const ok = await login(phone, password, tab);
-      if (!ok) {
-        setError(t("wrongCredentials"));
-      }
+      if (!ok) setError(t("wrongCredentials"));
     } catch {
       setError(t("wrongCredentials"));
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDemoLogin = async (type: "customer" | "pharmacy" | "warehouse" | "admin") => {
+    setDemoLoading(type);
+    await new Promise(r => setTimeout(r, 400));
+    loginDemo(type);
+    setDemoLoading(null);
   };
 
   const tabs: { key: TabType; icon: any; label: string }[] = [
@@ -50,6 +66,13 @@ export default function LoginScreen() {
   ];
 
   const activeColor = tab === "warehouse" ? "#0D7A54" : Colors.primary;
+
+  const DEMO_BUTTONS = [
+    { type: "customer" as const, label: "دخول سريع — عميل", icon: "person", color: "#3B82F6" },
+    { type: "pharmacy" as const, label: "دخول سريع — صيدلي", icon: "storefront", color: Colors.primary },
+    { type: "warehouse" as const, label: "دخول سريع — مذخر", icon: "cube", color: "#0D7A54" },
+    { type: "admin" as const, label: "دخول سريع — مدير", icon: "shield", color: "#7C3AED" },
+  ];
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -67,6 +90,39 @@ export default function LoginScreen() {
         <Text style={styles.title}>{t("welcomeBack")}</Text>
         <Text style={styles.subtitle}>{t("loginSubtitle")}</Text>
 
+        {/* Quick Demo Buttons */}
+        <View style={styles.demoSection}>
+          <View style={styles.demoHeader}>
+            <View style={styles.demoLine} />
+            <Text style={styles.demoHeaderText}>دخول سريع للتجربة</Text>
+            <View style={styles.demoLine} />
+          </View>
+          <View style={styles.demoGrid}>
+            {DEMO_BUTTONS.map(btn => (
+              <TouchableOpacity
+                key={btn.type}
+                style={[styles.demoBtn, { borderColor: btn.color + "40", backgroundColor: btn.color + "10" }]}
+                onPress={() => handleDemoLogin(btn.type)}
+                disabled={demoLoading !== null}
+              >
+                {demoLoading === btn.type ? (
+                  <ActivityIndicator size="small" color={btn.color} />
+                ) : (
+                  <Ionicons name={btn.icon as any} size={18} color={btn.color} />
+                )}
+                <Text style={[styles.demoBtnText, { color: btn.color }]}>{btn.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.orRow}>
+          <View style={styles.orLine} />
+          <Text style={styles.orText}>أو سجّل الدخول بحسابك</Text>
+          <View style={styles.orLine} />
+        </View>
+
+        {/* Tab Selector */}
         <View style={styles.tabs}>
           {tabs.map(tabItem => (
             <TouchableOpacity
@@ -176,11 +232,9 @@ export default function LoginScreen() {
           </View>
         )}
 
-        <View style={[styles.demoHint, { backgroundColor: activeColor + "15" }]}>
-          <Ionicons name="information-circle-outline" size={16} color={activeColor} />
-          <Text style={[styles.demoHintText, { color: activeColor }]}>
-            {tab === "customer" ? t("tryDemo") : tab === "pharmacy" ? t("tryDemoPharmacy") : t("tryDemoWarehouse")}
-          </Text>
+        <View style={styles.adminHint}>
+          <Ionicons name="shield-outline" size={14} color="#7C3AED" />
+          <Text style={styles.adminHintText}>للدخول كمدير: +9647700000001</Text>
         </View>
       </ScrollView>
     </View>
@@ -202,6 +256,23 @@ const styles = StyleSheet.create({
   content: { padding: 24 },
   title: { fontSize: 26, fontWeight: "800", color: Colors.textPrimary, textAlign: "right", marginBottom: 6 },
   subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: "right", marginBottom: 20 },
+
+  demoSection: { marginBottom: 20 },
+  demoHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  demoLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  demoHeaderText: { fontSize: 12, fontWeight: "700", color: Colors.textMuted },
+  demoGrid: { gap: 8 },
+  demoBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 12, paddingHorizontal: 16,
+    borderRadius: 12, borderWidth: 1,
+  },
+  demoBtnText: { fontSize: 13, fontWeight: "700" },
+
+  orRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 20 },
+  orLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  orText: { fontSize: 12, fontWeight: "600", color: Colors.textMuted },
+
   tabs: {
     flexDirection: "row", backgroundColor: Colors.surfaceAlt,
     borderRadius: 14, padding: 4, marginBottom: 20,
@@ -238,12 +309,13 @@ const styles = StyleSheet.create({
     marginTop: 8, marginBottom: 16,
   },
   loginBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
-  registerRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 20 },
+  registerRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 16 },
   registerRowText: { fontSize: 13, color: Colors.textSecondary },
   registerLink: { fontSize: 13, fontWeight: "700", color: Colors.primary },
-  demoHint: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    borderRadius: 10, padding: 12, justifyContent: "flex-end",
+  adminHint: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, padding: 10, backgroundColor: "#7C3AED10",
+    borderRadius: 10, borderWidth: 1, borderColor: "#7C3AED30",
   },
-  demoHintText: { fontSize: 12, flex: 1, textAlign: "right" },
+  adminHintText: { fontSize: 12, color: "#7C3AED", fontWeight: "600" },
 });
