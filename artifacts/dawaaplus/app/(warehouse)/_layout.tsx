@@ -81,12 +81,13 @@ export default function WarehouseTabLayout() {
       <View style={{ flex: 1, flexDirection: "row", backgroundColor: Colors.background }}>
         <SidebarNav />
         <View style={{ flex: 1 }}>
-          <Tabs
-            screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}
-          >
-            {WAREHOUSE_TABS.map(tab => (
-              <Tabs.Screen key={tab.name} name={tab.name} />
-            ))}
+          <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
+            <Tabs.Screen name="index" />
+            <Tabs.Screen name="inventory" />
+            <Tabs.Screen name="orders" />
+            <Tabs.Screen name="pharmacies" />
+            <Tabs.Screen name="import" />
+            <Tabs.Screen name="settings" />
           </Tabs>
         </View>
       </View>

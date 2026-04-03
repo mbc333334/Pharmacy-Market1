@@ -78,9 +78,10 @@ export default function AdminTabLayout() {
         <SidebarNav />
         <View style={{ flex: 1 }}>
           <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
-            {ADMIN_TABS.map(tab => (
-              <Tabs.Screen key={tab.name} name={tab.name} />
-            ))}
+            <Tabs.Screen name="index" />
+            <Tabs.Screen name="subscriptions" />
+            <Tabs.Screen name="ads" />
+            <Tabs.Screen name="pharmacies" />
           </Tabs>
         </View>
       </View>

@@ -87,12 +87,13 @@ export default function PharmacyTabLayout() {
       <View style={{ flex: 1, flexDirection: "row", backgroundColor: Colors.background }}>
         <SidebarNav />
         <View style={{ flex: 1 }}>
-          <Tabs
-            screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}
-          >
-            {PHARMACY_TABS.map(tab => (
-              <Tabs.Screen key={tab.name} name={tab.name} />
-            ))}
+          <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
+            <Tabs.Screen name="index" />
+            <Tabs.Screen name="medicines" />
+            <Tabs.Screen name="offers" />
+            <Tabs.Screen name="rawakid" />
+            <Tabs.Screen name="orders" />
+            <Tabs.Screen name="settings" />
             <Tabs.Screen name="integration" options={{ href: null }} />
           </Tabs>
         </View>

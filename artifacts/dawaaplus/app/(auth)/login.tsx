@@ -14,6 +14,36 @@ type TabType = "customer" | "pharmacy" | "warehouse";
 
 const ADMIN_PHONE = "+9647700000001";
 
+const DEMO_ACCOUNTS = [
+  {
+    type: "customer" as const,
+    label: "عميل",
+    sub: "تصفح الصيدليات والأدوية",
+    icon: "person" as const,
+    color: "#3B82F6",
+    bg: "#3B82F610",
+    border: "#3B82F630",
+  },
+  {
+    type: "pharmacy" as const,
+    label: "صيدلية",
+    sub: "لوحة تحكم الصيدلية",
+    icon: "storefront" as const,
+    color: Colors.primary,
+    bg: Colors.primaryLight,
+    border: Colors.primary + "30",
+  },
+  {
+    type: "warehouse" as const,
+    label: "مذخر",
+    sub: "إدارة المستودع",
+    icon: "cube" as const,
+    color: "#0D7A54",
+    bg: "#0D7A5410",
+    border: "#0D7A5430",
+  },
+];
+
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -52,7 +82,7 @@ export default function LoginScreen() {
     }
   };
 
-  const handleDemoLogin = async (type: "customer" | "pharmacy" | "warehouse" | "admin") => {
+  const handleDemoLogin = async (type: "customer" | "pharmacy" | "warehouse") => {
     setDemoLoading(type);
     await new Promise(r => setTimeout(r, 400));
     loginDemo(type);
@@ -66,12 +96,6 @@ export default function LoginScreen() {
   ];
 
   const activeColor = tab === "warehouse" ? "#0D7A54" : Colors.primary;
-
-  const DEMO_BUTTONS = [
-    { type: "customer" as const, label: "دخول سريع — عميل", icon: "person", color: "#3B82F6" },
-    { type: "pharmacy" as const, label: "دخول سريع — صيدلي", icon: "storefront", color: Colors.primary },
-    { type: "warehouse" as const, label: "دخول سريع — مذخر", icon: "cube", color: "#0D7A54" },
-  ];
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -89,30 +113,40 @@ export default function LoginScreen() {
         <Text style={styles.title}>{t("welcomeBack")}</Text>
         <Text style={styles.subtitle}>{t("loginSubtitle")}</Text>
 
-        {/* Quick Demo Buttons */}
-        <View style={styles.demoSection}>
-          <View style={styles.demoHeader}>
-            <View style={styles.demoLine} />
-            <Text style={styles.demoHeaderText}>دخول سريع للتجربة</Text>
-            <View style={styles.demoLine} />
+        {/* Single combined quick-login card */}
+        <View style={styles.demoCard}>
+          <View style={styles.demoCardHeader}>
+            <Text style={styles.demoCardTitle}>دخول سريع للتجربة</Text>
+            <View style={styles.demoCardBadge}>
+              <Text style={styles.demoCardBadgeText}>DEMO</Text>
+            </View>
           </View>
-          <View style={styles.demoGrid}>
-            {DEMO_BUTTONS.map(btn => (
+          <Text style={styles.demoCardSub}>اختر نوع الحساب للدخول مباشرة</Text>
+
+          {DEMO_ACCOUNTS.map((acc, idx) => (
+            <React.Fragment key={acc.type}>
+              {idx > 0 && <View style={styles.demoSeparator} />}
               <TouchableOpacity
-                key={btn.type}
-                style={[styles.demoBtn, { borderColor: btn.color + "40", backgroundColor: btn.color + "10" }]}
-                onPress={() => handleDemoLogin(btn.type)}
+                style={styles.demoRow}
+                onPress={() => handleDemoLogin(acc.type)}
                 disabled={demoLoading !== null}
+                activeOpacity={0.7}
               >
-                {demoLoading === btn.type ? (
-                  <ActivityIndicator size="small" color={btn.color} />
-                ) : (
-                  <Ionicons name={btn.icon as any} size={18} color={btn.color} />
-                )}
-                <Text style={[styles.demoBtnText, { color: btn.color }]}>{btn.label}</Text>
+                <Ionicons name="chevron-back" size={16} color={Colors.textMuted} />
+                <View style={styles.demoRowRight}>
+                  <Text style={[styles.demoRowLabel, { color: acc.color }]}>{acc.label}</Text>
+                  <Text style={styles.demoRowSub}>{acc.sub}</Text>
+                </View>
+                <View style={[styles.demoIconCircle, { backgroundColor: acc.bg, borderColor: acc.border }]}>
+                  {demoLoading === acc.type ? (
+                    <ActivityIndicator size="small" color={acc.color} />
+                  ) : (
+                    <Ionicons name={acc.icon} size={20} color={acc.color} />
+                  )}
+                </View>
               </TouchableOpacity>
-            ))}
-          </View>
+            </React.Fragment>
+          ))}
         </View>
 
         <View style={styles.orRow}>
@@ -252,17 +286,35 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: "800", color: Colors.textPrimary, textAlign: "right", marginBottom: 6 },
   subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: "right", marginBottom: 20 },
 
-  demoSection: { marginBottom: 20 },
-  demoHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
-  demoLine: { flex: 1, height: 1, backgroundColor: Colors.border },
-  demoHeaderText: { fontSize: 12, fontWeight: "700", color: Colors.textMuted },
-  demoGrid: { gap: 8 },
-  demoBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, paddingVertical: 12, paddingHorizontal: 16,
-    borderRadius: 12, borderWidth: 1,
+  demoCard: {
+    backgroundColor: Colors.surfaceAlt,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 16,
+    marginBottom: 20,
   },
-  demoBtnText: { fontSize: 13, fontWeight: "700" },
+  demoCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 4 },
+  demoCardTitle: { fontSize: 14, fontWeight: "800", color: Colors.textPrimary },
+  demoCardBadge: {
+    backgroundColor: Colors.primary + "20", borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 2,
+  },
+  demoCardBadgeText: { fontSize: 10, fontWeight: "800", color: Colors.primary, letterSpacing: 0.5 },
+  demoCardSub: { fontSize: 12, color: Colors.textMuted, textAlign: "right", marginBottom: 14 },
+  demoRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingVertical: 10,
+  },
+  demoSeparator: { height: 1, backgroundColor: Colors.border, marginHorizontal: 0 },
+  demoIconCircle: {
+    width: 44, height: 44, borderRadius: 12,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1,
+  },
+  demoRowRight: { flex: 1, alignItems: "flex-end" },
+  demoRowLabel: { fontSize: 14, fontWeight: "700" },
+  demoRowSub: { fontSize: 12, color: Colors.textMuted, textAlign: "right" },
 
   orRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 20 },
   orLine: { flex: 1, height: 1, backgroundColor: Colors.border },
