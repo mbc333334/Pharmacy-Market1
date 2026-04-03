@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useMemo } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, Platform,
+  TextInput, Platform, Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -102,6 +102,11 @@ export default function BrowseScreen() {
 }
 
 function MedicineRow({ medicine, inCart, onAdd }: { medicine: Medicine; inCart: boolean; onAdd: () => void }) {
+  const openWhatsApp = () => {
+    const msg = encodeURIComponent(`مرحباً، أريد الاستفسار عن ${medicine.name} - ${medicine.brand}`);
+    Linking.openURL(`https://wa.me/9647701234567?text=${msg}`);
+  };
+
   return (
     <View style={styles.row}>
       <View style={styles.rowLeft}>
@@ -112,8 +117,11 @@ function MedicineRow({ medicine, inCart, onAdd }: { medicine: Medicine; inCart: 
         >
           <Ionicons name={inCart ? "checkmark" : "add"} size={18} color="#fff" />
         </TouchableOpacity>
+        <TouchableOpacity style={styles.whatsappBtn} onPress={openWhatsApp}>
+          <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+        </TouchableOpacity>
         <View style={styles.priceCol}>
-          <Text style={styles.rowPrice}>{medicine.price.toFixed(2)} ر.س</Text>
+          <Text style={styles.rowPrice}>{medicine.price.toFixed(2)} د.ع</Text>
           {medicine.originalPrice && (
             <Text style={styles.originalPrice}>{medicine.originalPrice.toFixed(2)}</Text>
           )}
@@ -203,6 +211,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center",
   },
   addBtnDone: { backgroundColor: Colors.success },
+  whatsappBtn: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: "#E8F5E9", alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: "#25D36630",
+  },
   empty: { alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 18, fontWeight: "700", color: Colors.textSecondary },
   emptySubText: { fontSize: 14, color: Colors.textMuted },

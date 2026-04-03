@@ -69,6 +69,15 @@ export default function WarehouseTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="import"
+        options={{
+          title: "استيراد",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "cloud-download" : "cloud-download-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: t("settings"),

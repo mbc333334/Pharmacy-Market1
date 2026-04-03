@@ -10,6 +10,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { CATEGORIES, SAMPLE_MEDICINES, Medicine } from "@/data/sampleData";
+import LanguageButton from "@/components/LanguageButton";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -37,6 +38,7 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.iconBtn}>
             <Ionicons name="notifications-outline" size={22} color={Colors.textPrimary} />
           </TouchableOpacity>
+          <LanguageButton style={{ backgroundColor: "rgba(0,0,0,0.06)" }} />
         </View>
         <View>
           <Text style={styles.greeting}>أهلاً، {firstName} 👋</Text>

@@ -38,11 +38,11 @@ function RootLayoutNav() {
     if (!user) {
       if (!inAuth) router.replace("/(auth)/welcome");
     } else if (user.type === "pharmacy") {
-      if (!inPharmacy) router.replace("/(pharmacy)/");
+      if (!inPharmacy) router.replace("/(pharmacy)");
     } else if (user.type === "warehouse") {
-      if (!inWarehouse) router.replace("/(warehouse)/");
+      if (!inWarehouse) router.replace("/(warehouse)");
     } else {
-      if (!inCustomer) router.replace("/(customer)/");
+      if (!inCustomer) router.replace("/(customer)");
     }
   }, [user, isLoading, segments]);
 

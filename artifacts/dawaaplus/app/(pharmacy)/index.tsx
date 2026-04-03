@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { SAMPLE_ORDERS } from "@/data/sampleData";
 import { RAWAKID } from "@/data/rawakidData";
 import { router } from "expo-router";
+import LanguageButton from "@/components/LanguageButton";
 
 export default function PharmacyDashboard() {
   const insets = useSafeAreaInsets();
@@ -37,6 +38,7 @@ export default function PharmacyDashboard() {
             <Ionicons name="notifications-outline" size={22} color="#fff" />
             {newOrders > 0 && <View style={styles.notifDot} />}
           </TouchableOpacity>
+          <LanguageButton iconColor="#fff" />
         </View>
         <View>
           <Text style={styles.headerGreeting}>مرحباً، {pharmacy?.pharmacyName} 👋</Text>

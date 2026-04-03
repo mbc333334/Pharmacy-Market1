@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, Alert, Platform,
+  TextInput, Alert, Platform, Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -16,6 +16,8 @@ const PROMO_CODES: Record<string, number> = {
   WELCOME: 0.15,
 };
 
+type PaymentMethod = "cod" | "card" | "whatsapp";
+
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
   const { items, totalPrice, updateQuantity, removeItem, clearCart } = useCart();
@@ -23,6 +25,11 @@ export default function CartScreen() {
   const [discount, setDiscount] = useState(0);
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoError, setPromoError] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardName, setCardName] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvv, setCardCvv] = useState("");
 
   const topInset = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomInset = insets.bottom + (Platform.OS === "web" ? 34 : 0);
@@ -45,16 +52,32 @@ export default function CartScreen() {
   };
 
   const handleCheckout = () => {
+    if (paymentMethod === "card") {
+      if (!cardNumber || !cardName || !cardExpiry || !cardCvv) {
+        Alert.alert("معلومات البطاقة", "يرجى إدخال جميع بيانات البطاقة المصرفية");
+        return;
+      }
+    }
+    const payLabels: Record<PaymentMethod, string> = {
+      cod: "الدفع عند الاستلام",
+      card: "البطاقة المصرفية",
+      whatsapp: "التواصل عبر واتساب",
+    };
     Alert.alert(
       "تأكيد الطلب ✅",
-      `إجمالي طلبك: ${finalTotal.toFixed(2)} ر.س\nسيتم التواصل معك لتأكيد التوصيل`,
+      `إجمالي طلبك: ${finalTotal.toFixed(2)} د.ع\nطريقة الدفع: ${payLabels[paymentMethod]}\nسيتم التواصل معك لتأكيد التوصيل`,
       [
         { text: "إلغاء", style: "cancel" },
         {
           text: "تأكيد الطلب",
           onPress: () => {
+            if (paymentMethod === "whatsapp") {
+              Linking.openURL("https://wa.me/9647701234567?text=مرحباً، أريد تأكيد طلبي");
+            }
             clearCart();
-            Alert.alert("تم الطلب! 🎉", "طلبك في طريقه إليك");
+            if (paymentMethod !== "whatsapp") {
+              Alert.alert("تم الطلب! 🎉", "طلبك في طريقه إليك");
+            }
           },
         },
       ]
@@ -128,20 +151,113 @@ export default function CartScreen() {
               <Text style={styles.promoHint}>جرّب: SUGAR20 · DAWAA10 · WELCOME</Text>
             </View>
 
+            {/* Payment Method */}
+            <View style={styles.paymentSection}>
+              <Text style={styles.paymentTitle}>طريقة الدفع</Text>
+              <View style={styles.paymentOptions}>
+                <PaymentOption
+                  icon="cash-outline"
+                  label="عند الاستلام"
+                  sublabel="ادفع نقداً عند التوصيل"
+                  value="cod"
+                  selected={paymentMethod === "cod"}
+                  color="#0D7A54"
+                  onPress={() => setPaymentMethod("cod")}
+                />
+                <PaymentOption
+                  icon="card-outline"
+                  label="بطاقة مصرفية"
+                  sublabel="Visa / Mastercard"
+                  value="card"
+                  selected={paymentMethod === "card"}
+                  color={Colors.primary}
+                  onPress={() => setPaymentMethod("card")}
+                />
+                <PaymentOption
+                  icon="logo-whatsapp"
+                  label="واتساب"
+                  sublabel="تواصل مع الصيدلية"
+                  value="whatsapp"
+                  selected={paymentMethod === "whatsapp"}
+                  color="#25D366"
+                  onPress={() => setPaymentMethod("whatsapp")}
+                />
+              </View>
+
+              {paymentMethod === "card" && (
+                <View style={styles.cardForm}>
+                  <Text style={styles.cardFormTitle}>بيانات البطاقة المصرفية</Text>
+                  <TextInput
+                    style={styles.cardInput}
+                    placeholder="رقم البطاقة"
+                    value={cardNumber}
+                    onChangeText={t => setCardNumber(t.replace(/\D/g, "").slice(0, 16))}
+                    keyboardType="numeric"
+                    textAlign="right"
+                    placeholderTextColor={Colors.textMuted}
+                    maxLength={16}
+                  />
+                  <TextInput
+                    style={styles.cardInput}
+                    placeholder="اسم صاحب البطاقة"
+                    value={cardName}
+                    onChangeText={setCardName}
+                    textAlign="right"
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                  <View style={styles.cardRow}>
+                    <TextInput
+                      style={[styles.cardInput, { flex: 1 }]}
+                      placeholder="CVV"
+                      value={cardCvv}
+                      onChangeText={t => setCardCvv(t.slice(0, 3))}
+                      keyboardType="numeric"
+                      textAlign="right"
+                      placeholderTextColor={Colors.textMuted}
+                      maxLength={3}
+                      secureTextEntry
+                    />
+                    <TextInput
+                      style={[styles.cardInput, { flex: 1 }]}
+                      placeholder="MM/YY"
+                      value={cardExpiry}
+                      onChangeText={t => setCardExpiry(t.slice(0, 5))}
+                      textAlign="right"
+                      placeholderTextColor={Colors.textMuted}
+                      maxLength={5}
+                    />
+                  </View>
+                  <View style={styles.cardSecure}>
+                    <Ionicons name="shield-checkmark" size={14} color={Colors.success} />
+                    <Text style={styles.cardSecureText}>مدفوعاتك محمية ومشفرة بالكامل</Text>
+                  </View>
+                </View>
+              )}
+
+              {paymentMethod === "whatsapp" && (
+                <View style={styles.whatsappNote}>
+                  <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+                  <Text style={styles.whatsappNoteText}>
+                    سيتم فتح واتساب للتواصل مع الصيدلية وتأكيد الطلب
+                  </Text>
+                </View>
+              )}
+            </View>
+
             {/* Order Summary */}
             <View style={styles.summary}>
               <Text style={styles.summaryTitle}>ملخص الطلب</Text>
-              <SummaryRow label="المجموع الفرعي" value={`${totalPrice.toFixed(2)} ر.س`} />
-              <SummaryRow label="رسوم التوصيل" value={`${DELIVERY_FEE.toFixed(2)} ر.س`} />
+              <SummaryRow label="المجموع الفرعي" value={`${totalPrice.toFixed(2)} د.ع`} />
+              <SummaryRow label="رسوم التوصيل" value={`${DELIVERY_FEE.toFixed(2)} د.ع`} />
               {promoApplied && (
                 <SummaryRow
                   label={`خصم ${Math.round(discount * 100)}%`}
-                  value={`-${discountAmount.toFixed(2)} ر.س`}
+                  value={`-${discountAmount.toFixed(2)} د.ع`}
                   highlight
                 />
               )}
               <View style={styles.totalRow}>
-                <Text style={styles.totalValue}>{finalTotal.toFixed(2)} ر.س</Text>
+                <Text style={styles.totalValue}>{finalTotal.toFixed(2)} د.ع</Text>
                 <Text style={styles.totalLabel}>الإجمالي</Text>
               </View>
             </View>
@@ -153,13 +269,45 @@ export default function CartScreen() {
 
       {/* Checkout Bar */}
       <View style={[styles.checkoutBar, { paddingBottom: bottomInset + 12 }]}>
-        <TouchableOpacity style={styles.checkoutBtn} onPress={handleCheckout}>
-          <Text style={styles.checkoutPrice}>{finalTotal.toFixed(2)} ر.س</Text>
-          <Text style={styles.checkoutText}>إتمام الطلب</Text>
-          <Ionicons name="arrow-back" size={20} color="#fff" />
+        <TouchableOpacity
+          style={[styles.checkoutBtn, paymentMethod === "whatsapp" && styles.checkoutBtnWhatsapp]}
+          onPress={handleCheckout}
+        >
+          <Text style={styles.checkoutPrice}>{finalTotal.toFixed(2)} د.ع</Text>
+          <Text style={styles.checkoutText}>
+            {paymentMethod === "whatsapp" ? "تواصل عبر واتساب" : "إتمام الطلب"}
+          </Text>
+          <Ionicons
+            name={paymentMethod === "whatsapp" ? "logo-whatsapp" : "arrow-back"}
+            size={20}
+            color="#fff"
+          />
         </TouchableOpacity>
       </View>
     </View>
+  );
+}
+
+function PaymentOption({
+  icon, label, sublabel, value, selected, color, onPress,
+}: {
+  icon: any; label: string; sublabel: string; value: PaymentMethod;
+  selected: boolean; color: string; onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.paymentOption, selected && { borderColor: color, backgroundColor: color + "12" }]}
+      onPress={onPress}
+    >
+      <View style={styles.paymentOptionRight}>
+        <Text style={[styles.paymentOptionLabel, selected && { color }]}>{label}</Text>
+        <Text style={styles.paymentOptionSub}>{sublabel}</Text>
+      </View>
+      <Ionicons name={icon} size={26} color={selected ? color : Colors.textMuted} />
+      <View style={[styles.radioOuter, selected && { borderColor: color }]}>
+        {selected && <View style={[styles.radioInner, { backgroundColor: color }]} />}
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -180,7 +328,7 @@ function CartRow({
         <Text style={styles.cartItemName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.cartItemBrand}>{item.brand} • {item.pharmacyName}</Text>
         <View style={styles.cartRowBottom}>
-          <Text style={styles.cartItemPrice}>{(item.price * item.quantity).toFixed(2)} ر.س</Text>
+          <Text style={styles.cartItemPrice}>{(item.price * item.quantity).toFixed(2)} د.ع</Text>
           <View style={styles.qtyControl}>
             <TouchableOpacity style={styles.qtyBtn} onPress={onIncrease}>
               <Ionicons name="add" size={16} color={Colors.primary} />
@@ -266,6 +414,49 @@ const styles = StyleSheet.create({
   promoError: { color: Colors.error, fontSize: 12, textAlign: "right", marginTop: 6 },
   promoSuccess: { color: Colors.success, fontSize: 12, textAlign: "right", marginTop: 6, fontWeight: "600" },
   promoHint: { fontSize: 11, color: Colors.textMuted, textAlign: "right", marginTop: 6 },
+  paymentSection: {
+    backgroundColor: Colors.surface, borderRadius: 16, padding: 16,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    gap: 10,
+  },
+  paymentTitle: { fontSize: 16, fontWeight: "800", color: Colors.textPrimary, textAlign: "right", marginBottom: 4 },
+  paymentOptions: { gap: 8 },
+  paymentOption: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    borderWidth: 2, borderColor: Colors.border, borderRadius: 14,
+    padding: 14,
+  },
+  paymentOptionRight: { flex: 1 },
+  paymentOptionLabel: { fontSize: 14, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
+  paymentOptionSub: { fontSize: 11, color: Colors.textMuted, textAlign: "right", marginTop: 2 },
+  radioOuter: {
+    width: 20, height: 20, borderRadius: 10,
+    borderWidth: 2, borderColor: Colors.border,
+    alignItems: "center", justifyContent: "center",
+  },
+  radioInner: { width: 10, height: 10, borderRadius: 5 },
+  cardForm: {
+    backgroundColor: Colors.surfaceAlt, borderRadius: 14,
+    padding: 14, gap: 10, marginTop: 4,
+  },
+  cardFormTitle: { fontSize: 13, fontWeight: "700", color: Colors.textPrimary, textAlign: "right", marginBottom: 4 },
+  cardInput: {
+    backgroundColor: Colors.surface, borderRadius: 12,
+    borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 14, color: Colors.textPrimary,
+  },
+  cardRow: { flexDirection: "row", gap: 10 },
+  cardSecure: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    justifyContent: "center", marginTop: 4,
+  },
+  cardSecureText: { fontSize: 12, color: Colors.success },
+  whatsappNote: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: "#E8F5E9", borderRadius: 12, padding: 12,
+  },
+  whatsappNoteText: { flex: 1, fontSize: 13, color: "#1B5E20", textAlign: "right" },
   summary: {
     backgroundColor: Colors.surface, borderRadius: 16, padding: 16,
     shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
@@ -293,6 +484,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16, flexDirection: "row",
     alignItems: "center", justifyContent: "center", gap: 10,
   },
+  checkoutBtnWhatsapp: { backgroundColor: "#25D366" },
   checkoutText: { fontSize: 16, fontWeight: "700", color: "#fff", flex: 1, textAlign: "center" },
   checkoutPrice: {
     fontSize: 14, fontWeight: "800", color: "rgba(255,255,255,0.85)",

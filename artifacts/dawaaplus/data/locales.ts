@@ -16,7 +16,7 @@ export interface Country {
 
 export const LANGUAGES: Language[] = [
   { code: "ar", name: "Arabic", nativeName: "العربية", flag: "🇮🇶", rtl: true },
-  { code: "ku", name: "Kurdish", nativeName: "کوردی", flag: "🏳️", rtl: true },
+  { code: "ku", name: "Kurdish", nativeName: "کوردی", flag: "☀️", rtl: true },
   { code: "en", name: "English", nativeName: "English", flag: "🇬🇧", rtl: false },
 ];
 

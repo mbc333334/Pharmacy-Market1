@@ -8,6 +8,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/i18n";
 import { router } from "expo-router";
+import LanguageButton from "@/components/LanguageButton";
 
 const SAMPLE_LINKED = [
   { id: "1", name: "دەرمانخانەی شیفا", city: "هەولێر", orders: 12, status: "active" },
@@ -46,6 +47,7 @@ export default function WarehouseDashboard() {
             <Ionicons name="notifications-outline" size={22} color="#fff" />
             {newOrders > 0 && <View style={styles.notifDot} />}
           </TouchableOpacity>
+          <LanguageButton iconColor="#fff" />
         </View>
         <View>
           <Text style={styles.headerGreeting}>{t("hello")}، {wh?.warehouseName} 👋</Text>
