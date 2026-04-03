@@ -1,4 +1,4 @@
-# داواپلاس (DawaPlus) Workspace
+# صيدليتي + Workspace
 
 ## Overview
 
@@ -6,7 +6,7 @@ pnpm workspace monorepo using TypeScript. داواپلاس is a pharmacy & medic
 
 ## App Features
 
-- **App Name**: داواپلاس (DawaPlus) — "داوا" = medicine in Kurdish, similar to دواء in Arabic
+- **App Name**: صيدليتي + (Saydaliti+) — "صيدليتي" = My Pharmacy in Arabic/Kurdish
 - **3 Languages**: Arabic (العربية), Kurdish (کوردی), English — switchable from welcome screen
 - **User Types**: Customer, Pharmacy, Warehouse
 - **Pharmacy Database Integration**: CSV/Excel import, REST API, MySQL/PostgreSQL, WooCommerce, Odoo

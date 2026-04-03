@@ -111,7 +111,7 @@ type Translations = Record<LangCode, Record<TranslationKey, string>>;
 
 const t: Translations = {
   ar: {
-    appName: "داواپلاس",
+    appName: "صيدليتي +",
     appTagline: "منصة الصيدليات والأدوية\nفي إقليم كردستان والعراق",
     pharmacies: "صيدلية",
     products: "منتج",
@@ -218,7 +218,7 @@ const t: Translations = {
     address: "العنوان",
   },
   ku: {
-    appName: "داواپلاس",
+    appName: "صيدليتي +",
     appTagline: "پلاتفۆرمی دەرمانخانە و دەرمان\nلە هەرێمی کوردستان و عێراق",
     pharmacies: "دەرمانخانە",
     products: "بەرهەم",
@@ -325,7 +325,7 @@ const t: Translations = {
     address: "ناونیشان",
   },
   en: {
-    appName: "DawaPlus",
+    appName: "Saydaliti +",
     appTagline: "Pharmacy & Medicine Platform\nin Kurdistan Region & Iraq",
     pharmacies: "Pharmacy",
     products: "Product",
