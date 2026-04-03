@@ -30,10 +30,11 @@ function RootLayoutNav() {
 
   useEffect(() => {
     if (isLoading) return;
-    const inAuth = segments[0] === "(auth)";
-    const inPharmacy = segments[0] === "(pharmacy)";
-    const inCustomer = segments[0] === "(customer)";
-    const inWarehouse = segments[0] === "(warehouse)";
+    const seg0 = (segments as string[])[0];
+    const inAuth = seg0 === "(auth)";
+    const inPharmacy = seg0 === "(pharmacy)";
+    const inCustomer = seg0 === "(customer)";
+    const inWarehouse = seg0 === "(warehouse)";
 
     if (!user) {
       if (!inAuth) router.replace("/(auth)/welcome");

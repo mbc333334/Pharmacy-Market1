@@ -33,11 +33,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const ok = await login(phone, password, tab);
-      if (ok) {
-        if (tab === "pharmacy") router.replace("/(pharmacy)");
-        else if (tab === "warehouse") router.replace("/(warehouse)");
-        else router.replace("/(customer)");
-      } else {
+      if (!ok) {
         setError(t("wrongCredentials"));
       }
     } catch {
