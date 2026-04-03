@@ -71,7 +71,6 @@ export default function LoginScreen() {
     { type: "customer" as const, label: "دخول سريع — عميل", icon: "person", color: "#3B82F6" },
     { type: "pharmacy" as const, label: "دخول سريع — صيدلي", icon: "storefront", color: Colors.primary },
     { type: "warehouse" as const, label: "دخول سريع — مذخر", icon: "cube", color: "#0D7A54" },
-    { type: "admin" as const, label: "دخول سريع — مدير", icon: "shield", color: "#7C3AED" },
   ];
 
   return (
@@ -232,10 +231,6 @@ export default function LoginScreen() {
           </View>
         )}
 
-        <View style={styles.adminHint}>
-          <Ionicons name="shield-outline" size={14} color="#7C3AED" />
-          <Text style={styles.adminHintText}>للدخول كمدير: +9647700000001</Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -312,10 +307,4 @@ const styles = StyleSheet.create({
   registerRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 16 },
   registerRowText: { fontSize: 13, color: Colors.textSecondary },
   registerLink: { fontSize: 13, fontWeight: "700", color: Colors.primary },
-  adminHint: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, padding: 10, backgroundColor: "#7C3AED10",
-    borderRadius: 10, borderWidth: 1, borderColor: "#7C3AED30",
-  },
-  adminHintText: { fontSize: 12, color: "#7C3AED", fontWeight: "600" },
 });

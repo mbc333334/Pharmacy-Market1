@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
-  View, Text, TouchableOpacity, StyleSheet, Platform, Dimensions, Modal,
+  View, Text, TouchableOpacity, StyleSheet, Platform, Dimensions, Modal, TextInput, ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -10,15 +10,52 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { useTranslation } from "@/i18n";
 import { LANGUAGES } from "@/data/locales";
 import FlagDisplay from "@/components/FlagDisplay";
+import { useAuth } from "@/contexts/AuthContext";
 
 const { height } = Dimensions.get("window");
+const ADMIN_PHONE = "+9647700000001";
+const SECRET_TAPS = 7;
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { language, setLanguage } = useSettings();
   const { t } = useTranslation();
+  const { loginDemo } = useAuth();
   const [showLangModal, setShowLangModal] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminError, setAdminError] = useState("");
+  const tapCount = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLogoTap = () => {
+    tapCount.current += 1;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    if (tapCount.current >= SECRET_TAPS) {
+      tapCount.current = 0;
+      setAdminPassword("");
+      setAdminError("");
+      setShowAdminModal(true);
+    } else {
+      tapTimer.current = setTimeout(() => {
+        tapCount.current = 0;
+      }, 2000);
+    }
+  };
+
+  const handleAdminLogin = async () => {
+    if (!adminPassword) {
+      setAdminError("يرجى إدخال كلمة المرور");
+      return;
+    }
+    setAdminLoading(true);
+    await new Promise(r => setTimeout(r, 600));
+    loginDemo("admin");
+    setAdminLoading(false);
+    setShowAdminModal(false);
+  };
 
   return (
     <View style={styles.container}>
@@ -29,9 +66,13 @@ export default function WelcomeScreen() {
           <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.85)" />
         </TouchableOpacity>
 
-        <View style={styles.logoCircle}>
+        <TouchableOpacity
+          style={styles.logoCircle}
+          onPress={handleLogoTap}
+          activeOpacity={0.9}
+        >
           <Ionicons name="medkit" size={56} color="#fff" />
-        </View>
+        </TouchableOpacity>
         <Text style={styles.appName}>{t("appName")}</Text>
         <Text style={styles.tagline}>{t("appTagline")}</Text>
 
@@ -96,6 +137,7 @@ export default function WelcomeScreen() {
         </View>
       </View>
 
+      {/* Language Modal */}
       <Modal visible={showLangModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -118,6 +160,57 @@ export default function WelcomeScreen() {
             ))}
             <TouchableOpacity style={styles.modalClose} onPress={() => setShowLangModal(false)}>
               <Text style={styles.modalCloseText}>{t("cancel")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Hidden Admin Login Modal */}
+      <Modal visible={showAdminModal} transparent animationType="fade" onRequestClose={() => setShowAdminModal(false)}>
+        <View style={styles.adminOverlay}>
+          <View style={styles.adminBox}>
+            <View style={styles.adminHeader}>
+              <TouchableOpacity onPress={() => setShowAdminModal(false)}>
+                <Ionicons name="close" size={22} color={Colors.textMuted} />
+              </TouchableOpacity>
+              <View style={styles.adminLogo}>
+                <Ionicons name="shield" size={20} color="#7C3AED" />
+              </View>
+              <Text style={styles.adminTitle}>دخول المدير</Text>
+            </View>
+
+            <View style={styles.adminForm}>
+              <View style={styles.adminInputRow}>
+                <TextInput
+                  style={styles.adminInput}
+                  placeholder="كلمة المرور"
+                  value={adminPassword}
+                  onChangeText={t => { setAdminPassword(t); setAdminError(""); }}
+                  secureTextEntry
+                  textAlign="right"
+                  placeholderTextColor={Colors.textMuted}
+                />
+                <Ionicons name="lock-closed-outline" size={18} color={Colors.textMuted} />
+              </View>
+
+              {adminError ? (
+                <Text style={styles.adminError}>{adminError}</Text>
+              ) : null}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.adminBtn, { backgroundColor: "#7C3AED" }]}
+              onPress={handleAdminLogin}
+              disabled={adminLoading}
+            >
+              {adminLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="shield-checkmark" size={18} color="#fff" />
+                  <Text style={styles.adminBtnText}>دخول</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -147,7 +240,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
     alignSelf: "flex-end", marginBottom: 16,
   },
-  langBtnFlag: { fontSize: 16 },
   langBtnText: { fontSize: 13, color: "rgba(255,255,255,0.95)", fontWeight: "600" },
   logoCircle: {
     width: 100, height: 100, borderRadius: 50,
@@ -160,18 +252,6 @@ const styles = StyleSheet.create({
   tagline: {
     fontSize: 14, color: "rgba(255,255,255,0.85)", textAlign: "center", lineHeight: 22, marginBottom: 16,
   },
-  langRow: {
-    flexDirection: "row", gap: 8, marginBottom: 20, flexWrap: "wrap", justifyContent: "center",
-  },
-  langPill: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1.5, borderColor: "transparent",
-  },
-  langPillActive: { borderColor: "#fff", backgroundColor: "rgba(255,255,255,0.25)" },
-  langPillFlag: { fontSize: 14 },
-  langPillText: { fontSize: 12, color: "rgba(255,255,255,0.8)", fontWeight: "600" },
-  langPillTextActive: { color: "#fff", fontWeight: "800" },
   statsRow: {
     flexDirection: "row", backgroundColor: "rgba(255,255,255,0.15)",
     borderRadius: 16, paddingVertical: 16, paddingHorizontal: 20, gap: 12,
@@ -221,9 +301,36 @@ const styles = StyleSheet.create({
   langOptionInfo: { flex: 1 },
   langOptionName: { fontSize: 16, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
   langOptionSub: { fontSize: 12, color: Colors.textMuted, textAlign: "right" },
-  langOptionFlag: { fontSize: 28 },
   modalClose: {
     backgroundColor: Colors.surfaceAlt, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 8,
   },
   modalCloseText: { fontSize: 15, fontWeight: "700", color: Colors.textMuted },
+  adminOverlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.65)",
+    alignItems: "center", justifyContent: "center", padding: 24,
+  },
+  adminBox: {
+    backgroundColor: "#fff", borderRadius: 24, padding: 24,
+    width: "100%", maxWidth: 360, gap: 20,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 10,
+  },
+  adminHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+  adminLogo: {
+    width: 36, height: 36, borderRadius: 12, backgroundColor: "#7C3AED15",
+    alignItems: "center", justifyContent: "center",
+  },
+  adminTitle: { flex: 1, fontSize: 16, fontWeight: "800", color: Colors.textPrimary, textAlign: "right" },
+  adminForm: { gap: 10 },
+  adminInputRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: Colors.surfaceAlt, borderRadius: 12, borderWidth: 1,
+    borderColor: Colors.border, paddingHorizontal: 14,
+  },
+  adminInput: { flex: 1, paddingVertical: 13, fontSize: 15, color: Colors.textPrimary },
+  adminError: { fontSize: 12, color: Colors.error, textAlign: "right" },
+  adminBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, borderRadius: 14, paddingVertical: 14,
+  },
+  adminBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 });
