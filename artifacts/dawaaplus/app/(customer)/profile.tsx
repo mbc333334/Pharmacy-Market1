@@ -70,7 +70,7 @@ export default function ProfileScreen() {
                     <Text style={[styles.orderStatusText, { color: Colors.success }]}>{order.status}</Text>
                   </View>
                   <View style={styles.orderInfo}>
-                    <Text style={styles.orderTotal}>{order.total.toFixed(2)} ر.س</Text>
+                    <Text style={styles.orderTotal}>{order.total.toFixed(2)} د.ع</Text>
                     <Text style={styles.orderId}>{order.id}</Text>
                     <Text style={styles.orderDate}>{order.date} • {order.items} منتجات</Text>
                   </View>

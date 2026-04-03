@@ -31,7 +31,7 @@ export default function PharmacyMedicinesScreen() {
       description: med.description ?? "",
       pharmacyId: "my-pharmacy",
       pharmacyName: "صيدليتي",
-      pharmacyCity: "الرياض",
+      pharmacyCity: "هەولێر",
       rating: 0,
       reviews: 0,
       color: "#1A9E6E",
@@ -117,7 +117,7 @@ function PharmacyMedRow({ medicine, onDelete }: { medicine: Medicine; onDelete: 
               {medicine.stock} في المخزون
             </Text>
           </View>
-          <Text style={styles.rowPrice}>{medicine.price.toFixed(2)} ر.س</Text>
+          <Text style={styles.rowPrice}>{medicine.price.toFixed(2)} د.ع</Text>
         </View>
       </View>
       <View style={[styles.rowIcon, { backgroundColor: medicine.color + "18" }]}>
@@ -248,7 +248,7 @@ function AddMedicineModal({
             </ScrollView>
 
             <View style={styles.rowFields}>
-              <ModalField label="السعر (ر.س) *" value={price} onChangeText={setPrice} placeholder="0.00" keyboardType="decimal-pad" style={{ flex: 1 }} />
+              <ModalField label="السعر (د.ع) *" value={price} onChangeText={setPrice} placeholder="0.00" keyboardType="decimal-pad" style={{ flex: 1 }} />
               <ModalField label="الكمية المتوفرة *" value={stock} onChangeText={setStock} placeholder="0" keyboardType="number-pad" style={{ flex: 1 }} />
             </View>
 

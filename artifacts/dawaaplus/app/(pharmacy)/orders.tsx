@@ -114,12 +114,12 @@ function OrderCard({
       <View style={styles.itemsSection}>
         {order.items.map(item => (
           <View key={item.medicineId} style={styles.itemRow}>
-            <Text style={styles.itemPrice}>{(item.price * item.quantity).toFixed(2)} ر.س</Text>
+            <Text style={styles.itemPrice}>{(item.price * item.quantity).toFixed(2)} د.ع</Text>
             <Text style={styles.itemName}>{item.name} × {item.quantity}</Text>
           </View>
         ))}
         <View style={styles.totalRow}>
-          <Text style={styles.totalValue}>{order.total.toFixed(2)} ر.س</Text>
+          <Text style={styles.totalValue}>{order.total.toFixed(2)} د.ع</Text>
           <Text style={styles.totalLabel}>الإجمالي</Text>
         </View>
       </View>

@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 
-const CITIES = ["الرياض", "جدة", "الدمام", "مكة المكرمة", "المدينة المنورة", "أبها", "تبوك", "القصيم"];
+const CITIES = ["هەولێر", "سلێمانی", "دهۆک", "کەرکووک", "زاخۆ", "رانیه", "حلبجة", "بغداد", "موصل", "بصرة", "نجف", "کربلاء"];
 const STEPS = ["بيانات المالك", "بيانات الصيدلية", "المراجعة والإرسال"];
 
 export default function PharmacyRegisterScreen() {
@@ -90,7 +90,7 @@ export default function PharmacyRegisterScreen() {
           <View style={styles.form}>
             <Text style={styles.sectionTitle}>🧑‍⚕️ بيانات المالك</Text>
             <Field label="اسم المالك" value={ownerName} onChangeText={setOwnerName} placeholder="محمد أحمد العمري" />
-            <Field label="رقم الجوال" value={phone} onChangeText={setPhone} placeholder="+966 5X XXX XXXX" keyboardType="phone-pad" />
+            <Field label="رقم الهاتف" value={phone} onChangeText={setPhone} placeholder="+964 7XX XXX XXXX" keyboardType="phone-pad" />
             <Field label="كلمة المرور" value={password} onChangeText={setPassword} placeholder="••••••••" secure />
           </View>
         )}

@@ -64,7 +64,7 @@ export default function RegisterScreen() {
         <View style={styles.form}>
           {[
             { label: "الاسم الكامل", value: name, setter: setName, placeholder: "محمد أحمد العمري", keyboard: "default" as const },
-            { label: "رقم الجوال", value: phone, setter: setPhone, placeholder: "+966 5X XXX XXXX", keyboard: "phone-pad" as const },
+            { label: "رقم الجوال", value: phone, setter: setPhone, placeholder: "+964 7XX XXX XXXX", keyboard: "phone-pad" as const },
             { label: "كلمة المرور", value: password, setter: setPassword, placeholder: "••••••••", keyboard: "default" as const, secure: true },
             { label: "تأكيد كلمة المرور", value: confirmPass, setter: setConfirmPass, placeholder: "••••••••", keyboard: "default" as const, secure: true },
           ].map((field) => (

@@ -50,7 +50,7 @@ export default function PharmacyDashboard() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow}>
         <StatCard icon="medkit" value={String(pharmacy?.totalMedicines || 247)} label="منتج نشط" color={Colors.primary} />
         <StatCard icon="cube" value={String(SAMPLE_ORDERS.length)} label="طلبات اليوم" color="#3182CE" badge={newOrders > 0 ? newOrders : undefined} />
-        <StatCard icon="cash" value={`${todayRevenue.toFixed(0)} ر.س`} label="مبيعات الشهر" color="#D69E2E" />
+        <StatCard icon="cash" value={`${todayRevenue.toFixed(0)} د.ع`} label="مبيعات الشهر" color="#D69E2E" />
         <StatCard icon="star" value="4.8" label="التقييم" color="#805AD5" />
       </ScrollView>
 
@@ -112,7 +112,7 @@ export default function PharmacyDashboard() {
                   </Text>
                 </View>
                 <View style={styles.orderRight}>
-                  <Text style={styles.orderTotal}>{order.total.toFixed(2)} ر.س</Text>
+                  <Text style={styles.orderTotal}>{order.total.toFixed(0)} د.ع</Text>
                   <Text style={styles.orderTime}>{formatTime(order.createdAt)}</Text>
                 </View>
               </TouchableOpacity>

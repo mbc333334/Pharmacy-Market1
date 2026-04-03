@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { LANGUAGES, COUNTRIES } from "@/data/locales";
 import { LanguageSelector, CountrySelector } from "@/components/LocaleSelector";
+import FlagDisplay from "@/components/FlagDisplay";
 
 export default function PharmacySettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -47,7 +48,7 @@ export default function PharmacySettingsScreen() {
 
         {/* Quick Stats */}
         <View style={styles.statsRow}>
-          <StatBox label="المبيعات الشهرية" value="4,820 ر.س" icon="trending-up" color={Colors.primary} />
+          <StatBox label="المبيعات الشهرية" value="4,820,000 د.ع" icon="trending-up" color={Colors.primary} />
           <StatBox label="معدل التقييم" value="4.8 / 5" icon="star" color="#D69E2E" />
         </View>
 
@@ -71,7 +72,10 @@ export default function PharmacySettingsScreen() {
             <TouchableOpacity style={styles.localeRow} onPress={() => setShowLanguage(true)}>
               <Ionicons name="chevron-back" size={16} color={Colors.textMuted} />
               <View style={styles.localeRight}>
-                <Text style={styles.localeValue}>{language.flag}  {language.nativeName}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <FlagDisplay langCode={language.code} size={18} />
+                  <Text style={styles.localeValue}>{language.nativeName}</Text>
+                </View>
                 <Text style={styles.localeLabel}>اللغة المعروضة</Text>
               </View>
               <View style={[styles.menuIcon, { backgroundColor: Colors.primaryLight }]}>

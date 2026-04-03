@@ -172,9 +172,9 @@ function MedicineCard({ medicine, inCart, onAdd }: { medicine: Medicine; inCart:
           </TouchableOpacity>
           <View>
             {medicine.originalPrice && (
-              <Text style={styles.originalPrice}>{medicine.originalPrice.toFixed(2)} ر.س</Text>
+              <Text style={styles.originalPrice}>{medicine.originalPrice.toFixed(2)} د.ع</Text>
             )}
-            <Text style={styles.cardPrice}>{medicine.price.toFixed(2)} ر.س</Text>
+            <Text style={styles.cardPrice}>{medicine.price.toFixed(2)} د.ع</Text>
           </View>
         </View>
       </View>

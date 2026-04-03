@@ -32,7 +32,14 @@ export default function LoginScreen() {
     setError("");
     setLoading(true);
     try {
-      await login(phone, password, tab);
+      const ok = await login(phone, password, tab);
+      if (ok) {
+        if (tab === "pharmacy") router.replace("/(pharmacy)");
+        else if (tab === "warehouse") router.replace("/(warehouse)");
+        else router.replace("/(customer)");
+      } else {
+        setError(t("wrongCredentials"));
+      }
     } catch {
       setError(t("wrongCredentials"));
     } finally {
