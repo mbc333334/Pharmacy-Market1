@@ -186,7 +186,7 @@ export default function WarehouseImport() {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.confirmBtn} onPress={confirmItem}>
                     <Ionicons name="checkmark" size={18} color="#fff" />
-                    <Text style={styles.confirmBtnText}>إضافة للمخزن</Text>
+                    <Text style={styles.confirmBtnText}>إضافة للمذخر</Text>
                   </TouchableOpacity>
                 </View>
               </View>

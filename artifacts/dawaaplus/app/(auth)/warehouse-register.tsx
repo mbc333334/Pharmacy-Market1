@@ -86,10 +86,10 @@ export default function WarehouseRegisterScreen() {
 
         <View style={styles.sectionLabel}>
           <Ionicons name="cube-outline" size={16} color="#0D7A54" />
-          <Text style={styles.sectionLabelText}>معلومات المخزن</Text>
+          <Text style={styles.sectionLabelText}>معلومات المذخر</Text>
         </View>
 
-        <Field label={t("warehouseName")} value={warehouseName} onChangeText={setWarehouseName} icon="cube-outline" placeholder="اسم المخزن الرسمي" />
+        <Field label={t("warehouseName")} value={warehouseName} onChangeText={setWarehouseName} icon="cube-outline" placeholder="اسم المذخر الرسمي" />
         <Field label={t("licenseNumber")} value={licenseNumber} onChangeText={setLicenseNumber} icon="document-text-outline" placeholder="WH-XXXX-XXXX" />
         <Field label={t("city")} value={city} onChangeText={setCity} icon="location-outline" placeholder="المدينة (هەولێر، سلێمانی...)" />
         <Field label={t("address")} value={address} onChangeText={setAddress} icon="map-outline" placeholder="العنوان التفصيلي" />

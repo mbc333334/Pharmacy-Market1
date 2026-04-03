@@ -9,6 +9,7 @@ import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useTranslation } from "@/i18n";
 import { LANGUAGES } from "@/data/locales";
+import FlagDisplay from "@/components/FlagDisplay";
 
 const { height } = Dimensions.get("window");
 
@@ -23,7 +24,7 @@ export default function WelcomeScreen() {
     <View style={styles.container}>
       <View style={[styles.heroSection, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 40) }]}>
         <TouchableOpacity style={styles.langBtn} onPress={() => setShowLangModal(true)}>
-          <Text style={styles.langBtnFlag}>{language.flag}</Text>
+          <FlagDisplay langCode={language.code} size={20} />
           <Text style={styles.langBtnText}>{language.nativeName}</Text>
           <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.85)" />
         </TouchableOpacity>
@@ -33,21 +34,6 @@ export default function WelcomeScreen() {
         </View>
         <Text style={styles.appName}>{t("appName")}</Text>
         <Text style={styles.tagline}>{t("appTagline")}</Text>
-
-        <View style={styles.langRow}>
-          {LANGUAGES.map(lang => (
-            <TouchableOpacity
-              key={lang.code}
-              style={[styles.langPill, language.code === lang.code && styles.langPillActive]}
-              onPress={() => setLanguage(lang)}
-            >
-              <Text style={styles.langPillFlag}>{lang.flag}</Text>
-              <Text style={[styles.langPillText, language.code === lang.code && styles.langPillTextActive]}>
-                {lang.nativeName}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
@@ -127,7 +113,7 @@ export default function WelcomeScreen() {
                   <Text style={styles.langOptionName}>{lang.nativeName}</Text>
                   <Text style={styles.langOptionSub}>{lang.name}</Text>
                 </View>
-                <Text style={styles.langOptionFlag}>{lang.flag}</Text>
+                <FlagDisplay langCode={lang.code} size={28} />
               </TouchableOpacity>
             ))}
             <TouchableOpacity style={styles.modalClose} onPress={() => setShowLangModal(false)}>

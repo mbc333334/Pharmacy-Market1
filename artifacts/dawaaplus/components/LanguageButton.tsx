@@ -6,6 +6,7 @@ import {
 import Colors from "@/constants/colors";
 import { LANGUAGES } from "@/data/locales";
 import { useTranslation } from "@/i18n";
+import FlagDisplay from "@/components/FlagDisplay";
 
 interface Props {
   iconColor?: string;
@@ -20,7 +21,7 @@ export default function LanguageButton({ iconColor = Colors.textPrimary, style }
   return (
     <>
       <TouchableOpacity style={[styles.btn, style]} onPress={() => setOpen(true)}>
-        <Text style={styles.flag}>{current.flag}</Text>
+        <FlagDisplay langCode={current.code} size={20} />
         <Ionicons name="chevron-down" size={12} color={iconColor} />
       </TouchableOpacity>
 
@@ -39,7 +40,7 @@ export default function LanguageButton({ iconColor = Colors.textPrimary, style }
                   size={18}
                   color={lang === l.code ? Colors.primary : Colors.textMuted}
                 />
-                <Text style={styles.menuFlag}>{l.flag}</Text>
+                <FlagDisplay langCode={l.code} size={24} />
                 <Text style={[styles.menuName, lang === l.code && styles.menuNameActive]}>
                   {l.nativeName}
                 </Text>
