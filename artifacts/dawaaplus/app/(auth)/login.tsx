@@ -243,12 +243,21 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         {tab === "customer" ? (
-          <View style={styles.registerRow}>
-            <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-              <Text style={styles.registerLink}>{t("createAccount")}</Text>
+          <>
+            <View style={styles.registerRow}>
+              <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
+                <Text style={styles.registerLink}>{t("createAccount")}</Text>
+              </TouchableOpacity>
+              <Text style={styles.registerRowText}>{t("noAccount")}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.guestBtn}
+              onPress={() => router.replace("/(customer)")}
+            >
+              <Ionicons name="eye-outline" size={15} color={Colors.textMuted} />
+              <Text style={styles.guestBtnText}>تصفح بدون تسجيل</Text>
             </TouchableOpacity>
-            <Text style={styles.registerRowText}>{t("noAccount")}</Text>
-          </View>
+          </>
         ) : tab === "pharmacy" ? (
           <View style={styles.registerRow}>
             <TouchableOpacity onPress={() => router.push("/(auth)/pharmacy-register")}>
