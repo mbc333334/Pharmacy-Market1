@@ -189,7 +189,7 @@ export default function PharmacyTabLayout() {
       />
       <Tabs.Screen
         name="integration"
-        options={{ href: null, tabBarButton: () => null }}
+        options={{ href: null }}
       />
     </Tabs>
   );
