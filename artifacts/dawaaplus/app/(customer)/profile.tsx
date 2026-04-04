@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform,
+  Modal, TextInput, KeyboardAvoidingView, Pressable,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -10,6 +11,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { LANGUAGES, COUNTRIES } from "@/data/locales";
 import { LanguageSelector, CountrySelector } from "@/components/LocaleSelector";
+
+function savePassword(userId: string, pass: string) {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.localStorage.setItem(`customer_pass_${userId}`, pass);
+  }
+}
 
 const ORDERS = [
   { id: "ORD-2024-089", date: "28 مارس 2024", items: 3, total: 88.98, status: "مكتمل" as const },
@@ -26,6 +33,22 @@ export default function ProfileScreen() {
 
   const [showLanguage, setShowLanguage] = useState(false);
   const [showCountry, setShowCountry] = useState(false);
+  const [showPassModal, setShowPassModal] = useState(false);
+  const [pf, setPf] = useState({ newPass: "", confirmPass: "" });
+  const [pErr, setPErr] = useState("");
+  const [pSaved, setPSaved] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+
+  const openPassModal = () => { setPf({ newPass: "", confirmPass: "" }); setPErr(""); setPSaved(false); setShowPassModal(true); };
+  const closePassModal = () => setShowPassModal(false);
+  const submitPass = () => {
+    if (!pf.newPass.trim()) { setPErr("أدخل كلمة المرور الجديدة"); return; }
+    if (pf.newPass.length < 4) { setPErr("يجب أن تكون 4 أحرف على الأقل"); return; }
+    if (pf.newPass !== pf.confirmPass) { setPErr("كلمتا المرور غير متطابقتين"); return; }
+    if (user?.id) savePassword(user.id, pf.newPass.trim());
+    setPSaved(true);
+    setTimeout(() => { setPSaved(false); closePassModal(); }, 1800);
+  };
 
   const initials = user?.name?.split(" ").slice(0, 2).map(n => n[0]).join("") ?? "م";
 
@@ -221,8 +244,21 @@ export default function ProfileScreen() {
 
         <MenuSection title="الإعدادات" items={[
           { icon: "notifications-outline", label: "الإشعارات" },
-          { icon: "lock-closed-outline", label: "الأمان والخصوصية" },
         ]} />
+
+        {/* Password Change */}
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.passChangeBtn} onPress={openPassModal} activeOpacity={0.8}>
+            <View style={[styles.menuIcon, { backgroundColor: Colors.primaryLight }]}>
+              <Ionicons name="key-outline" size={18} color={Colors.primary} />
+            </View>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={styles.passChangeBtnTitle}>تغيير كلمة المرور</Text>
+              <Text style={styles.passChangeBtnSub}>تحديث كلمة المرور لحسابك</Text>
+            </View>
+            <Ionicons name="chevron-back" size={16} color={Colors.textMuted} />
+          </TouchableOpacity>
+        </View>
 
         <MenuSection title="المساعدة" items={[
           { icon: "chatbubble-outline", label: "تواصل معنا" },
@@ -250,6 +286,81 @@ export default function ProfileScreen() {
         selected={country}
         onSelect={setCountry}
       />
+
+      {/* Password Change Modal */}
+      <Modal visible={showPassModal} transparent animationType="slide" onRequestClose={closePassModal}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <Pressable style={styles.modalOverlay} onPress={closePassModal}>
+            <Pressable style={styles.modalSheet} onPress={e => e.stopPropagation()}>
+              <View style={styles.modalHandle} />
+              <View style={styles.modalHeader}>
+                <View style={[styles.menuIcon, { backgroundColor: Colors.primaryLight, width: 44, height: 44, borderRadius: 14 }]}>
+                  <Ionicons name="key-outline" size={22} color={Colors.primary} />
+                </View>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={styles.modalTitle}>تغيير كلمة المرور</Text>
+                  <Text style={styles.modalSub}>{user?.name}</Text>
+                </View>
+                <TouchableOpacity onPress={closePassModal}>
+                  <Ionicons name="close-circle" size={26} color={Colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              {pSaved ? (
+                <View style={styles.savedBox}>
+                  <Ionicons name="checkmark-circle" size={40} color={Colors.success} />
+                  <Text style={styles.savedText}>تم تغيير كلمة المرور بنجاح!</Text>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>كلمة المرور الجديدة</Text>
+                    <View style={styles.inputRow}>
+                      <TouchableOpacity onPress={() => setShowNewPass(v => !v)} style={styles.eyeBtn}>
+                        <Ionicons name={showNewPass ? "eye-off-outline" : "eye-outline"} size={20} color={Colors.textMuted} />
+                      </TouchableOpacity>
+                      <TextInput
+                        value={pf.newPass}
+                        onChangeText={t => setPf(p => ({ ...p, newPass: t }))}
+                        secureTextEntry={!showNewPass}
+                        placeholder="••••••••"
+                        placeholderTextColor={Colors.textMuted}
+                        style={styles.input}
+                        textAlign="right"
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>تأكيد كلمة المرور</Text>
+                    <TextInput
+                      value={pf.confirmPass}
+                      onChangeText={t => { setPErr(""); setPf(p => ({ ...p, confirmPass: t })); }}
+                      secureTextEntry
+                      placeholder="••••••••"
+                      placeholderTextColor={Colors.textMuted}
+                      style={[styles.input, pf.confirmPass && pf.confirmPass !== pf.newPass && { borderColor: Colors.error }]}
+                      textAlign="right"
+                    />
+                    {pf.confirmPass !== "" && pf.confirmPass !== pf.newPass && (
+                      <Text style={styles.mismatchText}>⚠️ كلمتا المرور غير متطابقتين</Text>
+                    )}
+                  </View>
+                  {pErr !== "" && <Text style={styles.errText}>{pErr}</Text>}
+                  <TouchableOpacity
+                    style={[styles.submitBtn, (!pf.newPass || pf.newPass !== pf.confirmPass) && { opacity: 0.4 }]}
+                    onPress={submitPass}
+                    disabled={!pf.newPass || pf.newPass !== pf.confirmPass}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="lock-closed-outline" size={18} color="#fff" />
+                    <Text style={styles.submitBtnText}>تغيير كلمة المرور</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
     </>
   );
 }
@@ -383,4 +494,39 @@ const styles = StyleSheet.create({
   guestPerkRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
   guestPerkIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   guestPerkText: { flex: 1, fontSize: 14, color: Colors.textSecondary, textAlign: "right", fontWeight: "500" },
+  passChangeBtn: {
+    flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface,
+    marginHorizontal: 16, borderRadius: 16, padding: 16,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+  },
+  passChangeBtnTitle: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
+  passChangeBtnSub: { fontSize: 12, color: Colors.textMuted, textAlign: "right", marginTop: 2 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  modalSheet: {
+    backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 24, paddingBottom: 36,
+    shadowColor: "#000", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 20,
+  },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: "center", marginBottom: 20 },
+  modalHeader: { flexDirection: "row", alignItems: "center", marginBottom: 24 },
+  modalTitle: { fontSize: 18, fontWeight: "900", color: Colors.textPrimary, textAlign: "right" },
+  modalSub: { fontSize: 12, color: Colors.textMuted, textAlign: "right", marginTop: 2 },
+  inputGroup: { marginBottom: 14 },
+  inputLabel: { fontSize: 12, fontWeight: "700", color: Colors.textMuted, textAlign: "right", marginBottom: 6 },
+  input: {
+    flex: 1, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12,
+    padding: 12, fontSize: 15, color: Colors.textPrimary, textAlign: "right",
+    backgroundColor: Colors.background,
+  },
+  inputRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  eyeBtn: { padding: 4 },
+  savedBox: { alignItems: "center", paddingVertical: 30, gap: 12 },
+  savedText: { fontSize: 16, fontWeight: "800", color: Colors.success },
+  errText: { fontSize: 12, color: Colors.error, textAlign: "right", marginBottom: 10, fontWeight: "600" },
+  mismatchText: { fontSize: 11, color: Colors.error, textAlign: "right", marginTop: 4, fontWeight: "600" },
+  submitBtn: {
+    backgroundColor: Colors.primary, borderRadius: 14, padding: 15, marginTop: 6,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+  },
+  submitBtnText: { fontSize: 16, fontWeight: "800", color: "#fff" },
 });

@@ -117,7 +117,7 @@ export default function App() {
 
 function Login({ onLogin }:{ onLogin:(p:any)=>void }) {
   const [phone,setPhone]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState("");
-  const login=()=>{ const p=PHARMACIES.find(p=>p.phone===phone.trim()&&p.pass===pass.trim()); p?onLogin(p):setErr("رقم الهاتف أو كلمة المرور غير صحيحة"); };
+  const login=()=>{ const p=PHARMACIES.find(p=>p.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`ph_pass_${p.id}`)||p.pass)); p?onLogin(p):setErr("رقم الهاتف أو كلمة المرور غير صحيحة"); };
   return (
     <div dir="rtl" style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
       <div style={{ background:`linear-gradient(135deg,${C.primary},${C.dark})`, padding:"48px 24px 70px", textAlign:"center" }}>
@@ -183,6 +183,52 @@ function PhDash({ ph, products, orders }:any) {
   );
 }
 
+function PassCard({ storageKey, color }:{ storageKey:string; color:string }) {
+  const [pf,setPf]=useState({ newPass:"", confirmPass:"" });
+  const [showNew,setShowNew]=useState(false);
+  const [pErr,setPErr]=useState(""); const [pSaved,setPSaved]=useState(false);
+  const submit=()=>{
+    setPErr("");
+    if (!pf.newPass.trim()) { setPErr("أدخل كلمة المرور الجديدة"); return; }
+    if (pf.newPass.length<4) { setPErr("يجب أن تكون 4 أحرف على الأقل"); return; }
+    if (pf.newPass!==pf.confirmPass) { setPErr("كلمتا المرور غير متطابقتين"); return; }
+    localStorage.setItem(storageKey, pf.newPass.trim());
+    setPSaved(true); setTimeout(()=>{ setPSaved(false); setPf({ newPass:"", confirmPass:"" }); },2000);
+  };
+  return (
+    <Card style={{ maxWidth:560, marginTop:14, border:`1.5px solid ${color}30` }}>
+      <SH icon="🔑" title="تغيير كلمة المرور" />
+      {pSaved ? (
+        <div style={{ textAlign:"center", color:C.green, fontWeight:800, padding:"10px 0", fontSize:14 }}>✅ تم تغيير كلمة المرور بنجاح!</div>
+      ) : (
+        <div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:3 }}>كلمة المرور الجديدة</label>
+              <div style={{ position:"relative" }}>
+                <input type={showNew?"text":"password"} value={pf.newPass} onChange={e=>setPf(p=>({...p,newPass:e.target.value}))}
+                  placeholder="••••••" style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", paddingLeft:34, fontSize:13, boxSizing:"border-box" }} />
+                <button onClick={()=>setShowNew(v=>!v)} style={{ position:"absolute", left:8, top:9, background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:13 }}>{showNew?"🙈":"👁️"}</button>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:3 }}>تأكيد كلمة المرور</label>
+              <input type="password" value={pf.confirmPass} onChange={e=>setPf(p=>({...p,confirmPass:e.target.value}))}
+                onKeyDown={(e:any)=>e.key==="Enter"&&submit()} placeholder="••••••"
+                style={{ width:"100%", border:`1.5px solid ${pf.confirmPass&&pf.confirmPass!==pf.newPass?C.red:C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box" }} />
+            </div>
+          </div>
+          {pf.confirmPass&&pf.confirmPass!==pf.newPass&&<div style={{ fontSize:11, color:C.red, marginBottom:6 }}>⚠️ كلمتا المرور غير متطابقتين</div>}
+          {pErr&&<div style={{ background:"#FFF5F5", border:"1px solid #FED7D7", borderRadius:7, padding:"7px 12px", fontSize:12, color:C.red, marginBottom:8 }}>{pErr}</div>}
+          <button onClick={submit} disabled={!pf.newPass||pf.newPass!==pf.confirmPass}
+            style={{ width:"100%", background:pf.newPass&&pf.newPass===pf.confirmPass?`linear-gradient(135deg,${color},${C.green})`:"#ccc", color:"#fff", border:"none", borderRadius:9, padding:10, fontWeight:800, cursor:pf.newPass&&pf.newPass===pf.confirmPass?"pointer":"not-allowed", fontSize:13 }}>
+            🔐 تغيير كلمة المرور
+          </button>
+        </div>
+      )}
+    </Card>
+  );
+}
 function PhAccount({ ph, onSave }:any) {
   const [f,setF]=useState({...ph}); const [saved,setSaved]=useState(false);
   const save=()=>{ onSave(f); setSaved(true); setTimeout(()=>setSaved(false),3000); };
@@ -201,6 +247,7 @@ function PhAccount({ ph, onSave }:any) {
         </div>
         <Btn label={saved?"✅ تم الحفظ والمزامنة!":"💾 حفظ ومزامنة"} color={saved?C.green:C.primary} onClick={save} full />
       </Card>
+      <PassCard storageKey={`ph_pass_${ph.id}`} color={C.primary} />
     </div>
   );
 }
