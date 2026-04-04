@@ -94,7 +94,7 @@ function loginCheck(phone:string, pass:string): { name:string; role:string; phon
 // ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [user, setUser] = useState<{name:string;role:string}|null>(null);
+  const [user, setUser] = useState<{name:string;role:string;phone?:string}|null>(null);
   const [db, setDB] = useState(() => readLiveDB());
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString("ar-IQ"));
 
@@ -180,18 +180,89 @@ const BASE_MENU = [
   {id:"settings",label:"الإعدادات",       icon:"⚙️", roles:["superadmin"]},
 ];
 
-function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastSync:string; onRefresh:()=>void; onLogout:()=>void; user:{name:string;role:string} }) {
+function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastSync:string; onRefresh:()=>void; onLogout:()=>void; user:{name:string;role:string;phone?:string} }) {
   const [sec, setSec] = useState("dash");
   const [open, setOpen] = useState(true);
   const menu = BASE_MENU.filter(m=>m.roles.includes(user.role));
   const isSuperAdmin = user.role==="superadmin";
+
+  // ── Quick password-change modal ──────────────────────────────────────────────
+  const [showPassModal, setShowPassModal] = useState(false);
+  const [pForm, setPForm] = useState({ newPass:"", confirmPass:"" });
+  const [showPNew, setShowPNew] = useState(false);
+  const [pErr, setPErr] = useState("");
+  const [pSaved, setPSaved] = useState(false);
+
+  const openPModal = () => { setPForm({ newPass:"", confirmPass:"" }); setPErr(""); setPSaved(false); setShowPassModal(true); };
+  const closePModal = () => setShowPassModal(false);
+  const submitPChange = () => {
+    setPErr("");
+    if (!pForm.newPass.trim()) { setPErr("أدخل كلمة المرور الجديدة"); return; }
+    if (pForm.newPass.length < 4) { setPErr("يجب أن تكون 4 أحرف على الأقل"); return; }
+    if (pForm.newPass !== pForm.confirmPass) { setPErr("كلمتا المرور غير متطابقتين"); return; }
+    if (isSuperAdmin) {
+      wrLS("admin_super_password", pForm.newPass.trim());
+    } else {
+      const accs = rdLS("admin_accounts", []) as any[];
+      const updated = accs.map((a:any) => (a.phone===(user as any).phone ? { ...a, password: pForm.newPass.trim() } : a));
+      wrLS("admin_accounts", updated);
+    }
+    setPSaved(true);
+    setTimeout(() => { setPSaved(false); closePModal(); }, 1800);
+  };
+
   return (
     <div style={{ display:"flex", height:"100vh", overflow:"hidden" }}>
+      {/* ── Quick password modal ── */}
+      {showPassModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+          <div dir="rtl" style={{ background:"#fff", borderRadius:18, padding:28, width:"100%", maxWidth:420, boxShadow:"0 20px 60px rgba(0,0,0,0.35)" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:20 }}>
+              <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${C.admin},#553C9A)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🔑</div>
+              <div>
+                <div style={{ fontWeight:900, fontSize:16, color:C.text }}>تغيير كلمة المرور</div>
+                <div style={{ fontSize:12, color:C.muted }}>{user.name} · {isSuperAdmin?"مدير المنصة":"مشرف"}</div>
+              </div>
+              <button onClick={closePModal} style={{ marginRight:"auto", background:"none", border:"none", fontSize:22, cursor:"pointer", color:C.muted }}>×</button>
+            </div>
+            {pSaved ? (
+              <div style={{ textAlign:"center", padding:"20px 0", color:C.green, fontWeight:800, fontSize:15 }}>✅ تم تغيير كلمة المرور بنجاح!</div>
+            ) : (
+              <>
+                <div style={{ marginBottom:12 }}>
+                  <label style={{ fontSize:12, fontWeight:700, color:C.muted, display:"block", marginBottom:6 }}>كلمة المرور الجديدة</label>
+                  <div style={{ position:"relative" }}>
+                    <input type={showPNew?"text":"password"} value={pForm.newPass} onChange={e=>setPForm(p=>({...p,newPass:e.target.value}))}
+                      placeholder="••••••••" style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:10, padding:"10px 14px", paddingLeft:36, fontSize:14, boxSizing:"border-box" }} />
+                    <button onClick={()=>setShowPNew(v=>!v)} style={{ position:"absolute", left:10, top:11, background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:14 }}>{showPNew?"🙈":"👁️"}</button>
+                  </div>
+                </div>
+                <div style={{ marginBottom:16 }}>
+                  <label style={{ fontSize:12, fontWeight:700, color:C.muted, display:"block", marginBottom:6 }}>تأكيد كلمة المرور</label>
+                  <input type="password" value={pForm.confirmPass} onChange={e=>setPForm(p=>({...p,confirmPass:e.target.value}))}
+                    onKeyDown={(e:any)=>e.key==="Enter"&&submitPChange()} placeholder="••••••••"
+                    style={{ width:"100%", border:`1.5px solid ${pForm.confirmPass&&pForm.confirmPass!==pForm.newPass?C.red:C.border}`, borderRadius:10, padding:"10px 14px", fontSize:14, boxSizing:"border-box" }} />
+                  {pForm.confirmPass && pForm.confirmPass!==pForm.newPass && <div style={{ fontSize:11, color:C.red, marginTop:4 }}>⚠️ كلمتا المرور غير متطابقتين</div>}
+                </div>
+                {pErr && <div style={{ background:"#FFF5F5", border:"1px solid #FED7D7", borderRadius:8, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:12 }}>{pErr}</div>}
+                <div style={{ display:"flex", gap:10 }}>
+                  <button onClick={closePModal} style={{ flex:1, background:"#F7FAFC", color:C.muted, border:`1px solid ${C.border}`, borderRadius:10, padding:11, fontWeight:700, cursor:"pointer", fontSize:13 }}>إلغاء</button>
+                  <button onClick={submitPChange} disabled={!pForm.newPass||pForm.newPass!==pForm.confirmPass}
+                    style={{ flex:2, background:pForm.newPass&&pForm.newPass===pForm.confirmPass?`linear-gradient(135deg,${C.admin},#553C9A)`:"#ccc", color:"#fff", border:"none", borderRadius:10, padding:11, fontWeight:800, cursor:pForm.newPass&&pForm.newPass===pForm.confirmPass?"pointer":"not-allowed", fontSize:14 }}>
+                    💾 حفظ كلمة المرور
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {/* Sidebar */}
       <div style={{ width:open?220:60, background:"#1a202c", display:"flex", flexDirection:"column", transition:"width 0.2s", flexShrink:0, overflow:"hidden" }}>
         <div style={{ padding:"14px 12px", borderBottom:"1px solid #2d3748", display:"flex", alignItems:"center", gap:8 }}>
           <span style={{ fontSize:22, flexShrink:0 }}>🛡️</span>
           {open && <div style={{ flex:1 }}><div style={{ color:"#fff", fontSize:12, fontWeight:800 }}>{user.name}</div><div style={{ color:"#A0AEC0", fontSize:10 }}>{user.role==="superadmin"?"مدير المنصة":"مشرف"}</div></div>}
+          {open && <button onClick={openPModal} title="تغيير كلمة المرور" style={{ background:"none", border:"1px solid #4A5568", borderRadius:7, color:"#A0AEC0", cursor:"pointer", fontSize:13, padding:"3px 7px", flexShrink:0 }}>🔑</button>}
           <button onClick={()=>setOpen(v=>!v)} style={{ background:"none", border:"none", color:"#A0AEC0", cursor:"pointer", fontSize:16, flexShrink:0, marginRight:open?"0":"auto" }}>☰</button>
         </div>
         <div style={{ flex:1, overflowY:"auto", padding:"6px 0" }}>
