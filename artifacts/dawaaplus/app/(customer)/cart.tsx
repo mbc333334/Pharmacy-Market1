@@ -11,6 +11,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart, CartItem } from "@/contexts/CartContext";
 import { useOrders, PaymentMethod } from "@/contexts/OrdersContext";
+import { usePaymentMethods } from "@/contexts/PaymentMethodsContext";
 
 const DELIVERY_FEE = 3500;
 const PROMO_CODES: Record<string, number> = {
@@ -52,6 +53,7 @@ export default function CartScreen() {
   const { user } = useAuth();
   const { items, totalPrice, updateQuantity, removeItem, clearCart } = useCart();
   const { placeCustomerOrder } = useOrders();
+  const { enabledMethods, isEnabled } = usePaymentMethods();
   const [promoCode, setPromoCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [promoApplied, setPromoApplied] = useState(false);
@@ -63,6 +65,14 @@ export default function CartScreen() {
   const [cardCvv, setCardCvv] = useState("");
   const [walletPhone, setWalletPhone] = useState("");
   const [showGuestModal, setShowGuestModal] = useState(false);
+
+  // Reset payment method if admin disables it
+  React.useEffect(() => {
+    if (!isEnabled(paymentMethod)) {
+      const first = enabledMethods[0];
+      if (first) setPaymentMethod(first.id);
+    }
+  }, [enabledMethods, paymentMethod, isEnabled]);
   const [guestStep, setGuestStep] = useState<"choice" | "phone">("choice");
   const [guestPhone, setGuestPhone] = useState("");
   const [guestPhoneError, setGuestPhoneError] = useState("");
@@ -238,68 +248,73 @@ export default function CartScreen() {
 
             {/* ══ PAYMENT METHOD ══ */}
             <View style={styles.paymentSection}>
-              <Text style={styles.paymentTitle}>طريقة الدفع</Text>
-
-              {/* ─ Cash & WhatsApp ─ */}
-              <View style={styles.paymentOptions}>
-                <PaymentOption
-                  icon="cash-outline"
-                  label="الدفع عند الاستلام"
-                  sublabel="ادفع نقداً عند التوصيل"
-                  value="cod"
-                  selected={paymentMethod === "cod"}
-                  color="#0D7A54"
-                  onPress={() => setPaymentMethod("cod")}
-                />
-                <PaymentOption
-                  icon="card-outline"
-                  label="بطاقة مصرفية"
-                  sublabel="Visa / Mastercard / FIB Card"
-                  value="card"
-                  selected={paymentMethod === "card"}
-                  color={Colors.primary}
-                  onPress={() => setPaymentMethod("card")}
-                />
-                <PaymentOption
-                  icon="logo-whatsapp"
-                  label="واتساب"
-                  sublabel="تواصل مع الصيدلية مباشرةً"
-                  value="whatsapp"
-                  selected={paymentMethod === "whatsapp"}
-                  color="#25D366"
-                  onPress={() => setPaymentMethod("whatsapp")}
-                />
+              <View style={styles.paymentHeaderRow}>
+                <Text style={styles.paymentCount}>{enabledMethods.length} وسيلة متاحة</Text>
+                <Text style={styles.paymentTitle}>طريقة الدفع</Text>
               </View>
 
-              {/* ─ Iraqi E-Wallets ─ */}
-              <View style={styles.walletsHeader}>
-                <View style={styles.walletsDivider} />
-                <Text style={styles.walletsDividerText}>المحافظ الإلكترونية العراقية</Text>
-                <View style={styles.walletsDivider} />
-              </View>
+              {enabledMethods.length === 0 ? (
+                <View style={styles.noPaymentBox}>
+                  <Ionicons name="warning-outline" size={28} color={Colors.textMuted} />
+                  <Text style={styles.noPaymentText}>
+                    لا توجد وسائل دفع متاحة حالياً.{"\n"}يرجى التواصل مع إدارة المتجر.
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {/* ─ Non-wallet methods (cash, card, whatsapp) ─ */}
+                  {enabledMethods.filter(m => m.category !== "wallet").length > 0 && (
+                    <View style={styles.paymentOptions}>
+                      {enabledMethods.filter(m => m.category !== "wallet").map(m => (
+                        <PaymentOption
+                          key={m.id}
+                          icon={m.icon as any}
+                          label={m.label}
+                          sublabel={m.description}
+                          value={m.id}
+                          selected={paymentMethod === m.id}
+                          color={m.color}
+                          onPress={() => setPaymentMethod(m.id)}
+                        />
+                      ))}
+                    </View>
+                  )}
 
-              <View style={styles.walletsGrid}>
-                {IRAQ_WALLETS.map(w => (
-                  <TouchableOpacity
-                    key={w.id}
-                    style={[
-                      styles.walletBtn,
-                      { borderColor: paymentMethod === w.id ? w.color : Colors.border },
-                      paymentMethod === w.id && { backgroundColor: w.bg },
-                    ]}
-                    onPress={() => setPaymentMethod(w.id)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={[styles.walletDot, { backgroundColor: paymentMethod === w.id ? w.color : Colors.border }]} />
-                    <Text style={[
-                      styles.walletBtnText,
-                      { color: paymentMethod === w.id ? w.color : Colors.textSecondary },
-                    ]}>
-                      {w.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                  {/* ─ Iraqi E-Wallets (if any enabled) ─ */}
+                  {enabledMethods.filter(m => m.category === "wallet").length > 0 && (
+                    <>
+                      <View style={styles.walletsHeader}>
+                        <View style={styles.walletsDivider} />
+                        <Text style={styles.walletsDividerText}>المحافظ الإلكترونية العراقية</Text>
+                        <View style={styles.walletsDivider} />
+                      </View>
+
+                      <View style={styles.walletsGrid}>
+                        {enabledMethods.filter(m => m.category === "wallet").map(w => (
+                          <TouchableOpacity
+                            key={w.id}
+                            style={[
+                              styles.walletBtn,
+                              { borderColor: paymentMethod === w.id ? w.color : Colors.border },
+                              paymentMethod === w.id && { backgroundColor: w.bg },
+                            ]}
+                            onPress={() => setPaymentMethod(w.id)}
+                            activeOpacity={0.75}
+                          >
+                            <View style={[styles.walletDot, { backgroundColor: paymentMethod === w.id ? w.color : Colors.border }]} />
+                            <Text style={[
+                              styles.walletBtnText,
+                              { color: paymentMethod === w.id ? w.color : Colors.textSecondary },
+                            ]}>
+                              {w.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </>
+                  )}
+                </>
+              )}
 
               {/* ─ Card form ─ */}
               {paymentMethod === "card" && (
@@ -687,7 +702,11 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
     gap: 10,
   },
-  paymentTitle: { fontSize: 16, fontWeight: "800", color: Colors.textPrimary, textAlign: "right", marginBottom: 4 },
+  paymentHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  paymentTitle: { fontSize: 16, fontWeight: "800", color: Colors.textPrimary, textAlign: "right" },
+  paymentCount: { fontSize: 12, color: Colors.textMuted, fontWeight: "600", backgroundColor: Colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  noPaymentBox: { alignItems: "center", gap: 8, paddingVertical: 20 },
+  noPaymentText: { fontSize: 13, color: Colors.textMuted, textAlign: "center", lineHeight: 20 },
   paymentOptions: { gap: 8 },
   paymentOption: {
     flexDirection: "row", alignItems: "center", gap: 12,
