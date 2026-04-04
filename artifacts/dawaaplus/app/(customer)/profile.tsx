@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform,
@@ -18,6 +19,7 @@ const ORDERS = [
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { user, logout } = useAuth();
   const { language, country, setLanguage, setCountry } = useSettings();
   const topInset = insets.top + (Platform.OS === "web" ? 67 : 0);
@@ -26,6 +28,105 @@ export default function ProfileScreen() {
   const [showCountry, setShowCountry] = useState(false);
 
   const initials = user?.name?.split(" ").slice(0, 2).map(n => n[0]).join("") ?? "م";
+
+  // ── Guest View ──────────────────────────────────────────────
+  if (!user) {
+    return (
+      <ScrollView
+        style={[styles.container, { paddingTop: topInset }]}
+        contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.guestHero}>
+          <View style={styles.guestAvatarWrap}>
+            <View style={styles.guestAvatar}>
+              <Ionicons name="person-outline" size={44} color={Colors.primary} />
+            </View>
+          </View>
+          <Text style={styles.guestTitle}>مرحباً بك في دواء+</Text>
+          <Text style={styles.guestSub}>
+            سجّل دخولك أو أنشئ حساباً مجانياً لتتمتع بتجربة شراء كاملة وتتبع طلباتك
+          </Text>
+          <View style={styles.guestBtnGroup}>
+            <TouchableOpacity
+              style={styles.guestLoginBtn}
+              onPress={() => router.push("/(auth)/login")}
+            >
+              <Ionicons name="log-in-outline" size={20} color="#fff" />
+              <Text style={styles.guestLoginBtnText}>تسجيل الدخول</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.guestRegisterBtn}
+              onPress={() => router.push("/(auth)/register")}
+            >
+              <Ionicons name="person-add-outline" size={20} color={Colors.primary} />
+              <Text style={styles.guestRegisterBtnText}>إنشاء حساب مجاني</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.guestPerksCard}>
+          <Text style={styles.guestPerksTitle}>مزايا التسجيل</Text>
+          {[
+            { icon: "cube-outline", text: "تتبع طلباتك في الوقت الفعلي", color: Colors.primary },
+            { icon: "heart-outline", text: "حفظ قائمة أدويتك المفضلة", color: Colors.error },
+            { icon: "location-outline", text: "إدارة عناوين التوصيل بسهولة", color: "#3182CE" },
+            { icon: "notifications-outline", text: "إشعارات عند وصول طلبك", color: "#D69E2E" },
+            { icon: "pricetag-outline", text: "عروض وخصومات حصرية للأعضاء", color: "#0D7A54" },
+          ].map(perk => (
+            <View key={perk.text} style={styles.guestPerkRow}>
+              <Text style={styles.guestPerkText}>{perk.text}</Text>
+              <View style={[styles.guestPerkIcon, { backgroundColor: perk.color + "18" }]}>
+                <Ionicons name={perk.icon as any} size={18} color={perk.color} />
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={[styles.section, { marginTop: 8 }]}>
+          <Text style={styles.sectionTitle}>اللغة والمنطقة</Text>
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.localeRow} onPress={() => setShowLanguage(true)}>
+              <Ionicons name="chevron-back" size={16} color={Colors.textMuted} />
+              <View style={styles.localeRight}>
+                <Text style={styles.localeValue}>{language.flag} {language.nativeName}</Text>
+                <Text style={styles.localeLabel}>اللغة</Text>
+              </View>
+              <View style={[styles.menuIcon, { backgroundColor: Colors.primaryLight }]}>
+                <Ionicons name="language-outline" size={18} color={Colors.primary} />
+              </View>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.localeRow} onPress={() => setShowCountry(true)}>
+              <Ionicons name="chevron-back" size={16} color={Colors.textMuted} />
+              <View style={styles.localeRight}>
+                <Text style={styles.localeValue}>{country.flag} {country.nameAr}</Text>
+                <Text style={styles.localeLabel}>البلد ({country.dialCode})</Text>
+              </View>
+              <View style={[styles.menuIcon, { backgroundColor: Colors.primaryLight }]}>
+                <Ionicons name="globe-outline" size={18} color={Colors.primary} />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <LanguageSelector
+          visible={showLanguage}
+          onClose={() => setShowLanguage(false)}
+          data={LANGUAGES}
+          selected={language}
+          onSelect={setLanguage}
+        />
+        <CountrySelector
+          visible={showCountry}
+          onClose={() => setShowCountry(false)}
+          data={COUNTRIES}
+          selected={country}
+          onSelect={setCountry}
+        />
+      </ScrollView>
+    );
+  }
 
   return (
     <>
@@ -247,4 +348,39 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.errorLight, borderRadius: 14, padding: 16,
   },
   logoutText: { fontSize: 16, fontWeight: "700", color: Colors.error },
+  guestHero: {
+    backgroundColor: Colors.surface, padding: 28, alignItems: "center", gap: 12,
+    marginBottom: 16,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+  },
+  guestAvatarWrap: { marginBottom: 4 },
+  guestAvatar: {
+    width: 90, height: 90, borderRadius: 45,
+    backgroundColor: Colors.primaryLight, alignItems: "center", justifyContent: "center",
+    borderWidth: 2, borderColor: Colors.primary + "30",
+  },
+  guestTitle: { fontSize: 22, fontWeight: "800", color: Colors.textPrimary, textAlign: "center" },
+  guestSub: { fontSize: 14, color: Colors.textMuted, textAlign: "center", lineHeight: 22, paddingHorizontal: 8 },
+  guestBtnGroup: { width: "100%", gap: 10, marginTop: 4 },
+  guestLoginBtn: {
+    backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 15,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+  },
+  guestLoginBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  guestRegisterBtn: {
+    borderWidth: 2, borderColor: Colors.primary, borderRadius: 14, paddingVertical: 13,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+  },
+  guestRegisterBtnText: { fontSize: 15, fontWeight: "700", color: Colors.primary },
+  guestPerksCard: {
+    backgroundColor: Colors.surface, marginHorizontal: 16, borderRadius: 18,
+    padding: 20, gap: 4, marginBottom: 16,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+  },
+  guestPerksTitle: {
+    fontSize: 16, fontWeight: "800", color: Colors.textPrimary, textAlign: "right", marginBottom: 10,
+  },
+  guestPerkRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
+  guestPerkIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  guestPerkText: { flex: 1, fontSize: 14, color: Colors.textSecondary, textAlign: "right", fontWeight: "500" },
 });

@@ -1,12 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, Alert, Platform, Linking,
+  TextInput, Alert, Platform, Linking, Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCart, CartItem } from "@/contexts/CartContext";
 import { useOrders } from "@/contexts/OrdersContext";
 
@@ -21,6 +23,8 @@ type PaymentMethod = "cod" | "card" | "whatsapp";
 
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { user } = useAuth();
   const { items, totalPrice, updateQuantity, removeItem, clearCart } = useCart();
   const { placeCustomerOrder } = useOrders();
   const [promoCode, setPromoCode] = useState("");
@@ -32,6 +36,7 @@ export default function CartScreen() {
   const [cardName, setCardName] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
+  const [showGuestModal, setShowGuestModal] = useState(false);
 
   const topInset = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomInset = insets.bottom + (Platform.OS === "web" ? 34 : 0);
@@ -54,6 +59,12 @@ export default function CartScreen() {
   };
 
   const handleCheckout = () => {
+    // Gate: guests must log in or register before purchasing
+    if (!user) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setShowGuestModal(true);
+      return;
+    }
     if (paymentMethod === "card") {
       if (!cardNumber || !cardName || !cardExpiry || !cardCvv) {
         Alert.alert("معلومات البطاقة", "يرجى إدخال جميع بيانات البطاقة المصرفية");
@@ -308,6 +319,49 @@ export default function CartScreen() {
           />
         </TouchableOpacity>
       </View>
+
+      {/* Guest Checkout Gate Modal */}
+      <Modal visible={showGuestModal} transparent animationType="slide" onRequestClose={() => setShowGuestModal(false)}>
+        <TouchableOpacity
+          style={styles.guestOverlay}
+          activeOpacity={1}
+          onPress={() => setShowGuestModal(false)}
+        >
+          <View style={styles.guestSheet} onStartShouldSetResponder={() => true}>
+            <View style={styles.guestHandle} />
+
+            <View style={styles.guestIconWrap}>
+              <Ionicons name="lock-closed" size={36} color={Colors.primary} />
+            </View>
+            <Text style={styles.guestTitle}>تسجيل الدخول مطلوب</Text>
+            <Text style={styles.guestSub}>
+              أضفت منتجات رائعة! سجّل دخولك أو أنشئ حساباً لإتمام الطلب وتتبع توصيلك.
+            </Text>
+
+            <View style={styles.guestBtnGroup}>
+              <TouchableOpacity
+                style={styles.guestLoginBtn}
+                onPress={() => { setShowGuestModal(false); router.push("/(auth)/login"); }}
+              >
+                <Ionicons name="log-in-outline" size={20} color="#fff" />
+                <Text style={styles.guestLoginBtnText}>تسجيل الدخول</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.guestRegisterBtn}
+                onPress={() => { setShowGuestModal(false); router.push("/(auth)/register"); }}
+              >
+                <Ionicons name="person-add-outline" size={20} color={Colors.primary} />
+                <Text style={styles.guestRegisterBtnText}>إنشاء حساب مجاني</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.guestCancelBtn} onPress={() => setShowGuestModal(false)}>
+              <Text style={styles.guestCancelText}>متابعة التصفح</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -515,4 +569,38 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 4,
   },
+  guestOverlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end",
+  },
+  guestSheet: {
+    backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 28, paddingBottom: 40, alignItems: "center", gap: 14,
+  },
+  guestHandle: {
+    width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, marginBottom: 6,
+  },
+  guestIconWrap: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: Colors.primaryLight, alignItems: "center", justifyContent: "center",
+    marginBottom: 4,
+  },
+  guestTitle: { fontSize: 22, fontWeight: "800", color: Colors.textPrimary, textAlign: "center" },
+  guestSub: {
+    fontSize: 14, color: Colors.textMuted, textAlign: "center", lineHeight: 22, paddingHorizontal: 8,
+  },
+  guestBtnGroup: { width: "100%", gap: 10, marginTop: 4 },
+  guestLoginBtn: {
+    backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 15,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+  },
+  guestLoginBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  guestRegisterBtn: {
+    borderWidth: 2, borderColor: Colors.primary, borderRadius: 14, paddingVertical: 13,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+  },
+  guestRegisterBtnText: { fontSize: 15, fontWeight: "700", color: Colors.primary },
+  guestCancelBtn: {
+    paddingVertical: 10, alignItems: "center",
+  },
+  guestCancelText: { fontSize: 14, color: Colors.textMuted, fontWeight: "500" },
 });

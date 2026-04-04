@@ -41,7 +41,8 @@ function RootLayoutNav() {
     const inAdmin = seg0 === "(admin)";
 
     if (!user) {
-      if (!inAuth) router.replace("/(auth)/welcome");
+      // Guests are allowed in (auth) and (customer) — browsing without registration
+      if (!inAuth && !inCustomer) router.replace("/(auth)/welcome");
     } else if (user.type === "admin") {
       if (!inAdmin) router.replace("/(admin)");
     } else if (user.type === "pharmacy") {

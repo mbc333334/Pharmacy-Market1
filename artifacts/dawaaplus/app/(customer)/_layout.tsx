@@ -37,7 +37,7 @@ function SidebarNav() {
   const router = useRouter();
   const segments = useSegments();
   const { isDesktop, sidebarWidth } = useLayout();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const { t } = useTranslation();
   const { totalItems } = useCart();
   const currentRoute = (segments as string[])[segments.length - 1] || "index";
@@ -82,10 +82,17 @@ function SidebarNav() {
         })}
       </ScrollView>
 
-      <TouchableOpacity style={styles.sidebarLogout} onPress={() => logout()}>
-        <Ionicons name="log-out-outline" size={22} color={Colors.error} />
-        {isDesktop && <Text style={styles.sidebarLogoutText}>{t("logout")}</Text>}
-      </TouchableOpacity>
+      {user ? (
+        <TouchableOpacity style={styles.sidebarLogout} onPress={() => logout()}>
+          <Ionicons name="log-out-outline" size={22} color={Colors.error} />
+          {isDesktop && <Text style={styles.sidebarLogoutText}>{t("logout")}</Text>}
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity style={styles.sidebarLogin} onPress={() => router.push("/(auth)/login")}>
+          <Ionicons name="log-in-outline" size={22} color={Colors.primary} />
+          {isDesktop && <Text style={styles.sidebarLoginText}>تسجيل الدخول</Text>}
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -216,4 +223,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 12, borderRadius: 12, marginTop: 8,
   },
   sidebarLogoutText: { fontSize: 14, fontWeight: "600", color: Colors.error },
+  sidebarLogin: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 10, paddingVertical: 12, borderRadius: 12, marginTop: 8,
+    backgroundColor: Colors.primaryLight,
+  },
+  sidebarLoginText: { fontSize: 14, fontWeight: "600", color: Colors.primary },
 });

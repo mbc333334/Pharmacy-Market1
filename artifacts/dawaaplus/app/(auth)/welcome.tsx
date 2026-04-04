@@ -116,6 +116,14 @@ export default function WelcomeScreen() {
           <Text style={styles.registerBtnText}>{t("register")}</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.guestBtn}
+          onPress={() => router.replace("/(customer)")}
+        >
+          <Ionicons name="eye-outline" size={16} color={Colors.textMuted} />
+          <Text style={styles.guestBtnText}>تصفح بدون تسجيل</Text>
+        </TouchableOpacity>
+
         <View style={styles.linksRow}>
           <TouchableOpacity
             style={styles.linkBtn}
@@ -281,6 +289,11 @@ const styles = StyleSheet.create({
     alignItems: "center", marginBottom: 16,
   },
   registerBtnText: { fontSize: 15, fontWeight: "700", color: Colors.primary },
+  guestBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, paddingVertical: 10, marginBottom: 12,
+  },
+  guestBtnText: { fontSize: 13, color: Colors.textMuted, fontWeight: "600" },
   linksRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16,
   },
