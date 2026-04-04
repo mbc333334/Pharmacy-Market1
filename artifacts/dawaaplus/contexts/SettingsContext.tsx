@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { LANGUAGES, COUNTRIES, Language, Country } from "@/data/locales";
+import { getTranslations, Translations } from "@/constants/translations";
 
 interface SettingsContextType {
   language: Language;
   country: Country;
   setLanguage: (lang: Language) => void;
   setCountry: (country: Country) => void;
+  t: Translations;
 }
 
 const DEFAULT_LANGUAGE = LANGUAGES.find(l => l.code === "ar")!;
@@ -25,8 +27,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setCountryState(c);
   }, []);
 
+  const t = getTranslations(language.code);
+
   return (
-    <SettingsContext.Provider value={{ language, country, setLanguage, setCountry }}>
+    <SettingsContext.Provider value={{ language, country, setLanguage, setCountry, t }}>
       {children}
     </SettingsContext.Provider>
   );

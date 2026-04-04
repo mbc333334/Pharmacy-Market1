@@ -10,6 +10,19 @@ const C = {
   red:"#E53E3E", green:"#38A169", blue:"#3182CE", orange:"#DD6B20",
 };
 
+const DC_COMPANIES_LIST = [
+  { id:"dc1", name:"شركة الإسراع للتوصيل", phone:"9647501222222" },
+  { id:"dc2", name:"توصيل الخليج",          phone:"9647701222223" },
+  { id:"dc3", name:"شركة السهم السريع",      phone:"9647601222224" },
+  { id:"dc4", name:"نجوم التوصيل",           phone:"9647801222225" },
+];
+function getDeliveryCompanies() {
+  return DC_COMPANIES_LIST.map(dc => {
+    try { const s=localStorage.getItem(`dc_profile_${dc.id}`); if(s){ const p=JSON.parse(s); return {...dc,name:p.name||dc.name,phone:(p.phone||dc.phone).replace(/^0/,"964")}; } } catch {}
+    return dc;
+  });
+}
+
 const WAREHOUSES = [
   { id:"wh1", name:"مذخر الخليج",      phone:"07501111111", pass:"123456", city:"أربيل",       address:"المنطقة الصناعية",  license:"WH-2024-001", email:"gulf@email.com",     plan:"premium",  revenue:18500000, joined:"2024-01-10" },
   { id:"wh2", name:"مذخر الرافدين",    phone:"07701111112", pass:"123456", city:"السليمانية",  address:"شارع التجار",       license:"WH-2024-002", email:"rafidain@email.com", plan:"standard", revenue:12200000, joined:"2024-02-05" },
@@ -52,6 +65,7 @@ export default function App() {
   const [linkedPharmacies, setLinkedPharmacies] = useState(LINKED_PHARMACIES);
   const [profile, setProfile] = useState<any>(null);
   const [social, setSocialState] = useState<any>({ facebook:"", instagram:"", tiktok:"", website:"", whatsapp:"" });
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(()=>{
     if (!wh) return;
@@ -71,13 +85,15 @@ export default function App() {
     {id:"pharm",l:"الصيدليات",i:"💊"},{id:"orders",l:"الطلبات",i:"🛒"},{id:"sub",l:"الاشتراك",i:"💎"},
     {id:"fin",l:"المالية",i:"💰"},{id:"social",l:"وسائل التواصل",i:"📱"},{id:"sup",l:"الدعم",i:"💬"}];
 
-  if (!wh) return <Login onLogin={w=>{ setWh(w); setSec("dash"); }} />;
+  if (!wh) return <Login onLogin={w=>{ setWh(w); setSec("dash"); setShowWelcome(true); }} />;
+  const portalUrl = `${window.location.origin}/dawaaplus-warehouses/`;
   return (
     <div dir="rtl" style={{ display:"flex", height:"100vh", fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif", overflow:"hidden" }}>
+      {showWelcome && <WelcomeShareModal user={wh} onClose={()=>setShowWelcome(false)} portalUrl={portalUrl} portalName="بوابة المذاخر" color={C.primary} icon="🏭" />}
       <Sidebar color={C.primary} icon="🏭" title="بوابة المذخر" name={wh.name}
         menu={MENU} active={sec} onNav={setSec} onLogout={()=>setWh(null)} />
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        <TopBar color={C.primary} label={MENU.find(m=>m.id===sec)?.l||""} name={wh.name} />
+        <TopBar color={C.primary} label={MENU.find(m=>m.id===sec)?.l||""} name={wh.name} portalUrl={portalUrl} />
         <div style={{ flex:1, overflowY:"auto", padding:20, background:C.bg }}>
           {sec==="dash"   && <WhDash wh={wh} products={products} orders={orders} pharmacies={linkedPharmacies} />}
           {sec==="acc"    && <WhAccount wh={profile||wh} onSave={saveProfile} />}
@@ -258,25 +274,38 @@ function Pharmacies({ pharmacies, color }:any) {
 }
 
 function Orders({ orders, onUpdate, color }:any) {
-  const update=(id:string,status:string)=>onUpdate(orders.map((o:any)=>o.id===id?{...o,status}:o));
+  const [companies] = useState(()=>getDeliveryCompanies());
+  const updateStatus=(id:string,status:string)=>onUpdate(orders.map((o:any)=>o.id===id?{...o,status}:o));
+  const updateDc=(id:string,dcId:string)=>onUpdate(orders.map((o:any)=>o.id===id?{...o,dcId}:o));
   return (
     <div>
-      <AppSync text="طلبات الصيدليات تصل هنا مباشرة — عدّل الحالة لإعلامها بالتقدم" />
+      <AppSync text="طلبات الصيدليات تصل هنا مباشرة — عدّل الحالة وعيّن شركة توصيل" />
       <Card><SH icon="🛒" title={`طلبات الصيدليات (${orders.length})`} />
         {orders.map((o:any)=>(
-          <div key={o.id} style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:`1px solid ${C.border}` }}>
-            <div>
-              <div style={{ fontWeight:700,color,fontSize:13 }}>{o.id}</div>
-              <div style={{ fontSize:13 }}>{o.product}</div>
-              <div style={{ fontSize:11,color:C.muted }}>الصيدلية: {o.pharmacy} · {o.date}</div>
+          <div key={o.id} style={{ borderBottom:`1px solid ${C.border}`, padding:"12px 0" }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8 }}>
+              <div>
+                <div style={{ fontWeight:700,color,fontSize:13 }}>{o.id}</div>
+                <div style={{ fontSize:13 }}>{o.product}</div>
+                <div style={{ fontSize:11,color:C.muted }}>الصيدلية: {o.pharmacy} · {o.date}</div>
+              </div>
+              <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+                <span style={{ fontWeight:700 }}>{o.amount.toLocaleString()} د.ع</span>
+                <select value={o.status} onChange={e=>updateStatus(o.id,e.target.value)}
+                  style={{ border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 9px",fontSize:12,cursor:"pointer" }}>
+                  <option value="new">جديد</option><option value="processing">قيد التجهيز</option>
+                  <option value="completed">مكتمل</option><option value="cancelled">ملغي</option>
+                </select>
+              </div>
             </div>
-            <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-              <span style={{ fontWeight:700 }}>{o.amount.toLocaleString()} د.ع</span>
-              <select value={o.status} onChange={e=>update(o.id,e.target.value)}
-                style={{ border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 9px",fontSize:12,cursor:"pointer" }}>
-                <option value="new">جديد</option><option value="processing">قيد التجهيز</option>
-                <option value="completed">مكتمل</option><option value="cancelled">ملغي</option>
+            <div style={{ display:"flex",alignItems:"center",gap:8,background:C.bg,borderRadius:8,padding:"7px 10px" }}>
+              <span style={{ fontSize:11,color:C.muted,flexShrink:0 }}>🚚 التوصيل:</span>
+              <select value={o.dcId||""} onChange={e=>updateDc(o.id,e.target.value)}
+                style={{ border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 8px",fontSize:11,cursor:"pointer",flex:1 }}>
+                <option value="">— بدون تعيين (اختياري) —</option>
+                {companies.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              {o.dcId && <a href={`https://wa.me/${companies.find((c:any)=>c.id===o.dcId)?.phone}?text=${encodeURIComponent(`طلب ${o.id} — ${o.product} — الصيدلية: ${o.pharmacy}`)}`} target="_blank" rel="noreferrer" style={{ background:"#25D366",color:"#fff",borderRadius:7,padding:"4px 10px",fontSize:11,textDecoration:"none",fontWeight:700,flexShrink:0 }}>📲 واتساب</a>}
             </div>
           </div>
         ))}
@@ -471,13 +500,49 @@ function Sidebar({ color,icon,title,name,menu,active,onNav,onLogout }:any) {
     </div>
   );
 }
-function TopBar({ color,label,name }:any) {
+function TopBar({ color,label,name,portalUrl }:any) {
+  const [copied,setCopied]=useState(false);
+  const copy=()=>{ navigator.clipboard.writeText(portalUrl||window.location.href).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); }); };
+  const msg=encodeURIComponent(`🏭 منصة دواء+ | بوابة المذاخر\n${portalUrl||window.location.origin}`);
   return (
     <div style={{ background:"#fff",borderBottom:`1px solid ${C.border}`,padding:"0 20px",height:56,display:"flex",alignItems:"center",gap:12,flexShrink:0 }}>
       <div style={{ flex:1 }}><span style={{ fontWeight:800,fontSize:15 }}>{label}</span></div>
-      <div style={{ display:"flex",alignItems:"center",gap:6,background:`${C.primary}12`,borderRadius:20,padding:"5px 12px",border:`1px solid ${C.primary}30` }}>
-        <span style={{ width:7,height:7,borderRadius:"50%",background:C.green,display:"block" }} />
-        <span style={{ fontSize:11,color:C.primary,fontWeight:700 }}>📡 متزامن مع المنصة</span>
+      <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+        <button onClick={copy} style={{ background:copied?"#F0FFF4":"#EDF2F7",border:`1px solid ${copied?C.green:C.border}`,borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700,color:copied?C.green:C.text }}>{copied?"✅ تم":"🔗 الرابط"}</button>
+        <a href={`https://wa.me/?text=${msg}`} target="_blank" rel="noreferrer" style={{ background:"#25D366",color:"#fff",borderRadius:8,padding:"5px 10px",fontSize:11,textDecoration:"none",fontWeight:700 }}>💬 واتساب</a>
+        <div style={{ display:"flex",alignItems:"center",gap:6,background:`${C.primary}12`,borderRadius:20,padding:"5px 12px",border:`1px solid ${C.primary}30` }}>
+          <span style={{ width:7,height:7,borderRadius:"50%",background:C.green,display:"block" }} />
+          <span style={{ fontSize:11,color:C.primary,fontWeight:700 }}>📡 متزامن مع المنصة</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WelcomeShareModal({ user,onClose,portalUrl,portalName,color,icon }:any) {
+  const [copied,setCopied]=useState(false);
+  const phone=(user.phone||"").replace(/^0/,"964");
+  const msg=encodeURIComponent(`${icon} مرحباً في دواء+!\n${portalName}\n\nيمكنك الوصول عبر:\n${portalUrl}\n\nرقم الدخول: ${user.phone}`);
+  const copy=()=>{ navigator.clipboard.writeText(portalUrl).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); }); };
+  return (
+    <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20 }}>
+      <div dir="rtl" style={{ background:"#fff",borderRadius:22,padding:30,maxWidth:420,width:"100%",boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }}>
+        <div style={{ textAlign:"center",marginBottom:20 }}>
+          <div style={{ fontSize:52,marginBottom:8 }}>{icon}</div>
+          <h2 style={{ fontSize:22,fontWeight:900,margin:"0 0 6px",color:C.text }}>مرحباً بك في دواء+ 🎉</h2>
+          <p style={{ fontSize:13,color:C.muted,margin:0 }}>احتفظ برابط منصتك وشاركه مع فريقك</p>
+        </div>
+        <div style={{ background:C.bg,borderRadius:12,padding:"12px 16px",marginBottom:18,border:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:11,color:C.muted,marginBottom:4 }}>🔗 رابط {portalName}</div>
+          <div style={{ fontSize:12,fontWeight:700,color:C.text,wordBreak:"break-all" }}>{portalUrl}</div>
+        </div>
+        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12 }}>
+          <a href={`https://wa.me/${phone}?text=${msg}`} target="_blank" rel="noreferrer" style={{ background:"#25D366",color:"#fff",borderRadius:10,padding:"12px 10px",textDecoration:"none",textAlign:"center",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6 }}>💬 واتساب</a>
+          <a href={`https://t.me/share/url?url=${encodeURIComponent(portalUrl)}&text=${encodeURIComponent(`${icon} دواء+ | ${portalName}`)}`} target="_blank" rel="noreferrer" style={{ background:"#2AABEE",color:"#fff",borderRadius:10,padding:"12px 10px",textDecoration:"none",textAlign:"center",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6 }}>✈️ تيليغرام</a>
+          <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(portalUrl)}`} target="_blank" rel="noreferrer" style={{ background:"#1877F2",color:"#fff",borderRadius:10,padding:"12px 10px",textDecoration:"none",textAlign:"center",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6 }}>📘 فيسبوك</a>
+          <button onClick={copy} style={{ background:copied?C.green:color,color:"#fff",border:"none",borderRadius:10,padding:"12px 10px",textAlign:"center",fontWeight:700,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6 }}>{copied?"✅ تم النسخ!":"📋 نسخ الرابط"}</button>
+        </div>
+        <button onClick={onClose} style={{ width:"100%",background:"#EDF2F7",color:C.text,border:"none",borderRadius:10,padding:11,fontWeight:700,cursor:"pointer",fontSize:13 }}>متابعة إلى لوحة التحكم ←</button>
       </div>
     </div>
   );

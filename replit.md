@@ -24,9 +24,19 @@ pnpm workspace monorepo using TypeScript. داواپلاس is a pharmacy & medic
 
 ## i18n System
 
-- Translations: `artifacts/dawaaplus/i18n/translations.ts` — all keys in ar/ku/en
-- Hook: `artifacts/dawaaplus/i18n/index.ts` — `useTranslation()` returns `t()` and `isRTL`
-- Languages: `artifacts/dawaaplus/data/locales.ts` — trimmed to 3 core languages
+- Translations: `artifacts/dawaaplus/constants/translations.ts` — 70+ keys in 6 languages (ar/ku/en/fa/tr/fr) via `getTranslations(langCode)`
+- Hook: `artifacts/dawaaplus/i18n.ts` — `useTranslation()` returns `{ t(), lang, isRtl }` — t() accepts any key from Translations interface
+- Context: `artifacts/dawaaplus/contexts/SettingsContext.tsx` — `SettingsProvider` exposes `{ language, country, setLanguage, setCountry, t: Translations }`
+- Languages list: `artifacts/dawaaplus/data/locales.ts` — 70+ languages with rtl flag, country list
+- Applied: customer tab bar labels (home/browse/pharmacies/cart/profile) + pharmacy/warehouse sidebar labels
+
+## Web Portals
+
+- **Pharmacy portal** (`dawaaplus-pharmacies`): WelcomeShareModal on login, TopBar with WhatsApp + copy-link, delivery company assignment on orders
+- **Warehouse portal** (`dawaaplus-warehouses`): WelcomeShareModal on login, TopBar with WhatsApp + copy-link, delivery company assignment on orders
+- **Delivery portal** (`dawaaplus-delivery`): WelcomeShareModal on login, TopBar with WhatsApp + copy-link
+- **Admin portal** (`dawaaplus-web`): reads subscriber data via shared localStorage + BroadcastChannel `dawapl_sync`
+- **Shared localStorage schema**: `ph_profile_${id}`, `wh_profile_${id}`, `dc_profile_${id}`, `dc_companies_list`
 
 ## Stack
 

@@ -44,6 +44,7 @@ export default function App() {
   const [trips, setTripsState]     = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [social, setSocialState] = useState<any>({ facebook:"", instagram:"", tiktok:"", website:"", whatsapp:"" });
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(()=>{
     if (!dc) return;
@@ -62,13 +63,15 @@ export default function App() {
     {id:"drivers",l:"السائقون",i:"👨‍✈️"},{id:"ratings",l:"التقييمات",i:"⭐"},{id:"sub",l:"الاشتراك",i:"💎"},
     {id:"fin",l:"المالية",i:"💰"},{id:"social",l:"وسائل التواصل",i:"📱"},{id:"sup",l:"الدعم",i:"💬"}];
 
-  if (!dc) return <Login onLogin={c=>{ setDc(c); setSec("dash"); }} />;
+  if (!dc) return <Login onLogin={c=>{ setDc(c); setSec("dash"); setShowWelcome(true); }} />;
+  const portalUrl = `${window.location.origin}/dawaaplus-delivery/`;
   return (
     <div dir="rtl" style={{ display:"flex", height:"100vh", fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif", overflow:"hidden" }}>
+      {showWelcome && <WelcomeShareModal user={dc} onClose={()=>setShowWelcome(false)} portalUrl={portalUrl} portalName="بوابة شركات التوصيل" color={C.primary} icon="🚚" />}
       <Sidebar color={C.primary} icon="🚚" title="بوابة التوصيل" name={dc.name}
         menu={MENU} active={sec} onNav={setSec} onLogout={()=>setDc(null)} />
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        <TopBar color={C.primary} label={MENU.find(m=>m.id===sec)?.l||""} name={dc.name} />
+        <TopBar color={C.primary} label={MENU.find(m=>m.id===sec)?.l||""} name={dc.name} portalUrl={portalUrl} />
         <div style={{ flex:1, overflowY:"auto", padding:20, background:C.bg }}>
           {sec==="dash"    && <DcDash dc={dc} drivers={drivers} trips={trips} />}
           {sec==="acc"     && <DcAccount dc={profile||dc} onSave={saveProfile} />}
@@ -502,13 +505,49 @@ function Sidebar({ color,icon,title,name,menu,active,onNav,onLogout }:any) {
     </div>
   );
 }
-function TopBar({ color,label,name }:any) {
+function TopBar({ color,label,name,portalUrl }:any) {
+  const [copied,setCopied]=useState(false);
+  const copy=()=>{ navigator.clipboard.writeText(portalUrl||window.location.href).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); }); };
+  const msg=encodeURIComponent(`🚚 منصة دواء+ | بوابة شركات التوصيل\n${portalUrl||window.location.origin}`);
   return (
     <div style={{ background:"#fff",borderBottom:`1px solid ${C.border}`,padding:"0 20px",height:56,display:"flex",alignItems:"center",gap:12,flexShrink:0 }}>
       <div style={{ flex:1 }}><span style={{ fontWeight:800,fontSize:15 }}>{label}</span></div>
-      <div style={{ display:"flex",alignItems:"center",gap:6,background:`${color}15`,borderRadius:20,padding:"5px 12px",border:`1px solid ${color}40` }}>
-        <span style={{ width:7,height:7,borderRadius:"50%",background:C.green,display:"block" }} />
-        <span style={{ fontSize:11,color:C.dark,fontWeight:700 }}>🚚 متزامن مع المنصة</span>
+      <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+        <button onClick={copy} style={{ background:copied?"#F0FFF4":"#EDF2F7",border:`1px solid ${copied?C.green:C.border}`,borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700,color:copied?C.green:C.text }}>{copied?"✅ تم":"🔗 الرابط"}</button>
+        <a href={`https://wa.me/?text=${msg}`} target="_blank" rel="noreferrer" style={{ background:"#25D366",color:"#fff",borderRadius:8,padding:"5px 10px",fontSize:11,textDecoration:"none",fontWeight:700 }}>💬 واتساب</a>
+        <div style={{ display:"flex",alignItems:"center",gap:6,background:`${color}15`,borderRadius:20,padding:"5px 12px",border:`1px solid ${color}40` }}>
+          <span style={{ width:7,height:7,borderRadius:"50%",background:C.green,display:"block" }} />
+          <span style={{ fontSize:11,color:C.dark,fontWeight:700 }}>🚚 متزامن مع المنصة</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WelcomeShareModal({ user,onClose,portalUrl,portalName,color,icon }:any) {
+  const [copied,setCopied]=useState(false);
+  const phone=(user.phone||"").replace(/^0/,"964");
+  const msg=encodeURIComponent(`${icon} مرحباً في دواء+!\n${portalName}\n\nيمكنك الوصول عبر:\n${portalUrl}\n\nرقم الدخول: ${user.phone}`);
+  const copy=()=>{ navigator.clipboard.writeText(portalUrl).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); }); };
+  return (
+    <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20 }}>
+      <div dir="rtl" style={{ background:"#fff",borderRadius:22,padding:30,maxWidth:420,width:"100%",boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }}>
+        <div style={{ textAlign:"center",marginBottom:20 }}>
+          <div style={{ fontSize:52,marginBottom:8 }}>{icon}</div>
+          <h2 style={{ fontSize:22,fontWeight:900,margin:"0 0 6px",color:C.text }}>مرحباً بك في دواء+ 🎉</h2>
+          <p style={{ fontSize:13,color:C.muted,margin:0 }}>احتفظ برابط منصتك وشاركه مع فريقك</p>
+        </div>
+        <div style={{ background:C.bg,borderRadius:12,padding:"12px 16px",marginBottom:18,border:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:11,color:C.muted,marginBottom:4 }}>🔗 رابط {portalName}</div>
+          <div style={{ fontSize:12,fontWeight:700,color:C.text,wordBreak:"break-all" }}>{portalUrl}</div>
+        </div>
+        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12 }}>
+          <a href={`https://wa.me/${phone}?text=${msg}`} target="_blank" rel="noreferrer" style={{ background:"#25D366",color:"#fff",borderRadius:10,padding:"12px 10px",textDecoration:"none",textAlign:"center",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6 }}>💬 واتساب</a>
+          <a href={`https://t.me/share/url?url=${encodeURIComponent(portalUrl)}&text=${encodeURIComponent(`${icon} دواء+ | ${portalName}`)}`} target="_blank" rel="noreferrer" style={{ background:"#2AABEE",color:"#fff",borderRadius:10,padding:"12px 10px",textDecoration:"none",textAlign:"center",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6 }}>✈️ تيليغرام</a>
+          <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(portalUrl)}`} target="_blank" rel="noreferrer" style={{ background:"#1877F2",color:"#fff",borderRadius:10,padding:"12px 10px",textDecoration:"none",textAlign:"center",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6 }}>📘 فيسبوك</a>
+          <button onClick={copy} style={{ background:copied?C.green:color,color:"#fff",border:"none",borderRadius:10,padding:"12px 10px",textAlign:"center",fontWeight:700,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6 }}>{copied?"✅ تم النسخ!":"📋 نسخ الرابط"}</button>
+        </div>
+        <button onClick={onClose} style={{ width:"100%",background:"#EDF2F7",color:C.text,border:"none",borderRadius:10,padding:11,fontWeight:700,cursor:"pointer",fontSize:13 }}>متابعة إلى لوحة التحكم ←</button>
       </div>
     </div>
   );

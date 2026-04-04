@@ -99,6 +99,7 @@ function SidebarNav() {
 
 export default function CustomerTabLayout() {
   const { useSidebar } = useLayout();
+  const { t } = useTranslation();
 
   if (useSidebar) {
     return (
@@ -145,7 +146,7 @@ export default function CustomerTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "الرئيسية",
+          title: t("home"),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
           ),
@@ -154,7 +155,7 @@ export default function CustomerTabLayout() {
       <Tabs.Screen
         name="browse"
         options={{
-          title: "تصفح",
+          title: t("browse"),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "search" : "search-outline"} size={24} color={color} />
           ),
@@ -163,7 +164,7 @@ export default function CustomerTabLayout() {
       <Tabs.Screen
         name="pharmacies"
         options={{
-          title: "الصيدليات",
+          title: t("pharmacies"),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "storefront" : "storefront-outline"} size={24} color={color} />
           ),
@@ -172,14 +173,14 @@ export default function CustomerTabLayout() {
       <Tabs.Screen
         name="cart"
         options={{
-          title: "سلتي",
+          title: t("cart"),
           tabBarIcon: ({ color, focused }) => <CartTabIcon color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "حسابي",
+          title: t("profile"),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
           ),
