@@ -372,7 +372,69 @@ export default function PharmacyImport() {
         {/* ── Sync Tab ── */}
         {activeTab === "sync" && (
           <View style={styles.section}>
-            {/* Manual Sync Button */}
+            {/* Auto Sync Master Toggle */}
+            <View style={[styles.syncCard, syncSettings.autoSyncEnabled && { borderWidth: 1.5, borderColor: ACCENT + "40" }]}>
+              <View style={styles.syncCardHeader}>
+                <Switch
+                  value={syncSettings.autoSyncEnabled}
+                  onValueChange={v => updateSyncSettings({ autoSyncEnabled: v })}
+                  thumbColor={syncSettings.autoSyncEnabled ? ACCENT : "#ccc"}
+                  trackColor={{ false: Colors.border, true: ACCENT + "50" }}
+                />
+                <View style={styles.syncCardInfo}>
+                  <Text style={styles.syncCardTitle}>المزامنة التلقائية</Text>
+                  <Text style={styles.syncCardSub}>
+                    {syncSettings.autoSyncEnabled
+                      ? "مفعّلة — يتحدث المخزون تلقائياً عند البيع أو الاستلام"
+                      : "موقوفة — يمكنك المزامنة يدوياً في أي وقت"}
+                  </Text>
+                </View>
+                <Ionicons
+                  name={syncSettings.autoSyncEnabled ? "sync-circle" : "sync-circle-outline"}
+                  size={26}
+                  color={syncSettings.autoSyncEnabled ? ACCENT : Colors.textMuted}
+                />
+              </View>
+            </View>
+
+            {/* Sub-options (only active when auto-sync is ON) */}
+            {syncSettings.autoSyncEnabled && (
+              <>
+                <View style={[styles.syncCard, styles.syncSubCard]}>
+                  <View style={styles.syncCardHeader}>
+                    <Switch
+                      value={syncSettings.syncOnSale}
+                      onValueChange={v => updateSyncSettings({ syncOnSale: v })}
+                      thumbColor={syncSettings.syncOnSale ? Colors.error : "#ccc"}
+                      trackColor={{ false: Colors.border, true: Colors.error + "50" }}
+                    />
+                    <View style={styles.syncCardInfo}>
+                      <Text style={styles.syncCardTitle}>خصم تلقائي عند البيع</Text>
+                      <Text style={styles.syncCardSub}>عند تسليم طلب عميل → تنقص الكمية تلقائياً</Text>
+                    </View>
+                    <Ionicons name="arrow-down-circle" size={22} color={Colors.error} />
+                  </View>
+                </View>
+
+                <View style={[styles.syncCard, styles.syncSubCard]}>
+                  <View style={styles.syncCardHeader}>
+                    <Switch
+                      value={syncSettings.syncOnRestock}
+                      onValueChange={v => updateSyncSettings({ syncOnRestock: v })}
+                      thumbColor={syncSettings.syncOnRestock ? Colors.success : "#ccc"}
+                      trackColor={{ false: Colors.border, true: Colors.success + "50" }}
+                    />
+                    <View style={styles.syncCardInfo}>
+                      <Text style={styles.syncCardTitle}>إضافة تلقائية عند الاستلام</Text>
+                      <Text style={styles.syncCardSub}>عند وصول شحنة من مذخر → تزيد الكمية تلقائياً</Text>
+                    </View>
+                    <Ionicons name="arrow-up-circle" size={22} color={Colors.success} />
+                  </View>
+                </View>
+              </>
+            )}
+
+            {/* Manual Sync Button — always available */}
             <TouchableOpacity
               style={[styles.manualSyncBtn, syncing && { opacity: 0.7 }]}
               disabled={syncing}
@@ -385,48 +447,16 @@ export default function PharmacyImport() {
             >
               {syncing
                 ? <ActivityIndicator color="#fff" size="small" />
-                : <Ionicons name="sync-outline" size={26} color="#fff" />}
+                : <Ionicons name="refresh-circle-outline" size={26} color="#fff" />}
               <View style={styles.manualSyncBtnInfo}>
                 <Text style={styles.manualSyncBtnTitle}>{syncing ? "جارٍ المزامنة..." : "مزامنة الآن"}</Text>
                 <Text style={styles.manualSyncBtnSub}>
                   {syncSettings.lastManualSync
-                    ? `آخر مزامنة: ${new Date(syncSettings.lastManualSync).toLocaleTimeString("ar-IQ")}`
-                    : "اضغط لمزامنة مخزونك مع قاعدة البيانات"}
+                    ? `آخر مزامنة يدوية: ${new Date(syncSettings.lastManualSync).toLocaleTimeString("ar-IQ")}`
+                    : "اضغط لمزامنة المخزون فوراً مع قاعدة البيانات"}
                 </Text>
               </View>
             </TouchableOpacity>
-
-            <View style={styles.syncCard}>
-              <View style={styles.syncCardHeader}>
-                <Switch
-                  value={syncSettings.syncOnSale}
-                  onValueChange={v => updateSyncSettings({ syncOnSale: v })}
-                  thumbColor={syncSettings.syncOnSale ? Colors.error : "#ccc"}
-                  trackColor={{ false: Colors.border, true: Colors.error + "50" }}
-                />
-                <View style={styles.syncCardInfo}>
-                  <Text style={styles.syncCardTitle}>خصم تلقائي عند البيع</Text>
-                  <Text style={styles.syncCardSub}>عند تسليم طلب عميل → تنقص الكمية تلقائياً</Text>
-                </View>
-                <Ionicons name="arrow-down-circle" size={24} color={Colors.error} />
-              </View>
-            </View>
-
-            <View style={styles.syncCard}>
-              <View style={styles.syncCardHeader}>
-                <Switch
-                  value={syncSettings.syncOnRestock}
-                  onValueChange={v => updateSyncSettings({ syncOnRestock: v })}
-                  thumbColor={syncSettings.syncOnRestock ? Colors.success : "#ccc"}
-                  trackColor={{ false: Colors.border, true: Colors.success + "50" }}
-                />
-                <View style={styles.syncCardInfo}>
-                  <Text style={styles.syncCardTitle}>إضافة تلقائية عند الاستلام</Text>
-                  <Text style={styles.syncCardSub}>عند وصول شحنة من مذخر → تزيد الكمية تلقائياً</Text>
-                </View>
-                <Ionicons name="arrow-up-circle" size={24} color={Colors.success} />
-              </View>
-            </View>
 
             <View style={styles.thresholdRow}>
               <TextInput
@@ -566,6 +596,7 @@ const styles = StyleSheet.create({
   manualSyncBtnTitle: { fontSize: 18, fontWeight: "800", color: "#fff", textAlign: "right" },
   manualSyncBtnSub: { fontSize: 12, color: "rgba(255,255,255,0.8)", textAlign: "right", marginTop: 3 },
   syncCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  syncSubCard: { marginRight: 16, borderWidth: 1, borderColor: Colors.border },
   syncCardHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
   syncCardInfo: { flex: 1 },
   syncCardTitle: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },

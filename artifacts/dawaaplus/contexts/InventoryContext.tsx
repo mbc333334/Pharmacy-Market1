@@ -79,9 +79,9 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [warehouseInventory, setWarehouseInventory] = useState<InventoryItem[]>(INITIAL_WAREHOUSE_INVENTORY);
   const [syncEvents, setSyncEvents] = useState<SyncEvent[]>([]);
   const [syncSettings, setSyncSettings] = useState<SyncSettings>({
-    autoSyncEnabled: false,
-    syncOnSale: false,
-    syncOnRestock: false,
+    autoSyncEnabled: true,
+    syncOnSale: true,
+    syncOnRestock: true,
     lowStockThreshold: 10,
     isConnected: false,
     connectedDbType: null,
@@ -124,7 +124,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   }, [logEvent]);
 
   const decrementOnSale = useCallback((items: { name: string; qty: number }[]) => {
-    if (!syncSettings.syncOnSale) return;
+    if (!syncSettings.autoSyncEnabled || !syncSettings.syncOnSale) return;
     setPharmacyInventory(prev => {
       const updated = [...prev];
       items.forEach(soldItem => {
@@ -149,10 +149,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       });
       return updated;
     });
-  }, [syncSettings.syncOnSale, logEvent]);
+  }, [syncSettings.autoSyncEnabled, syncSettings.syncOnSale, logEvent]);
 
   const restockFromWarehouse = useCallback((items: { name: string; qty: number; price?: number }[]) => {
-    if (!syncSettings.syncOnRestock) return;
+    if (!syncSettings.autoSyncEnabled || !syncSettings.syncOnRestock) return;
     setPharmacyInventory(prev => {
       const updated = [...prev];
       items.forEach(restockItem => {
@@ -198,7 +198,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       });
       return updated;
     });
-  }, [syncSettings.syncOnRestock, logEvent]);
+  }, [syncSettings.autoSyncEnabled, syncSettings.syncOnRestock, logEvent]);
 
   const importItems = useCallback((items: Omit<InventoryItem, "id">[], owner: "pharmacy" | "warehouse") => {
     const mapped = items.map((item, i) => ({ ...item, id: `imp-${Date.now()}-${i}` }));
