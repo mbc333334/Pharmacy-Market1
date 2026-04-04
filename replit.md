@@ -17,7 +17,10 @@ pnpm workspace monorepo using TypeScript. داواپلاس is a pharmacy & medic
 - **Warehouse Accounts**: Linked only to participating pharmacies, full dashboard with inventory/orders/pharmacies management
 - **Default Region**: Iraq (العراق, +964)
 - **Subscription System**: 3 tiers (Free/Standard/Premium) for pharmacies and warehouses, pricing in د.ع
-- **Admin Panel**: Subscription management, advertisements management, subscriber list
+- **Admin Panel**: Full subscription management (pending requests queue, approve/reject, plan change, block/unblock), advertisements, subscriber list, settings
+- **Admin Settings (⚙️)**: superadmin-only section — manage payment/collection accounts (add/edit/delete with icon & color picker), manage admin+supervisor accounts (phone login, role-based access)
+- **Multi-user Admin Login**: superadmin (admin/admin) + registered accounts by phone number; supervisors see all data but cannot access payment settings or admin account management
+- **localStorage keys**: `admin_accounts` (registered users), `platform_payment_accounts` (override payment numbers), `sub_requests` (upgrade request queue)
 - **Pharmacy Offers**: Pharmacies on Standard/Premium plans can create time-limited discount offers
 - **Quick Demo Login**: 4 demo buttons on login screen (customer/pharmacy/warehouse/admin)
 - **Admin Login**: +9647700000001 via the phone field

@@ -61,14 +61,35 @@ function readLiveDB() {
   return { pharmacies, warehouses, deliveries };
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-const ADMIN = { phone:"admin", password:"admin", name:"مدير المنصة" };
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+const SUPER_ADMIN = { phone:"admin", password:"admin", name:"مدير المنصة", role:"superadmin" };
+const rdLS = (k:string,d:any)=>{ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch{ return d; } };
+const wrLS = (k:string,v:any)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} };
+function getAdminAccounts(){ return rdLS("admin_accounts",[]) as any[]; }
+function getPlatformPaymentAccounts(){
+  const saved = rdLS("platform_payment_accounts", null);
+  if (saved && Array.isArray(saved) && saved.length>0) return saved;
+  return [
+    { id:"zainCash",   label:"زين كاش",     icon:"📱", color:"#8B1538", num:"07501000001", hint:"أرسل المبلغ ثم ضع رقم العملية" },
+    { id:"fastPay",    label:"فاست باي",    icon:"⚡", color:"#0066CC", num:"07509000001", hint:"احتفظ بصورة الإيصال" },
+    { id:"fib",        label:"FIB",         icon:"🏦", color:"#004E87", num:"IQ98FIBK0000001", hint:"تحويل مصرفي عبر تطبيق FIB" },
+    { id:"asiaHawala", label:"آسيا حوالة", icon:"💳", color:"#B45309", num:"AH-DAWAPLUS-001", hint:"أذكر اسم المستفيد: دواء+" },
+    { id:"cashAdmin",  label:"كاش / واتساب",icon:"💵", color:"#38A169", num:"07501234567",   hint:"تواصل مع المدير مباشرة" },
+  ];
+}
+function loginCheck(phone:string, pass:string): { name:string; role:string } | null {
+  if (phone.trim()===SUPER_ADMIN.phone && pass.trim()===SUPER_ADMIN.password)
+    return { name:SUPER_ADMIN.name, role:"superadmin" };
+  const accounts = getAdminAccounts();
+  const found = accounts.find((a:any)=>a.phone===phone.trim() && a.password===pass.trim());
+  return found ? { name:found.name, role:found.role } : null;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [logged, setLogged] = useState(false);
+  const [user, setUser] = useState<{name:string;role:string}|null>(null);
   const [db, setDB] = useState(() => readLiveDB());
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString("ar-IQ"));
 
@@ -78,21 +99,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Listen for updates from subscriber portals via BroadcastChannel
+    if (!user) return;
     let bc: BroadcastChannel | null = null;
-    try {
-      bc = new BroadcastChannel("dawapl_sync");
-      bc.onmessage = () => refreshDB();
-    } catch {}
-    // Also poll every 15 seconds
+    try { bc = new BroadcastChannel("dawapl_sync"); bc.onmessage = () => refreshDB(); } catch {}
     const interval = setInterval(refreshDB, 15000);
     return () => { bc?.close(); clearInterval(interval); };
-  }, [refreshDB]);
+  }, [refreshDB, user]);
 
-  if (!logged) return <LoginScreen onLogin={() => setLogged(true)} />;
+  if (!user) return <LoginScreen onLogin={(u) => setUser(u)} />;
   return (
     <div dir="rtl" style={{ fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif", minHeight:"100vh", background:C.bg }}>
-      <AdminPortal db={db} lastSync={lastSync} onRefresh={refreshDB} onLogout={() => setLogged(false)} />
+      <AdminPortal db={db} lastSync={lastSync} onRefresh={refreshDB} onLogout={()=>setUser(null)} user={user} />
     </div>
   );
 }
@@ -100,14 +117,15 @@ export default function App() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOGIN — ADMIN ONLY
 // ═══════════════════════════════════════════════════════════════════════════════
-function LoginScreen({ onLogin }: { onLogin:()=>void }) {
+function LoginScreen({ onLogin }: { onLogin:(u:{name:string;role:string})=>void }) {
   const [phone, setPhone] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
   const [showPass, setShowPass] = useState(false);
   const handle = () => {
-    if (phone.trim() === ADMIN.phone && pass.trim() === ADMIN.password) { setError(""); onLogin(); }
-    else setError("بيانات الدخول غير صحيحة");
+    const result = loginCheck(phone, pass);
+    if (result) { setError(""); onLogin(result); }
+    else setError("رقم الهاتف أو كلمة المرور غير صحيحة");
   };
   return (
     <div dir="rtl" style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
@@ -118,10 +136,10 @@ function LoginScreen({ onLogin }: { onLogin:()=>void }) {
       </div>
       <div style={{ maxWidth:400, margin:"-36px auto 0", padding:"0 20px 40px", width:"100%" }}>
         <div style={{ background:C.surface, borderRadius:20, padding:"28px 24px", boxShadow:"0 8px 40px rgba(0,0,0,0.12)" }}>
-          <h2 style={{ textAlign:"center", fontSize:18, fontWeight:800, margin:"0 0 20px" }}>دخول المدير</h2>
-          <label style={{ fontSize:12, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>المعرّف</label>
-          <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="admin"
-            style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:10, padding:"11px 14px", fontSize:14, boxSizing:"border-box", marginBottom:12 }} />
+          <h2 style={{ textAlign:"center", fontSize:18, fontWeight:800, margin:"0 0 20px" }}>دخول الإدارة</h2>
+          <label style={{ fontSize:12, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>رقم الهاتف / المعرّف</label>
+          <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="07XXXXXXXXX أو admin"
+            style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:10, padding:"11px 14px", fontSize:14, boxSizing:"border-box", marginBottom:12, direction:"ltr", textAlign:"left" }} />
           <label style={{ fontSize:12, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>كلمة المرور</label>
           <div style={{ position:"relative", marginBottom:12 }}>
             <input type={showPass?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)}
@@ -134,7 +152,7 @@ function LoginScreen({ onLogin }: { onLogin:()=>void }) {
             دخول المنصة →
           </button>
           <div style={{ marginTop:16, background:"#F3F0FF", borderRadius:10, padding:"10px 14px", fontSize:12, color:C.admin }}>
-            🔐 هذه البوابة مخصصة لمدير المنصة فقط<br/>المشتركون يدخلون من مواقعهم الخاصة
+            🔐 بوابة المدير والمشرفين · المشتركون يدخلون من بواباتهم الخاصة
           </div>
         </div>
       </div>
@@ -145,31 +163,34 @@ function LoginScreen({ onLogin }: { onLogin:()=>void }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADMIN PORTAL
 // ═══════════════════════════════════════════════════════════════════════════════
-const ADMIN_MENU = [
-  {id:"dash",   label:"لوحة التحكم",   icon:"📊"},
-  {id:"pharms", label:"الصيدليات",      icon:"💊"},
-  {id:"wares",  label:"المذاخر",        icon:"🏭"},
-  {id:"deliv",  label:"شركات التوصيل", icon:"🚛"},
-  {id:"subs",   label:"الاشتراكات",    icon:"💎"},
-  {id:"finance",label:"الإدارة المالية",icon:"💰"},
-  {id:"announce",label:"الإعلانات",    icon:"📢"},
-  {id:"social", label:"وسائل التواصل", icon:"📱"},
+const BASE_MENU = [
+  {id:"dash",    label:"لوحة التحكم",    icon:"📊", roles:["superadmin","supervisor"]},
+  {id:"pharms",  label:"الصيدليات",       icon:"💊", roles:["superadmin","supervisor"]},
+  {id:"wares",   label:"المذاخر",         icon:"🏭", roles:["superadmin","supervisor"]},
+  {id:"deliv",   label:"شركات التوصيل",  icon:"🚛", roles:["superadmin","supervisor"]},
+  {id:"subs",    label:"الاشتراكات",     icon:"💎", roles:["superadmin","supervisor"]},
+  {id:"finance", label:"الإدارة المالية", icon:"💰", roles:["superadmin","supervisor"]},
+  {id:"announce",label:"الإعلانات",       icon:"📢", roles:["superadmin","supervisor"]},
+  {id:"social",  label:"وسائل التواصل",  icon:"📱", roles:["superadmin","supervisor"]},
+  {id:"settings",label:"الإعدادات",       icon:"⚙️", roles:["superadmin"]},
 ];
 
-function AdminPortal({ db, lastSync, onRefresh, onLogout }:{ db:any; lastSync:string; onRefresh:()=>void; onLogout:()=>void }) {
+function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastSync:string; onRefresh:()=>void; onLogout:()=>void; user:{name:string;role:string} }) {
   const [sec, setSec] = useState("dash");
   const [open, setOpen] = useState(true);
+  const menu = BASE_MENU.filter(m=>m.roles.includes(user.role));
+  const isSuperAdmin = user.role==="superadmin";
   return (
     <div style={{ display:"flex", height:"100vh", overflow:"hidden" }}>
       {/* Sidebar */}
       <div style={{ width:open?220:60, background:"#1a202c", display:"flex", flexDirection:"column", transition:"width 0.2s", flexShrink:0, overflow:"hidden" }}>
         <div style={{ padding:"14px 12px", borderBottom:"1px solid #2d3748", display:"flex", alignItems:"center", gap:8 }}>
           <span style={{ fontSize:22, flexShrink:0 }}>🛡️</span>
-          {open && <div style={{ flex:1 }}><div style={{ color:"#fff", fontSize:12, fontWeight:800 }}>بوابة المدير</div><div style={{ color:"#A0AEC0", fontSize:10 }}>دواء+ الإدارة المتكاملة</div></div>}
+          {open && <div style={{ flex:1 }}><div style={{ color:"#fff", fontSize:12, fontWeight:800 }}>{user.name}</div><div style={{ color:"#A0AEC0", fontSize:10 }}>{user.role==="superadmin"?"مدير المنصة":"مشرف"}</div></div>}
           <button onClick={()=>setOpen(v=>!v)} style={{ background:"none", border:"none", color:"#A0AEC0", cursor:"pointer", fontSize:16, flexShrink:0, marginRight:open?"0":"auto" }}>☰</button>
         </div>
         <div style={{ flex:1, overflowY:"auto", padding:"6px 0" }}>
-          {ADMIN_MENU.map(m=>(
+          {menu.map(m=>(
             <button key={m.id} onClick={()=>setSec(m.id)} style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:sec===m.id?`${C.admin}25`:"none", border:"none", cursor:"pointer", textAlign:"right", borderRight:sec===m.id?`3px solid ${C.admin}`:"3px solid transparent" }}>
               <span style={{ fontSize:17, flexShrink:0 }}>{m.icon}</span>
               {open && <span style={{ color:sec===m.id?"#fff":"#A0AEC0", fontSize:13, fontWeight:sec===m.id?700:400, whiteSpace:"nowrap" }}>{m.label}</span>}
@@ -183,7 +204,8 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout }:{ db:any; lastSync:st
       {/* Content */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
         <div style={{ background:C.surface, borderBottom:`1px solid ${C.border}`, padding:"0 20px", height:56, display:"flex", alignItems:"center", gap:12, flexShrink:0 }}>
-          <div style={{ flex:1 }}><span style={{ fontWeight:800, fontSize:15 }}>{ADMIN_MENU.find(m=>m.id===sec)?.label}</span></div>
+          <div style={{ flex:1 }}><span style={{ fontWeight:800, fontSize:15 }}>{menu.find(m=>m.id===sec)?.label}</span></div>
+          {!isSuperAdmin&&<span style={{ fontSize:11, background:"#FFF3E0", color:C.orange, borderRadius:8, padding:"3px 10px", fontWeight:700 }}>مشرف — صلاحيات محدودة</span>}
           <div style={{ fontSize:11, color:C.muted }}>آخر مزامنة: {lastSync}</div>
           <button onClick={onRefresh} style={{ background:`${C.admin}15`, color:C.admin, border:`1px solid ${C.admin}30`, borderRadius:20, padding:"5px 14px", fontSize:12, fontWeight:700, cursor:"pointer" }}>🔄 تحديث</button>
           <div style={{ display:"flex", alignItems:"center", gap:6, background:`${C.admin}12`, borderRadius:20, padding:"5px 12px", border:`1px solid ${C.admin}30` }}>
@@ -200,6 +222,7 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout }:{ db:any; lastSync:st
           {sec==="finance"  && <AdminFin     db={db} />}
           {sec==="announce" && <AdminAnn />}
           {sec==="social"   && <AdminSocial  db={db} />}
+          {sec==="settings" && isSuperAdmin && <AdminSettings />}
         </div>
       </div>
     </div>
@@ -382,7 +405,6 @@ function AdminDeliv({ db }:{ db:any }) {
 }
 
 function AdminSubs({ db }:{ db:any }) {
-  const rdLS = (k:string,d:any)=>{ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch{ return d; } };
   const [reqs, setReqs] = useState<any[]>(()=>rdLS("sub_requests",[]));
   const [tab, setTab] = useState<"pending"|"all">("pending");
   const [changePlanModal, setChangePlanModal] = useState<any>(null);
@@ -696,6 +718,206 @@ function AdminTable({ rows, cols, color, onSelect, selected }:{ rows:any[]; cols
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADMIN SETTINGS — accounts & payment
+// ═══════════════════════════════════════════════════════════════════════════════
+function AdminSettings() {
+  const [tab, setTab] = useState<"accounts"|"payments">("payments");
+
+  // ─── Payment Accounts ───────────────────────────────────────────────────────
+  const [payAccounts, setPayAccounts] = useState<any[]>(()=>getPlatformPaymentAccounts());
+  const [editingPay, setEditingPay] = useState<any>(null);
+  const [payForm, setPayForm] = useState({ label:"", icon:"💳", color:"#7C3AED", num:"", hint:"" });
+  const [paySaved, setPaySaved] = useState(false);
+
+  const savePayAccounts = (accs:any[]) => {
+    wrLS("platform_payment_accounts", accs);
+    setPayAccounts(accs);
+    try{ new BroadcastChannel("dawapl_sync").postMessage("update"); }catch{}
+    setPaySaved(true); setTimeout(()=>setPaySaved(false), 2000);
+  };
+  const startEditPay = (acc:any) => { setEditingPay(acc.id); setPayForm({ label:acc.label, icon:acc.icon, color:acc.color, num:acc.num, hint:acc.hint }); };
+  const savePay = () => {
+    if (!payForm.num.trim()||!payForm.label.trim()) return;
+    if (editingPay) {
+      savePayAccounts(payAccounts.map(a=>a.id===editingPay?{...a,...payForm}:a));
+    } else {
+      savePayAccounts([...payAccounts,{id:`pay_${Date.now()}`,...payForm}]);
+    }
+    setEditingPay(null); setPayForm({ label:"", icon:"💳", color:"#7C3AED", num:"", hint:"" });
+  };
+  const deletePay = (id:string) => savePayAccounts(payAccounts.filter(a=>a.id!==id));
+
+  // ─── Admin Accounts ─────────────────────────────────────────────────────────
+  const [accounts, setAccounts] = useState<any[]>(()=>getAdminAccounts());
+  const [accForm, setAccForm] = useState({ name:"", phone:"", password:"", role:"supervisor" });
+  const [accErr, setAccErr] = useState("");
+  const [accSaved, setAccSaved] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+
+  const saveAccounts = (accs:any[]) => { wrLS("admin_accounts", accs); setAccounts(accs); };
+  const addAccount = () => {
+    setAccErr("");
+    if (!accForm.name.trim()||!accForm.phone.trim()||!accForm.password.trim()) { setAccErr("جميع الحقول مطلوبة"); return; }
+    if (accForm.phone.trim()===SUPER_ADMIN.phone) { setAccErr("هذا المعرّف محجوز للمدير الرئيسي"); return; }
+    if (accounts.find(a=>a.phone===accForm.phone.trim())) { setAccErr("رقم الهاتف مسجّل مسبقاً"); return; }
+    const newAcc = { id:`ADM-${Date.now()}`, ...accForm, phone:accForm.phone.trim() };
+    saveAccounts([...accounts, newAcc]);
+    setAccForm({ name:"", phone:"", password:"", role:"supervisor" });
+    setAccSaved(true); setTimeout(()=>setAccSaved(false),2000);
+  };
+  const deleteAccount = (id:string) => saveAccounts(accounts.filter(a=>a.id!==id));
+
+  const ICONS = ["💳","📱","⚡","🏦","💵","🔷","🟢","💰"];
+  const COLORS = ["#8B1538","#0066CC","#004E87","#B45309","#38A169","#7C3AED","#D69E2E","#E53E3E"];
+
+  return (
+    <div>
+      {/* Tabs */}
+      <div style={{ display:"flex", gap:8, marginBottom:20 }}>
+        {[{id:"payments",l:"💳 حسابات الدفع / الاستحصال"},{id:"accounts",l:"👥 حسابات الإدارة والمشرفين"}].map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id as any)} style={{ padding:"10px 22px", borderRadius:10, border:`2px solid ${tab===t.id?C.admin:C.border}`, background:tab===t.id?C.admin:"#fff", color:tab===t.id?"#fff":C.text, fontWeight:700, cursor:"pointer", fontSize:13 }}>{t.l}</button>
+        ))}
+      </div>
+
+      {/* ── PAYMENT ACCOUNTS ── */}
+      {tab==="payments"&&<div>
+        <div style={{ background:"#F3F0FF", border:"1px solid #C4B5FD", borderRadius:10, padding:"10px 14px", marginBottom:16, fontSize:12, color:C.admin }}>
+          💡 هذه الحسابات تظهر للمشتركين عند طلب ترقية اشتراكهم — تأكد من دقة الأرقام قبل الحفظ
+        </div>
+        {paySaved&&<div style={{ background:"#F0FFF4",border:"1px solid #38A169",borderRadius:8,padding:"8px 14px",fontSize:13,color:C.green,marginBottom:12 }}>✅ تم حفظ حسابات الدفع بنجاح</div>}
+
+        {/* Existing accounts */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:12, marginBottom:20 }}>
+          {payAccounts.map(acc=>(
+            <div key={acc.id} style={{ background:"#fff", borderRadius:14, padding:"14px 16px", border:`2px solid ${editingPay===acc.id?acc.color:C.border}` }}>
+              {editingPay===acc.id ? (
+                <div>
+                  <div style={{ display:"flex", gap:6, marginBottom:8, flexWrap:"wrap" }}>
+                    {ICONS.map(ic=><button key={ic} onClick={()=>setPayForm(p=>({...p,icon:ic}))} style={{ fontSize:18, padding:"4px 6px", borderRadius:6, border:`2px solid ${payForm.icon===ic?"#7C3AED":C.border}`, background:"#fff", cursor:"pointer" }}>{ic}</button>)}
+                  </div>
+                  <div style={{ display:"flex", gap:6, marginBottom:8, flexWrap:"wrap" }}>
+                    {COLORS.map(col=><button key={col} onClick={()=>setPayForm(p=>({...p,color:col}))} style={{ width:22, height:22, borderRadius:"50%", background:col, border:`3px solid ${payForm.color===col?"#1a202c":C.border}`, cursor:"pointer" }} />)}
+                  </div>
+                  <input value={payForm.label} onChange={e=>setPayForm(p=>({...p,label:e.target.value}))} placeholder="اسم وسيلة الدفع" style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 10px", fontSize:12, boxSizing:"border-box", marginBottom:6 }} />
+                  <input value={payForm.num} onChange={e=>setPayForm(p=>({...p,num:e.target.value}))} placeholder="الرقم / الحساب" style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 10px", fontSize:12, fontFamily:"monospace", boxSizing:"border-box", marginBottom:6, direction:"ltr", textAlign:"left" }} />
+                  <input value={payForm.hint} onChange={e=>setPayForm(p=>({...p,hint:e.target.value}))} placeholder="تعليمات للمشترك (اختياري)" style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 10px", fontSize:12, boxSizing:"border-box", marginBottom:8 }} />
+                  <div style={{ display:"flex", gap:6 }}>
+                    <button onClick={savePay} style={{ flex:2, background:C.admin, color:"#fff", border:"none", borderRadius:8, padding:"8px", fontWeight:700, cursor:"pointer", fontSize:12 }}>💾 حفظ</button>
+                    <button onClick={()=>setEditingPay(null)} style={{ flex:1, background:C.bg, color:C.muted, border:`1px solid ${C.border}`, borderRadius:8, padding:"8px", cursor:"pointer", fontSize:12 }}>إلغاء</button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                    <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                      <div style={{ width:36, height:36, borderRadius:10, background:`${acc.color}15`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>{acc.icon}</div>
+                      <div><div style={{ fontWeight:700, fontSize:13 }}>{acc.label}</div><div style={{ fontSize:11, color:C.muted }}>{acc.hint||"—"}</div></div>
+                    </div>
+                    <div style={{ display:"flex", gap:4 }}>
+                      <button onClick={()=>startEditPay(acc)} style={{ background:`${C.admin}10`, color:C.admin, border:"none", borderRadius:6, padding:"5px 8px", cursor:"pointer", fontSize:11 }}>✏️</button>
+                      <button onClick={()=>deletePay(acc.id)} style={{ background:"#FFF5F5", color:C.red, border:"none", borderRadius:6, padding:"5px 8px", cursor:"pointer", fontSize:11 }}>🗑️</button>
+                    </div>
+                  </div>
+                  <div style={{ marginTop:10, background:C.bg, borderRadius:8, padding:"8px 10px", fontFamily:"monospace", fontSize:14, fontWeight:900, color:acc.color, direction:"ltr", textAlign:"left" }}>{acc.num}</div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Add new payment account */}
+          {editingPay===null&&<div style={{ background:`${C.admin}06`, borderRadius:14, padding:"14px 16px", border:`2px dashed ${C.admin}40` }}>
+            <div style={{ fontWeight:700, fontSize:13, marginBottom:10, color:C.admin }}>➕ إضافة حساب دفع جديد</div>
+            <div style={{ display:"flex", gap:6, marginBottom:8, flexWrap:"wrap" }}>
+              {ICONS.map(ic=><button key={ic} onClick={()=>setPayForm(p=>({...p,icon:ic}))} style={{ fontSize:18, padding:"4px 6px", borderRadius:6, border:`2px solid ${payForm.icon===ic?"#7C3AED":C.border}`, background:"#fff", cursor:"pointer" }}>{ic}</button>)}
+            </div>
+            <div style={{ display:"flex", gap:6, marginBottom:8, flexWrap:"wrap" }}>
+              {COLORS.map(col=><button key={col} onClick={()=>setPayForm(p=>({...p,color:col}))} style={{ width:22, height:22, borderRadius:"50%", background:col, border:`3px solid ${payForm.color===col?"#1a202c":C.border}`, cursor:"pointer" }} />)}
+            </div>
+            <input value={payForm.label} onChange={e=>setPayForm(p=>({...p,label:e.target.value}))} placeholder="اسم وسيلة الدفع (مثال: زين كاش)" style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:8, padding:"9px 10px", fontSize:12, boxSizing:"border-box", marginBottom:6 }} />
+            <input value={payForm.num} onChange={e=>setPayForm(p=>({...p,num:e.target.value}))} placeholder="رقم الهاتف / رقم الحساب" style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:8, padding:"9px 10px", fontSize:13, fontFamily:"monospace", boxSizing:"border-box", marginBottom:6, direction:"ltr", textAlign:"left" }} />
+            <input value={payForm.hint} onChange={e=>setPayForm(p=>({...p,hint:e.target.value}))} placeholder="تعليمات للمشترك (اختياري)" style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:8, padding:"9px 10px", fontSize:12, boxSizing:"border-box", marginBottom:10 }} />
+            <button onClick={savePay} disabled={!payForm.num.trim()||!payForm.label.trim()} style={{ width:"100%", background:payForm.num.trim()&&payForm.label.trim()?`linear-gradient(135deg,${C.admin},#553C9A)`:"#ccc", color:"#fff", border:"none", borderRadius:8, padding:"10px", fontWeight:800, cursor:payForm.num.trim()&&payForm.label.trim()?"pointer":"not-allowed", fontSize:13 }}>حفظ الحساب</button>
+          </div>}
+        </div>
+      </div>}
+
+      {/* ── ADMIN ACCOUNTS ── */}
+      {tab==="accounts"&&<div>
+        {accSaved&&<div style={{ background:"#F0FFF4",border:"1px solid #38A169",borderRadius:8,padding:"8px 14px",fontSize:13,color:C.green,marginBottom:12 }}>✅ تمت إضافة الحساب بنجاح</div>}
+
+        {/* Existing accounts */}
+        <div style={{ marginBottom:20 }}>
+          {/* Super Admin card */}
+          <div style={{ background:`linear-gradient(135deg,${C.admin}12,${C.admin}06)`, border:`2px solid ${C.admin}30`, borderRadius:14, padding:"14px 16px", marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+              <div style={{ width:38, height:38, borderRadius:12, background:C.admin, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, color:"#fff" }}>🛡️</div>
+              <div><div style={{ fontWeight:800, fontSize:14 }}>مدير المنصة (الرئيسي)</div><div style={{ fontSize:11, color:C.muted }}>معرّف: admin · كلمة مرور: admin</div></div>
+            </div>
+            <span style={{ background:`${C.admin}15`, color:C.admin, borderRadius:8, padding:"4px 10px", fontSize:11, fontWeight:700 }}>مدير كامل الصلاحيات</span>
+          </div>
+          {accounts.length===0 && <div style={{ textAlign:"center", color:C.muted, fontSize:13, padding:"20px 0" }}>لا توجد حسابات مضافة بعد</div>}
+          {accounts.map(acc=>(
+            <div key={acc.id} style={{ background:"#fff", border:`1px solid ${C.border}`, borderRadius:14, padding:"12px 16px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                <div style={{ width:38, height:38, borderRadius:12, background:acc.role==="supervisor"?"#FFF3E0":"#F3F0FF", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>{acc.role==="supervisor"?"👤":"⚙️"}</div>
+                <div>
+                  <div style={{ fontWeight:700, fontSize:13 }}>{acc.name}</div>
+                  <div style={{ fontSize:11, color:C.muted }}>📱 {acc.phone}</div>
+                </div>
+              </div>
+              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                <span style={{ background:acc.role==="supervisor"?"#FFF3E0":"#F3F0FF", color:acc.role==="supervisor"?C.orange:C.admin, borderRadius:8, padding:"4px 10px", fontSize:11, fontWeight:700 }}>{acc.role==="supervisor"?"مشرف":"مدير"}</span>
+                <button onClick={()=>deleteAccount(acc.id)} style={{ background:"#FFF5F5", color:C.red, border:"none", borderRadius:8, padding:"6px 10px", cursor:"pointer", fontSize:12 }}>🗑️ حذف</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Add new account */}
+        <div style={{ background:`${C.admin}06`, border:`2px dashed ${C.admin}40`, borderRadius:14, padding:"18px 16px" }}>
+          <div style={{ fontWeight:800, fontSize:14, color:C.admin, marginBottom:12 }}>➕ تسجيل حساب جديد</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>الاسم الكامل</label>
+              <input value={accForm.name} onChange={e=>setAccForm(p=>({...p,name:e.target.value}))} placeholder="مثال: أحمد علي" style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>رقم الهاتف (لتسجيل الدخول)</label>
+              <input value={accForm.phone} onChange={e=>setAccForm(p=>({...p,phone:e.target.value}))} placeholder="07XXXXXXXXX" style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box", direction:"ltr", textAlign:"left" }} />
+            </div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>كلمة المرور</label>
+              <div style={{ position:"relative" }}>
+                <input type={showPass?"text":"password"} value={accForm.password} onChange={e=>setAccForm(p=>({...p,password:e.target.value}))} placeholder="••••••••" style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", paddingLeft:36, fontSize:13, boxSizing:"border-box" }} />
+                <button onClick={()=>setShowPass(v=>!v)} style={{ position:"absolute", left:10, top:10, background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:14 }}>{showPass?"🙈":"👁️"}</button>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>الصلاحية</label>
+              <div style={{ display:"flex", gap:8 }}>
+                <div onClick={()=>setAccForm(p=>({...p,role:"supervisor"}))} style={{ flex:1, border:`2px solid ${accForm.role==="supervisor"?C.orange:C.border}`, borderRadius:9, padding:"9px 6px", textAlign:"center", cursor:"pointer", background:accForm.role==="supervisor"?"#FFF3E0":"#fff" }}>
+                  <div style={{ fontSize:16 }}>👤</div>
+                  <div style={{ fontSize:10, fontWeight:700, color:accForm.role==="supervisor"?C.orange:C.muted }}>مشرف</div>
+                </div>
+                <div onClick={()=>setAccForm(p=>({...p,role:"superadmin"}))} style={{ flex:1, border:`2px solid ${accForm.role==="superadmin"?C.admin:C.border}`, borderRadius:9, padding:"9px 6px", textAlign:"center", cursor:"pointer", background:accForm.role==="superadmin"?`${C.admin}10`:"#fff" }}>
+                  <div style={{ fontSize:16 }}>⚙️</div>
+                  <div style={{ fontSize:10, fontWeight:700, color:accForm.role==="superadmin"?C.admin:C.muted }}>مدير كامل</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {accForm.role==="supervisor"&&<div style={{ background:"#FFFDE7", border:"1px dashed #D69E2E", borderRadius:8, padding:"8px 12px", fontSize:11, color:"#92400E", marginBottom:10 }}>⚠️ المشرف يملك صلاحية قراءة جميع البيانات وإدارة الاشتراكات، لكن بدون الوصول إلى إعدادات الدفع وحسابات الإدارة</div>}
+          {accErr&&<div style={{ background:"#FFF5F5",border:"1px solid #FED7D7",borderRadius:8,padding:"8px 12px",fontSize:12,color:C.red,marginBottom:10 }}>{accErr}</div>}
+          <button onClick={addAccount} style={{ width:"100%", background:`linear-gradient(135deg,${C.admin},#553C9A)`, color:"#fff", border:"none", borderRadius:10, padding:"12px", fontWeight:800, cursor:"pointer", fontSize:13 }}>✅ إضافة الحساب</button>
+        </div>
+      </div>}
     </div>
   );
 }
