@@ -13,6 +13,7 @@ import { useTranslation } from "@/i18n";
 const CUSTOMER_TABS = [
   { name: "index", title: "الرئيسية", icon: "home", iconOff: "home-outline" },
   { name: "browse", title: "تصفح", icon: "search", iconOff: "search-outline" },
+  { name: "pharmacies", title: "الصيدليات", icon: "storefront", iconOff: "storefront-outline" },
   { name: "cart", title: "سلتي", icon: "cart", iconOff: "cart-outline" },
   { name: "profile", title: "حسابي", icon: "person", iconOff: "person-outline" },
 ];
@@ -100,6 +101,7 @@ export default function CustomerTabLayout() {
           <Tabs initialRouteName="index" screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
             <Tabs.Screen name="index" />
             <Tabs.Screen name="browse" />
+            <Tabs.Screen name="pharmacies" />
             <Tabs.Screen name="cart" />
             <Tabs.Screen name="profile" />
           </Tabs>
@@ -148,6 +150,15 @@ export default function CustomerTabLayout() {
           title: "تصفح",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "search" : "search-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="pharmacies"
+        options={{
+          title: "الصيدليات",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "storefront" : "storefront-outline"} size={24} color={color} />
           ),
         }}
       />
