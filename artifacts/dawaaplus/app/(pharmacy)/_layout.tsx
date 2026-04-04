@@ -19,6 +19,7 @@ const PHARMACY_TABS = [
   { name: "rawakid", title: "الرواكد", icon: "alert-circle", iconOff: "alert-circle-outline", badge: URGENT_COUNT },
   { name: "warehouses", title: "المذاخر", icon: "business", iconOff: "business-outline" },
   { name: "orders", title: "الطلبات", icon: "cube", iconOff: "cube-outline" },
+  { name: "delivery", title: "التوصيل", icon: "car", iconOff: "car-outline" },
   { name: "settings", title: "إعداداتي", icon: "settings", iconOff: "settings-outline" },
 ];
 
@@ -95,6 +96,7 @@ export default function PharmacyTabLayout() {
             <Tabs.Screen name="rawakid" />
             <Tabs.Screen name="warehouses" />
             <Tabs.Screen name="orders" />
+            <Tabs.Screen name="delivery" />
             <Tabs.Screen name="settings" />
             <Tabs.Screen name="integration" options={{ href: null }} />
           </Tabs>
@@ -186,6 +188,15 @@ export default function PharmacyTabLayout() {
           title: "الطلبات",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "cube" : "cube-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="delivery"
+        options={{
+          title: "التوصيل",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "car" : "car-outline"} size={24} color={color} />
           ),
         }}
       />

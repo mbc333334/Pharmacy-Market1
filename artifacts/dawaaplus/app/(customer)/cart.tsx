@@ -8,8 +8,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useCart, CartItem } from "@/contexts/CartContext";
+import { useOrders } from "@/contexts/OrdersContext";
 
-const DELIVERY_FEE = 15.00;
+const DELIVERY_FEE = 3500;
 const PROMO_CODES: Record<string, number> = {
   SUGAR20: 0.2,
   DAWAA10: 0.1,
@@ -21,6 +22,7 @@ type PaymentMethod = "cod" | "card" | "whatsapp";
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
   const { items, totalPrice, updateQuantity, removeItem, clearCart } = useCart();
+  const { placeCustomerOrder } = useOrders();
   const [promoCode, setPromoCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [promoApplied, setPromoApplied] = useState(false);
@@ -59,24 +61,46 @@ export default function CartScreen() {
       }
     }
     const payLabels: Record<PaymentMethod, string> = {
-      cod: "الدفع عند الاستلام",
+      cod: "الدفع عند الاستلام (كاش)",
       card: "البطاقة المصرفية",
       whatsapp: "التواصل عبر واتساب",
     };
     Alert.alert(
       "تأكيد الطلب ✅",
-      `إجمالي طلبك: ${finalTotal.toFixed(2)} د.ع\nطريقة الدفع: ${payLabels[paymentMethod]}\nسيتم التواصل معك لتأكيد التوصيل`,
+      `إجمالي طلبك: ${finalTotal.toLocaleString()} د.ع\nطريقة الدفع: ${payLabels[paymentMethod]}\nسيتم التواصل معك لتأكيد التوصيل`,
       [
         { text: "إلغاء", style: "cancel" },
         {
           text: "تأكيد الطلب",
           onPress: () => {
+            const order = placeCustomerOrder({
+              customerId: "c_me",
+              customerName: "العميل",
+              customerPhone: "+964 750 000 9999",
+              pharmacyId: "p1",
+              pharmacyName: "دەرمانخانەی شیفا",
+              items: items.map(i => ({
+                medicineId: i.id,
+                name: i.name,
+                quantity: i.quantity,
+                price: i.price * 1000,
+              })),
+              total: Math.round(totalPrice * 1000 - discountAmount * 1000),
+              deliveryFee: DELIVERY_FEE,
+              status: "new",
+              paymentMethod,
+              isPaid: paymentMethod === "card",
+              address: "حي المنصور، شارع 14",
+              city: "هەولێر",
+            });
             if (paymentMethod === "whatsapp") {
-              Linking.openURL("https://wa.me/9647701234567?text=مرحباً، أريد تأكيد طلبي");
+              const itemsList = items.map(i => `• ${i.name} × ${i.quantity}`).join("\n");
+              const msg = encodeURIComponent(`مرحباً،\nأريد تأكيد طلبي رقم ${order.id}:\n${itemsList}\nالإجمالي: ${finalTotal.toLocaleString()} د.ع`);
+              Linking.openURL(`https://wa.me/9647701234567?text=${msg}`);
             }
             clearCart();
             if (paymentMethod !== "whatsapp") {
-              Alert.alert("تم الطلب! 🎉", "طلبك في طريقه إليك");
+              Alert.alert("تم الطلب! 🎉", `رقم طلبك: ${order.id}\nسيتصل بك الصيدلي قريباً.`);
             }
           },
         },
