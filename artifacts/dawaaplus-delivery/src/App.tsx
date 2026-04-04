@@ -1,0 +1,463 @@
+import { useState, useEffect } from "react";
+
+const C = {
+  primary:"#D69E2E", dark:"#B7791F", light:"#FFFFF0", text:"#1a202c",
+  muted:"#718096", border:"#e2e8f0", bg:"#f7fafc", surface:"#fff",
+  red:"#E53E3E", green:"#38A169", blue:"#3182CE", orange:"#DD6B20",
+};
+
+const COMPANIES = [
+  { id:"dc1", name:"شركة الإسراع للتوصيل",  phone:"07501222222", pass:"123456", city:"أربيل",       address:"شارع 60",          license:"DL-2024-001", email:"speed@email.com",  plan:"premium",  revenue:9800000,  joined:"2024-01-08" },
+  { id:"dc2", name:"توصيل الخليج",            phone:"07701222223", pass:"123456", city:"السليمانية",  address:"شارع بختياري",      license:"DL-2024-002", email:"gulf@email.com",   plan:"standard", revenue:6200000,  joined:"2024-02-12" },
+  { id:"dc3", name:"شركة السهم السريع",        phone:"07601222224", pass:"123456", city:"دهوك",        address:"شارع التحرير",      license:"DL-2024-003", email:"arrow@email.com",  plan:"premium",  revenue:12100000, joined:"2024-01-25" },
+  { id:"dc4", name:"نجوم التوصيل",             phone:"07801222225", pass:"123456", city:"كركوك",       address:"شارع الثورة",       license:"DL-2024-004", email:"stars@email.com",  plan:"free",     revenue:3400000,  joined:"2024-03-18" },
+];
+
+const INIT_DRIVERS = [
+  { id:"d1", name:"كرم سالم",    phone:"07501000001", city:"أربيل",       status:"active",   trips:142, rating:4.8, vehicle:"سيارة"  },
+  { id:"d2", name:"ريبوار أحمد",  phone:"07701000002", city:"أربيل",       status:"active",   trips:98,  rating:4.6, vehicle:"دراجة"  },
+  { id:"d3", name:"فيان محمد",    phone:"07601000003", city:"السليمانية", status:"off",      trips:210, rating:4.9, vehicle:"سيارة"  },
+  { id:"d4", name:"صباح علي",     phone:"07801000004", city:"دهوك",       status:"active",   trips:67,  rating:4.5, vehicle:"دراجة"  },
+  { id:"d5", name:"شاناز كريم",   phone:"07501000005", city:"كركوك",      status:"inactive", trips:31,  rating:4.2, vehicle:"سيارة"  },
+];
+
+const INIT_TRIPS = [
+  { id:"#TR-2041", from:"صيدلية الشفاء",  to:"حي الجامعة",      driver:"كرم سالم",    status:"delivered", date:"2025-04-04", amount:8000  },
+  { id:"#TR-2040", from:"صيدلية النور",   to:"شارع 100",         driver:"ريبوار أحمد", status:"ongoing",   date:"2025-04-04", amount:6000  },
+  { id:"#TR-2039", from:"صيدلية الأمل",   to:"كمپنى",            driver:"كرم سالم",    status:"pending",   date:"2025-04-03", amount:10000 },
+  { id:"#TR-2038", from:"صيدلية الخير",   to:"حي الثورة",        driver:"صباح علي",    status:"delivered", date:"2025-04-03", amount:7500  },
+  { id:"#TR-2037", from:"مذخر الخليج",    to:"صيدلية الشفاء",    driver:"ريبوار أحمد", status:"cancelled", date:"2025-04-02", amount:15000 },
+];
+
+const LS = (key:string,def:any)=>{ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch{ return def; } };
+const tripBadge=(s:string)=>s==="pending"?{l:"معلّق",c:"#D97706",b:"#FFF3E0"}:s==="ongoing"?{l:"جاري",c:C.blue,b:"#EBF8FF"}:s==="delivered"?{l:"وصل",c:C.green,b:"#F0FFF4"}:{l:"ملغي",c:C.red,b:"#FFF5F5"};
+const driverBadge=(s:string)=>s==="active"?{l:"متاح",c:C.green,b:"#F0FFF4"}:s==="off"?{l:"خارج",c:C.orange,b:"#FFF3E0"}:{l:"غير نشط",c:C.muted,b:"#EDF2F7"};
+
+export default function App() {
+  const [dc, setDc] = useState<typeof COMPANIES[0]|null>(null);
+  const [sec, setSec] = useState("dash");
+  const [drivers, setDrivers] = useState(()=>LS("dc_drivers",INIT_DRIVERS));
+  const [trips, setTrips]     = useState(()=>LS("dc_trips",INIT_TRIPS));
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(()=>{ if(dc) setProfile(LS(`dc_profile_${dc.id}`,dc)); },[dc]);
+  useEffect(()=>{ localStorage.setItem("dc_drivers",JSON.stringify(drivers)); },[drivers]);
+  useEffect(()=>{ localStorage.setItem("dc_trips",JSON.stringify(trips)); },[trips]);
+
+  if (!dc) return <Login onLogin={c=>setDc(c)} />;
+  return (
+    <div dir="rtl" style={{ display:"flex", height:"100vh", fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif", overflow:"hidden" }}>
+      <Sidebar color={C.primary} icon="🚚" title="بوابة التوصيل" name={dc.name}
+        menu={[{id:"dash",l:"لوحة التحكم",i:"📊"},{id:"acc",l:"حسابي",i:"👤"},{id:"trips",l:"الرحلات",i:"🗺️"},
+          {id:"drivers",l:"السائقون",i:"👨‍✈️"},{id:"ratings",l:"التقييمات",i:"⭐"},{id:"sub",l:"الاشتراك",i:"💎"},
+          {id:"fin",l:"المالية",i:"💰"},{id:"sup",l:"الدعم",i:"💬"}]}
+        active={sec} onNav={setSec} onLogout={()=>setDc(null)} />
+      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+        <TopBar color={C.primary}
+          label={[{id:"dash",l:"لوحة التحكم"},{id:"acc",l:"حسابي"},{id:"trips",l:"الرحلات"},{id:"drivers",l:"السائقون"},{id:"ratings",l:"التقييمات"},{id:"sub",l:"الاشتراك"},{id:"fin",l:"المالية"},{id:"sup",l:"الدعم"}].find(m=>m.id===sec)?.l||""}
+          name={dc.name} />
+        <div style={{ flex:1, overflowY:"auto", padding:20, background:C.bg }}>
+          {sec==="dash"    && <DcDash dc={dc} drivers={drivers} trips={trips} />}
+          {sec==="acc"     && <DcAccount dc={profile||dc} onSave={(d:any)=>{ setProfile(d); localStorage.setItem(`dc_profile_${dc.id}`,JSON.stringify(d)); }} />}
+          {sec==="trips"   && <Trips trips={trips} onUpdate={setTrips} color={C.primary} />}
+          {sec==="drivers" && <Drivers drivers={drivers} onUpdate={setDrivers} color={C.primary} />}
+          {sec==="ratings" && <Ratings drivers={drivers} color={C.primary} />}
+          {sec==="sub"     && <SubPage plan={dc.plan} color={C.primary} />}
+          {sec==="fin"     && <FinPage revenue={dc.revenue} color={C.primary} />}
+          {sec==="sup"     && <Support name={dc.name} color={C.primary} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Login({ onLogin }:{ onLogin:(c:any)=>void }) {
+  const [phone,setPhone]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState("");
+  const login=()=>{ const c=COMPANIES.find(c=>c.phone===phone.trim()&&c.pass===pass.trim()); c?onLogin(c):setErr("رقم الهاتف أو كلمة المرور غير صحيحة"); };
+  return (
+    <div dir="rtl" style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
+      <div style={{ background:`linear-gradient(135deg,${C.primary},${C.dark})`, padding:"48px 24px 70px", textAlign:"center" }}>
+        <div style={{ fontSize:56, marginBottom:8 }}>🚚</div>
+        <h1 style={{ color:"#fff", fontSize:32, fontWeight:900, margin:0 }}>بوابة شركات التوصيل</h1>
+        <p style={{ color:"rgba(255,255,255,0.8)", fontSize:14, margin:"8px 0 0" }}>دواء+ — منصة إدارة شركة التوصيل</p>
+      </div>
+      <div style={{ maxWidth:440, margin:"-32px auto 0", padding:"0 20px 40px" }}>
+        <div style={{ background:C.surface, borderRadius:20, padding:"28px 24px", boxShadow:"0 8px 40px rgba(0,0,0,0.12)", marginBottom:18 }}>
+          <h2 style={{ textAlign:"center", fontSize:18, fontWeight:800, margin:"0 0 20px" }}>تسجيل الدخول</h2>
+          <Inp label="رقم الهاتف" val={phone} set={setPhone} ph="07xxxxxxxxx" />
+          <Inp label="كلمة المرور" val={pass} set={setPass} ph="••••••" type="password" />
+          {err && <div style={{ background:"#FFF5F5", border:"1px solid #FED7D7", borderRadius:8, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:10 }}>{err}</div>}
+          <Btn label="دخول →" color={C.primary} onClick={login} full />
+        </div>
+        <div style={{ background:C.surface, borderRadius:16, padding:"16px 18px", boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
+          <div style={{ fontSize:12, color:C.muted, textAlign:"center", marginBottom:10 }}>🔑 شركات مسجّلة — اضغط للدخول</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            {COMPANIES.map(c=>(
+              <button key={c.id} onClick={()=>onLogin(c)} style={{ background:C.light, border:`1px solid ${C.primary}30`, borderRadius:10, padding:"10px 14px", cursor:"pointer", textAlign:"right", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <span style={{ fontWeight:700, color:C.dark, fontSize:13 }}>🚚 {c.name}</span>
+                <span style={{ fontSize:11, color:C.muted }}>{c.city} · {c.phone}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DcDash({ dc, drivers, trips }:any) {
+  const activeDrivers = drivers.filter((d:any)=>d.status==="active").length;
+  const ongoingTrips  = trips.filter((t:any)=>t.status==="ongoing").length;
+  const todayTrips    = trips.filter((t:any)=>t.date==="2025-04-04").length;
+  const avgRating     = (drivers.reduce((s:number,d:any)=>s+d.rating,0)/drivers.length).toFixed(1);
+  return (
+    <div>
+      <AppSync text={`مرحباً ${dc.name}! رحلاتك ومواعيدك تُرسل للصيدليات والمذاخر تلقائياً`} />
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12, marginBottom:18 }}>
+        <Stat icon="🗺️" label="رحلات اليوم" value={todayTrips} color={C.primary} />
+        <Stat icon="⏳" label="رحلات جارية" value={ongoingTrips} color={ongoingTrips>0?C.orange:C.green} />
+        <Stat icon="👨‍✈️" label="سائق متاح" value={activeDrivers} color={C.primary} />
+        <Stat icon="⭐" label="متوسط التقييم" value={avgRating} color={C.primary} />
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+        <Card><SH icon="🗺️" title="آخر الرحلات" />
+          {trips.slice(0,5).map((t:any)=>(
+            <div key={t.id} style={{ padding:"8px 0", borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontWeight:700, fontSize:12, color:C.dark }}>{t.id}</div>
+                <div style={{ fontSize:11, color:C.muted }}>{t.from} → {t.to}</div>
+                <div style={{ fontSize:11, color:C.muted }}>{t.driver}</div>
+              </div>
+              <Bdg {...tripBadge(t.status)} />
+            </div>
+          ))}
+        </Card>
+        <Card><SH icon="👨‍✈️" title="السائقون المتاحون" />
+          {drivers.filter((d:any)=>d.status==="active").map((d:any)=>(
+            <div key={d.id} style={{ padding:"8px 0", borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontWeight:700, fontSize:12 }}>{d.name}</div>
+                <div style={{ fontSize:11, color:C.muted }}>{d.vehicle} · {d.city}</div>
+              </div>
+              <span style={{ fontWeight:700, color:C.primary, fontSize:12 }}>⭐ {d.rating}</span>
+            </div>
+          ))}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function DcAccount({ dc, onSave }:any) {
+  const [f,setF]=useState({...dc}); const [saved,setSaved]=useState(false);
+  const save=()=>{ onSave(f); setSaved(true); setTimeout(()=>setSaved(false),3000); };
+  return (
+    <div><AppSync text="تعديل بياناتك هنا يُحدّثها في السجل وتُرسل لمدير المنصة" />
+      <Card style={{ maxWidth:560 }}>
+        <SH icon="🚚" title="معلومات الشركة" />
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
+          {([["name","اسم الشركة"],["city","المدينة"],["phone","رقم الهاتف"],["address","العنوان"],["license","رقم الرخصة"],["email","البريد الإلكتروني"]] as const).map(([k,l])=>(
+            <div key={k} style={{ gridColumn:k==="address"||k==="email"?"span 2":"auto" }}>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:3 }}>{l}</label>
+              <input value={f[k]||""} onChange={e=>setF({...f,[k]:e.target.value})}
+                style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box" }} />
+            </div>
+          ))}
+        </div>
+        <Btn label={saved?"✅ تم الحفظ والمزامنة!":"💾 حفظ ومزامنة"} color={saved?C.green:C.primary} onClick={save} full />
+      </Card>
+    </div>
+  );
+}
+
+function Trips({ trips, onUpdate, color }:any) {
+  const [showAdd,setShowAdd]=useState(false);
+  const [newT,setNewT]=useState({ from:"", to:"", driver:"", amount:"" });
+  const add=()=>{
+    onUpdate([...trips,{ id:`#TR-${Date.now()}`, from:newT.from, to:newT.to, driver:newT.driver, status:"pending", date:"2025-04-04", amount:Number(newT.amount) }]);
+    setNewT({ from:"",to:"",driver:"",amount:"" }); setShowAdd(false);
+  };
+  const update=(id:string,status:string)=>onUpdate(trips.map((t:any)=>t.id===id?{...t,status}:t));
+  return (
+    <div>
+      <AppSync text="الرحلات تُنشأ عند استلام طلبات من الصيدليات أو المذاخر" />
+      <div style={{ display:"flex",gap:8,marginBottom:12 }}>
+        <button onClick={()=>setShowAdd(v=>!v)} style={{ background:color,color:"#fff",border:"none",borderRadius:9,padding:"8px 16px",fontWeight:700,cursor:"pointer" }}>+ رحلة جديدة</button>
+      </div>
+      {showAdd && <Card style={{ marginBottom:12, border:`2px solid ${color}` }}>
+        <SH icon="🗺️" title="إنشاء رحلة" />
+        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8 }}>
+          {([["from","من"],["to","إلى"],["driver","السائق"],["amount","الأجر (د.ع)"]] as const).map(([k,l])=>(
+            <div key={k}><label style={{ fontSize:11,color:C.muted,display:"block",marginBottom:2 }}>{l}</label>
+              <input value={(newT as any)[k]} onChange={e=>setNewT({...newT,[k]:e.target.value})}
+                style={{ width:"100%",border:`1px solid ${C.border}`,borderRadius:7,padding:"7px 9px",fontSize:12,boxSizing:"border-box" }} /></div>
+          ))}
+        </div>
+        <Btn label="إنشاء" color={color} onClick={add} />
+      </Card>}
+      <Card><SH icon="🗺️" title={`الرحلات (${trips.length})`} />
+        {trips.map((t:any)=>(
+          <div key={t.id} style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:`1px solid ${C.border}` }}>
+            <div>
+              <div style={{ fontWeight:700,color:C.dark,fontSize:13 }}>{t.id}</div>
+              <div style={{ fontSize:13 }}>{t.from} → {t.to}</div>
+              <div style={{ fontSize:11,color:C.muted }}>السائق: {t.driver} · {t.date}</div>
+            </div>
+            <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+              <span style={{ fontWeight:700 }}>{t.amount.toLocaleString()} د.ع</span>
+              <select value={t.status} onChange={e=>update(t.id,e.target.value)}
+                style={{ border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 9px",fontSize:12,cursor:"pointer" }}>
+                <option value="pending">معلّق</option><option value="ongoing">جاري</option>
+                <option value="delivered">وصل</option><option value="cancelled">ملغي</option>
+              </select>
+            </div>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
+function Drivers({ drivers, onUpdate, color }:any) {
+  const [showAdd,setShowAdd]=useState(false);
+  const [newD,setNewD]=useState({ name:"",phone:"",city:"",vehicle:"سيارة" });
+  const add=()=>{
+    onUpdate([...drivers,{ id:`d${Date.now()}`, name:newD.name, phone:newD.phone, city:newD.city, status:"active", trips:0, rating:0, vehicle:newD.vehicle }]);
+    setNewD({ name:"",phone:"",city:"",vehicle:"سيارة" }); setShowAdd(false);
+  };
+  const updateStatus=(id:string,status:string)=>onUpdate(drivers.map((d:any)=>d.id===id?{...d,status}:d));
+  const del=(id:string)=>onUpdate(drivers.filter((d:any)=>d.id!==id));
+  return (
+    <div>
+      <AppSync text="إدارة سائقيك هنا — حالتهم تظهر للصيدليات عند الطلب" />
+      <div style={{ display:"flex",gap:8,marginBottom:12 }}>
+        <button onClick={()=>setShowAdd(v=>!v)} style={{ background:color,color:"#fff",border:"none",borderRadius:9,padding:"8px 16px",fontWeight:700,cursor:"pointer" }}>+ إضافة سائق</button>
+      </div>
+      {showAdd && <Card style={{ marginBottom:12, border:`2px solid ${color}` }}>
+        <SH icon="👨‍✈️" title="سائق جديد" />
+        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8 }}>
+          {([["name","الاسم"],["phone","الهاتف"],["city","المدينة"],["vehicle","نوع المركبة"]] as const).map(([k,l])=>(
+            <div key={k}><label style={{ fontSize:11,color:C.muted,display:"block",marginBottom:2 }}>{l}</label>
+              <input value={(newD as any)[k]} onChange={e=>setNewD({...newD,[k]:e.target.value})}
+                style={{ width:"100%",border:`1px solid ${C.border}`,borderRadius:7,padding:"7px 9px",fontSize:12,boxSizing:"border-box" }} /></div>
+          ))}
+        </div>
+        <Btn label="إضافة" color={color} onClick={add} />
+      </Card>}
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:12 }}>
+        {drivers.map((d:any)=>(
+          <Card key={d.id}>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8 }}>
+              <div style={{ fontSize:28 }}>👨‍✈️</div>
+              <div style={{ display:"flex",gap:6,flexDirection:"column",alignItems:"flex-end" }}>
+                <Bdg {...driverBadge(d.status)} />
+                <button onClick={()=>del(d.id)} style={{ background:"#FFF5F5",color:C.red,border:"none",borderRadius:6,padding:"2px 7px",fontSize:10,cursor:"pointer" }}>حذف</button>
+              </div>
+            </div>
+            <div style={{ fontWeight:800,fontSize:15,marginBottom:2 }}>{d.name}</div>
+            <div style={{ fontSize:12,color:C.muted,marginBottom:2 }}>📱 {d.phone}</div>
+            <div style={{ fontSize:12,color:C.muted,marginBottom:4 }}>📍 {d.city} · 🚗 {d.vehicle}</div>
+            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:8 }}>
+              <span style={{ fontSize:12 }}>🗺️ {d.trips} رحلة</span>
+              <span style={{ fontSize:12,fontWeight:700,color:C.primary }}>⭐ {d.rating||"—"}</span>
+            </div>
+            <select value={d.status} onChange={e=>updateStatus(d.id,e.target.value)}
+              style={{ width:"100%",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 9px",fontSize:12,cursor:"pointer" }}>
+              <option value="active">متاح</option><option value="off">خارج</option><option value="inactive">غير نشط</option>
+            </select>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Ratings({ drivers, color }:any) {
+  const sorted=[...drivers].filter(d=>d.rating>0).sort((a:any,b:any)=>b.rating-a.rating);
+  return (
+    <div>
+      <AppSync text="تقييمات السائقين تأتي من العملاء في تطبيق دواء+" />
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12,marginBottom:16 }}>
+        <Stat icon="⭐" label="أعلى تقييم" value={sorted[0]?.rating||"—"} color={color} />
+        <Stat icon="📊" label="متوسط التقييمات" value={(drivers.reduce((s:number,d:any)=>s+d.rating,0)/drivers.filter((d:any)=>d.rating>0).length).toFixed(1)} color={color} />
+        <Stat icon="👨‍✈️" label="سائق بتقييم" value={sorted.length} color={color} />
+      </div>
+      <Card><SH icon="🏆" title="ترتيب السائقين" />
+        {sorted.map((d:any,i:number)=>(
+          <div key={d.id} style={{ display:"flex",alignItems:"center",gap:14,padding:"12px 0",borderBottom:`1px solid ${C.border}` }}>
+            <div style={{ fontSize:20,fontWeight:900,color:i===0?"#F59E0B":i===1?"#94A3B8":i===2?"#CD7F32":C.muted,width:28,textAlign:"center" }}>#{i+1}</div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:700 }}>{d.name}</div>
+              <div style={{ fontSize:12,color:C.muted }}>{d.city} · {d.vehicle} · {d.trips} رحلة</div>
+            </div>
+            <div style={{ textAlign:"left" }}>
+              <div style={{ fontSize:18,fontWeight:900,color }}>⭐ {d.rating}</div>
+              <Bdg {...driverBadge(d.status)} />
+            </div>
+          </div>
+        ))}
+        {sorted.length===0 && <div style={{ textAlign:"center",color:C.muted,padding:16 }}>لا توجد تقييمات بعد</div>}
+      </Card>
+    </div>
+  );
+}
+
+function SubPage({ plan, color }:any) {
+  const plans=[
+    { id:"free",     name:"مجاني",      price:0,       features:["3 سائقين","50 رحلة/شهر","دعم أساسي"] },
+    { id:"standard", name:"ستاندرد",    price:40000,   features:["20 سائق","500 رحلة/شهر","دعم أولوية","تقارير شهرية"] },
+    { id:"premium",  name:"بريميوم ✨",  price:90000,   features:["سائقون غير محدودون","رحلات غير محدودة","دعم 24/7","تتبع مباشر","إعلانات في التطبيق"] },
+  ];
+  const [up,setUp]=useState<string|null>(null);
+  return (
+    <div><AppSync text="ترقية اشتراكك تُفعَّل فوراً وتظهر لمدير المنصة" />
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14 }}>
+        {plans.map(p=>(
+          <Card key={p.id} style={{ border:`2px solid ${p.id===plan?color:C.border}`, position:"relative" }}>
+            {p.id===plan&&<div style={{ position:"absolute",top:-10,right:14,background:color,color:"#fff",borderRadius:9,padding:"2px 10px",fontSize:11,fontWeight:700 }}>اشتراكك الحالي</div>}
+            <div style={{ fontWeight:800,fontSize:17,marginBottom:4 }}>{p.name}</div>
+            <div style={{ fontSize:20,fontWeight:900,color,marginBottom:12 }}>{p.price===0?"مجاني":`${p.price.toLocaleString()} د.ع/شهر`}</div>
+            {p.features.map(f=><div key={f} style={{ fontSize:12,marginBottom:5,display:"flex",gap:5 }}><span style={{ color:C.green }}>✓</span>{f}</div>)}
+            {p.id!==plan&&<Btn label={up===p.id?"⏳ جاري الترقية...":"ترقية الآن"} color={color} onClick={()=>{ setUp(p.id); setTimeout(()=>setUp(null),1500); }} />}
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FinPage({ revenue, color }:any) {
+  const rows=[
+    { m:"زين كاش",   ref:"ZC-0401",amount:Math.round(revenue*0.32),date:"2025-04-01" },
+    { m:"فاست باي",  ref:"FP-0315",amount:Math.round(revenue*0.18),date:"2025-03-15" },
+    { m:"FIB",       ref:"FI-0301",amount:Math.round(revenue*0.38),date:"2025-03-01" },
+  ];
+  return (
+    <div>
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16 }}>
+        <Stat icon="💰" label="الإجمالي" value={`${(revenue/1000000).toFixed(1)}M د.ع`} color={color} />
+        <Stat icon="📅" label="هذا الشهر" value={`${(revenue*0.26/1000000).toFixed(2)}M`} change="+6%" color={color} />
+        <Stat icon="⏳" label="معلّق" value={`${Math.round(revenue*0.05/1000)}K`} color={C.orange} />
+      </div>
+      <Card><SH icon="📋" title="سجل المدفوعات" />
+        {rows.map((r,i)=>(
+          <div key={i} style={{ display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:`1px solid ${C.border}`,alignItems:"center" }}>
+            <div><div style={{ fontWeight:700,fontSize:13 }}>{r.m}</div><div style={{ fontSize:11,color:C.muted }}>Ref: {r.ref} · {r.date}</div></div>
+            <div><div style={{ fontWeight:800,color:C.green }}>{r.amount.toLocaleString()} د.ع</div><Bdg l="مكتمل" c={C.green} b="#F0FFF4" /></div>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
+function Support({ name, color }:any) {
+  const [tab,setTab]=useState<"t"|"m"|"c">("t");
+  const [msg,setMsg]=useState(""); const [sent,setSent]=useState(false);
+  const send=()=>{ setSent(true); setMsg(""); setTimeout(()=>setSent(false),4000); };
+  const tickets=[
+    { id:"TK-001",title:"تأخير في استلام الطلبات",status:"open",   date:"2025-04-03",reply:"نحن ندرس المشكلة..." },
+    { id:"TK-002",title:"سؤال عن عمولة التوصيل",  status:"resolved",date:"2025-04-01",reply:"تمت الإجابة عبر البريد." },
+  ];
+  return (
+    <div>
+      <div style={{ display:"flex",gap:8,marginBottom:14 }}>
+        {([["t","🎫 التذاكر"],["m","💬 تواصل مع المدير"],["c","📞 التواصل"]] as const).map(([id,l])=>(
+          <button key={id} onClick={()=>setTab(id)} style={{ background:tab===id?color:"#EDF2F7",color:tab===id?"#fff":C.text,border:"none",borderRadius:9,padding:"8px 16px",fontWeight:700,cursor:"pointer",fontSize:13 }}>{l}</button>
+        ))}
+      </div>
+      {tab==="t" && <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
+        {tickets.map(t=>(
+          <Card key={t.id}>
+            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
+              <span style={{ fontWeight:700,color:C.dark }}>{t.id} — {t.title}</span>
+              <Bdg l={t.status==="open"?"مفتوحة":"محلولة"} c={t.status==="open"?C.orange:C.green} b={t.status==="open"?"#FFF3E0":"#F0FFF4"} />
+            </div>
+            <div style={{ fontSize:12,color:C.muted }}>{t.reply}</div>
+          </Card>
+        ))}
+        <Card><SH icon="✍️" title="تذكرة جديدة" />
+          <input placeholder="الموضوع" style={{ width:"100%",border:`1px solid ${C.border}`,borderRadius:9,padding:"9px 12px",marginBottom:8,fontSize:13,boxSizing:"border-box" }} />
+          <textarea placeholder="وصف المشكلة..." rows={3} style={{ width:"100%",border:`1px solid ${C.border}`,borderRadius:9,padding:"9px 12px",fontSize:13,resize:"vertical",boxSizing:"border-box",marginBottom:8 }} />
+          <Btn label="إرسال" color={color} onClick={()=>{}} />
+        </Card>
+      </div>}
+      {tab==="m" && <Card>
+        <SH icon="💬" title={`رسالة لمدير المنصة — ${name}`} />
+        <div style={{ background:C.bg,borderRadius:10,padding:14,minHeight:80,marginBottom:10,fontSize:13,color:C.muted }}>مرحباً! كيف يمكننا مساعدتك؟ 👋</div>
+        <textarea value={msg} onChange={e=>setMsg(e.target.value)} rows={3} placeholder="اكتب رسالتك..."
+          style={{ width:"100%",border:`1px solid ${C.border}`,borderRadius:9,padding:"9px 12px",fontSize:13,resize:"vertical",boxSizing:"border-box",marginBottom:8 }} />
+        <Btn label={sent?"✅ تم الإرسال!":"📨 إرسال للمدير"} color={sent?C.green:color} onClick={send} />
+        {sent&&<div style={{ color:C.green,fontSize:12,marginTop:8 }}>✅ وصلت رسالتك، سيرد المدير قريباً</div>}
+      </Card>}
+      {tab==="c" && <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12 }}>
+        {[{i:"📞",l:"هاتف",v:"+964 770 000 0001",a:"tel:+9647700000001"},{i:"💬",l:"واتساب",v:"+964 770 000 0001",a:"https://wa.me/9647700000001"},{i:"📧",l:"بريد",v:"admin@dawaplus.iq",a:"mailto:admin@dawaplus.iq"}].map(c=>(
+          <Card key={c.l} style={{ textAlign:"center" }}>
+            <div style={{ fontSize:32,marginBottom:8 }}>{c.i}</div>
+            <div style={{ fontWeight:700,fontSize:13,marginBottom:3 }}>{c.l}</div>
+            <div style={{ fontSize:11,color:C.muted,marginBottom:10 }}>{c.v}</div>
+            <a href={c.a} target="_blank" rel="noreferrer" style={{ background:color,color:"#fff",borderRadius:9,padding:"7px 14px",fontSize:12,fontWeight:700,textDecoration:"none" }}>تواصل</a>
+          </Card>
+        ))}
+      </div>}
+    </div>
+  );
+}
+
+function Sidebar({ color,icon,title,name,menu,active,onNav,onLogout }:any) {
+  const [open,setOpen]=useState(true);
+  return (
+    <div style={{ width:open?220:60,background:"#1a202c",display:"flex",flexDirection:"column",transition:"width 0.2s",flexShrink:0,overflow:"hidden" }}>
+      <div style={{ padding:"14px 12px",borderBottom:"1px solid #2d3748",display:"flex",alignItems:"center",gap:8 }}>
+        <span style={{ fontSize:22,flexShrink:0 }}>{icon}</span>
+        {open&&<div style={{ flex:1 }}><div style={{ color:"#fff",fontSize:12,fontWeight:800,whiteSpace:"nowrap" }}>{title}</div><div style={{ color:"#A0AEC0",fontSize:10,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{name}</div></div>}
+        <button onClick={()=>setOpen(v=>!v)} style={{ background:"none",border:"none",color:"#A0AEC0",cursor:"pointer",fontSize:16,flexShrink:0,marginRight:open?"0":"auto" }}>☰</button>
+      </div>
+      <div style={{ flex:1,overflowY:"auto",padding:"6px 0" }}>
+        {menu.map((m:any)=>(
+          <button key={m.id} onClick={()=>onNav(m.id)} style={{ width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:active===m.id?`${color}25`:"none",border:"none",cursor:"pointer",textAlign:"right",borderRight:active===m.id?`3px solid ${color}`:"3px solid transparent" }}>
+            <span style={{ fontSize:17,flexShrink:0 }}>{m.i}</span>
+            {open&&<span style={{ color:active===m.id?"#fff":"#A0AEC0",fontSize:13,fontWeight:active===m.id?700:400,whiteSpace:"nowrap" }}>{m.l}</span>}
+          </button>
+        ))}
+      </div>
+      <button onClick={onLogout} style={{ padding:14,background:"none",border:"none",borderTop:"1px solid #2d3748",color:"#A0AEC0",cursor:"pointer",display:"flex",alignItems:"center",gap:8,fontSize:13 }}>
+        <span>🚪</span>{open&&<span>تسجيل الخروج</span>}
+      </button>
+    </div>
+  );
+}
+function TopBar({ color,label,name }:any) {
+  return (
+    <div style={{ background:"#fff",borderBottom:`1px solid ${C.border}`,padding:"0 20px",height:56,display:"flex",alignItems:"center",gap:12,flexShrink:0 }}>
+      <div style={{ flex:1 }}><span style={{ fontWeight:800,fontSize:15 }}>{label}</span></div>
+      <div style={{ display:"flex",alignItems:"center",gap:6,background:`${color}15`,borderRadius:20,padding:"5px 12px",border:`1px solid ${color}40` }}>
+        <span style={{ width:7,height:7,borderRadius:"50%",background:C.green,display:"block" }} />
+        <span style={{ fontSize:11,color:C.dark,fontWeight:700 }}>🚚 متزامن مع المنصة</span>
+      </div>
+    </div>
+  );
+}
+function AppSync({ text }:any) {
+  return <div style={{ background:"#FFFFF0",border:"1px solid #ECC94B",borderRadius:10,padding:"9px 14px",display:"flex",gap:8,alignItems:"center",marginBottom:14 }}><span>🚚</span><span style={{ fontSize:12,color:"#744210" }}>{text}</span></div>;
+}
+function Card({ children,style }:any) { return <div style={{ background:C.surface,borderRadius:14,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",...style }}>{children}</div>; }
+function SH({ icon,title }:any) { return <h3 style={{ fontSize:15,fontWeight:800,color:C.text,margin:"0 0 14px",display:"flex",alignItems:"center",gap:7 }}><span>{icon}</span>{title}</h3>; }
+function Stat({ icon,label,value,change,color }:any) {
+  return <div style={{ background:C.surface,borderRadius:14,padding:"16px 18px",borderTop:`3px solid ${color}`,boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+    <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}><span style={{ fontSize:22 }}>{icon}</span>{change&&<span style={{ fontSize:10,color:C.green,fontWeight:700,background:"#F0FFF4",borderRadius:6,padding:"2px 7px" }}>{change}</span>}</div>
+    <div style={{ fontSize:20,fontWeight:900,color:C.text }}>{value}</div>
+    <div style={{ fontSize:12,color:C.muted,marginTop:2 }}>{label}</div>
+  </div>;
+}
+function Bdg({ l,c,b }:any) { return <span style={{ background:b,color:c,borderRadius:7,padding:"2px 9px",fontSize:11,fontWeight:700 }}>{l}</span>; }
+function Btn({ label,color,onClick,full }:any) {
+  return <button onClick={onClick} style={{ background:color,color:"#fff",border:"none",borderRadius:9,padding:"10px 20px",fontWeight:700,cursor:"pointer",fontSize:13,width:full?"100%":"auto" }}>{label}</button>;
+}
+function Inp({ label,val,set,ph,type }:any) {
+  return <div style={{ marginBottom:10 }}>
+    <label style={{ fontSize:12,fontWeight:700,color:C.muted,display:"block",marginBottom:3 }}>{label}</label>
+    <input type={type||"text"} value={val} onChange={(e:any)=>set(e.target.value)} placeholder={ph}
+      style={{ width:"100%",border:`1.5px solid ${C.border}`,borderRadius:9,padding:"10px 12px",fontSize:13,boxSizing:"border-box" }} />
+  </div>;
+}

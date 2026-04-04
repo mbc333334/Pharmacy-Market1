@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/dawaaplus-delivery/"
+title = "دواء+ | بوابة شركات التوصيل"
+version = "1.0.0"
+id = "artifacts/dawaaplus-delivery"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/dawaaplus-delivery/" ]
+localPort = 22880
+
+[services.development]
+run = "pnpm --filter @workspace/dawaaplus-delivery run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/dawaaplus-delivery", "run", "build" ]
+publicDir = "artifacts/dawaaplus-delivery/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22880"
+BASE_PATH = "/dawaaplus-delivery/"
