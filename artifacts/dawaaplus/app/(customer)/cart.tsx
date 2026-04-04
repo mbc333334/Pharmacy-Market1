@@ -37,6 +37,9 @@ export default function CartScreen() {
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
   const [showGuestModal, setShowGuestModal] = useState(false);
+  const [guestStep, setGuestStep] = useState<"choice" | "phone">("choice");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestPhoneError, setGuestPhoneError] = useState("");
 
   const topInset = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomInset = insets.bottom + (Platform.OS === "web" ? 34 : 0);
@@ -58,19 +61,10 @@ export default function CartScreen() {
     }
   };
 
-  const handleCheckout = () => {
-    // Gate: guests must log in or register before purchasing
-    if (!user) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setShowGuestModal(true);
-      return;
-    }
-    if (paymentMethod === "card") {
-      if (!cardNumber || !cardName || !cardExpiry || !cardCvv) {
-        Alert.alert("معلومات البطاقة", "يرجى إدخال جميع بيانات البطاقة المصرفية");
-        return;
-      }
-    }
+  // Core checkout logic — works for both registered and guest customers
+  const proceedCheckout = (customerPhone?: string) => {
+    const phone = customerPhone ?? user?.phone ?? "+964 750 000 0000";
+    const name = user?.name ?? "زبون ضيف";
     const payLabels: Record<PaymentMethod, string> = {
       cod: "الدفع عند الاستلام (كاش)",
       card: "البطاقة المصرفية",
@@ -85,9 +79,9 @@ export default function CartScreen() {
           text: "تأكيد الطلب",
           onPress: () => {
             const order = placeCustomerOrder({
-              customerId: "c_me",
-              customerName: "العميل",
-              customerPhone: "+964 750 000 9999",
+              customerId: user?.id ?? "guest",
+              customerName: name,
+              customerPhone: phone,
               pharmacyId: "p1",
               pharmacyName: "دەرمانخانەی شیفا",
               items: items.map(i => ({
@@ -111,12 +105,41 @@ export default function CartScreen() {
             }
             clearCart();
             if (paymentMethod !== "whatsapp") {
-              Alert.alert("تم الطلب! 🎉", `رقم طلبك: ${order.id}\nسيتصل بك الصيدلي قريباً.`);
+              Alert.alert("تم الطلب! 🎉", `رقم طلبك: ${order.id}\nسيتصل بك الصيدلي قريباً لتأكيد التوصيل.`);
             }
           },
         },
       ]
     );
+  };
+
+  const handleCheckout = () => {
+    if (paymentMethod === "card") {
+      if (!cardNumber || !cardName || !cardExpiry || !cardCvv) {
+        Alert.alert("معلومات البطاقة", "يرجى إدخال جميع بيانات البطاقة المصرفية");
+        return;
+      }
+    }
+    // Registered user → checkout directly
+    if (user) {
+      proceedCheckout();
+      return;
+    }
+    // Guest → show choice modal
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setGuestStep("choice");
+    setGuestPhone("");
+    setGuestPhoneError("");
+    setShowGuestModal(true);
+  };
+
+  const handleGuestCheckout = () => {
+    if (!guestPhone || guestPhone.length < 10) {
+      setGuestPhoneError("يرجى إدخال رقم هاتف صحيح للتواصل معك عند التوصيل");
+      return;
+    }
+    setShowGuestModal(false);
+    proceedCheckout(guestPhone);
   };
 
   if (items.length === 0) {
@@ -330,35 +353,117 @@ export default function CartScreen() {
           <View style={styles.guestSheet} onStartShouldSetResponder={() => true}>
             <View style={styles.guestHandle} />
 
-            <View style={styles.guestIconWrap}>
-              <Ionicons name="lock-closed" size={36} color={Colors.primary} />
-            </View>
-            <Text style={styles.guestTitle}>تسجيل الدخول مطلوب</Text>
-            <Text style={styles.guestSub}>
-              أضفت منتجات رائعة! سجّل دخولك أو أنشئ حساباً لإتمام الطلب وتتبع توصيلك.
-            </Text>
+            {guestStep === "choice" ? (
+              <>
+                {/* ── Step 1: Choose path ── */}
+                <View style={styles.guestIconWrap}>
+                  <Ionicons name="cart" size={34} color={Colors.primary} />
+                </View>
+                <Text style={styles.guestTitle}>أكمل طلبك</Text>
+                <Text style={styles.guestSub}>
+                  سجّل دخولك لمتابعة طلباتك، أو اشترِ مباشرةً بدون حساب
+                </Text>
 
-            <View style={styles.guestBtnGroup}>
-              <TouchableOpacity
-                style={styles.guestLoginBtn}
-                onPress={() => { setShowGuestModal(false); router.push("/(auth)/login"); }}
-              >
-                <Ionicons name="log-in-outline" size={20} color="#fff" />
-                <Text style={styles.guestLoginBtnText}>تسجيل الدخول</Text>
-              </TouchableOpacity>
+                {/* Option 1: Login */}
+                <TouchableOpacity
+                  style={styles.guestLoginBtn}
+                  onPress={() => { setShowGuestModal(false); router.push("/(auth)/login"); }}
+                >
+                  <Ionicons name="log-in-outline" size={20} color="#fff" />
+                  <View style={styles.guestBtnInfo}>
+                    <Text style={styles.guestLoginBtnText}>تسجيل الدخول</Text>
+                    <Text style={styles.guestBtnInfoSub}>تتبع طلباتك وتاريخ مشترياتك</Text>
+                  </View>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.guestRegisterBtn}
-                onPress={() => { setShowGuestModal(false); router.push("/(auth)/register"); }}
-              >
-                <Ionicons name="person-add-outline" size={20} color={Colors.primary} />
-                <Text style={styles.guestRegisterBtnText}>إنشاء حساب مجاني</Text>
-              </TouchableOpacity>
-            </View>
+                {/* Option 2: Register */}
+                <TouchableOpacity
+                  style={styles.guestRegisterBtn}
+                  onPress={() => { setShowGuestModal(false); router.push("/(auth)/register"); }}
+                >
+                  <Ionicons name="person-add-outline" size={20} color={Colors.primary} />
+                  <View style={styles.guestBtnInfo}>
+                    <Text style={styles.guestRegisterBtnText}>إنشاء حساب مجاني</Text>
+                    <Text style={[styles.guestBtnInfoSub, { color: Colors.primary + "90" }]}>سريع وسهل، احفظ عناوينك</Text>
+                  </View>
+                </TouchableOpacity>
 
-            <TouchableOpacity style={styles.guestCancelBtn} onPress={() => setShowGuestModal(false)}>
-              <Text style={styles.guestCancelText}>متابعة التصفح</Text>
-            </TouchableOpacity>
+                {/* Divider */}
+                <View style={styles.guestOrRow}>
+                  <View style={styles.guestOrLine} />
+                  <Text style={styles.guestOrText}>أو</Text>
+                  <View style={styles.guestOrLine} />
+                </View>
+
+                {/* Option 3: Buy without registration */}
+                <TouchableOpacity
+                  style={styles.guestDirectBtn}
+                  onPress={() => {
+                    setGuestStep("phone");
+                    setGuestPhone("");
+                    setGuestPhoneError("");
+                  }}
+                >
+                  <Ionicons name="flash-outline" size={20} color="#D69E2E" />
+                  <View style={styles.guestBtnInfo}>
+                    <Text style={styles.guestDirectBtnText}>الشراء بدون تسجيل</Text>
+                    <Text style={[styles.guestBtnInfoSub, { color: "#D69E2E90" }]}>أسرع طريقة، لا حاجة لحساب</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.guestCancelBtn} onPress={() => setShowGuestModal(false)}>
+                  <Text style={styles.guestCancelText}>متابعة التصفح</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                {/* ── Step 2: Guest phone number ── */}
+                <TouchableOpacity
+                  style={styles.guestBackBtn}
+                  onPress={() => setGuestStep("choice")}
+                >
+                  <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+                  <Text style={styles.guestBackText}>رجوع</Text>
+                </TouchableOpacity>
+
+                <View style={[styles.guestIconWrap, { backgroundColor: "#D69E2E18" }]}>
+                  <Ionicons name="flash" size={34} color="#D69E2E" />
+                </View>
+                <Text style={styles.guestTitle}>رقمك للتوصيل</Text>
+                <Text style={styles.guestSub}>
+                  نحتاج رقم هاتفك فقط ليتواصل معك الصيدلي لتأكيد التوصيل
+                </Text>
+
+                <View style={styles.guestPhoneWrap}>
+                  <TextInput
+                    style={[styles.guestPhoneInput, guestPhoneError ? { borderColor: Colors.error } : {}]}
+                    placeholder="+964 7XX XXX XXXX"
+                    value={guestPhone}
+                    onChangeText={t => { setGuestPhone(t); setGuestPhoneError(""); }}
+                    keyboardType="phone-pad"
+                    textAlign="right"
+                    placeholderTextColor={Colors.textMuted}
+                    autoFocus
+                  />
+                  <Ionicons name="call-outline" size={20} color={Colors.textMuted} style={styles.guestPhoneIcon} />
+                </View>
+                {guestPhoneError ? (
+                  <Text style={styles.guestPhoneError}>{guestPhoneError}</Text>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[styles.guestLoginBtn, { backgroundColor: "#D69E2E" }]}
+                  onPress={handleGuestCheckout}
+                >
+                  <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+                  <Text style={styles.guestLoginBtnText}>تأكيد الطلب</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.guestPrivacyNote}>
+                  رقمك يُستخدم فقط للتواصل بشأن طلبك ولن يُشارك مع أي طرف ثالث
+                </Text>
+              </>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -574,33 +679,64 @@ const styles = StyleSheet.create({
   },
   guestSheet: {
     backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: 28, paddingBottom: 40, alignItems: "center", gap: 14,
+    padding: 24, paddingBottom: 40, alignItems: "center", gap: 12,
   },
   guestHandle: {
-    width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, marginBottom: 6,
+    width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, marginBottom: 4,
   },
   guestIconWrap: {
-    width: 80, height: 80, borderRadius: 40,
+    width: 72, height: 72, borderRadius: 36,
     backgroundColor: Colors.primaryLight, alignItems: "center", justifyContent: "center",
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  guestTitle: { fontSize: 22, fontWeight: "800", color: Colors.textPrimary, textAlign: "center" },
+  guestTitle: { fontSize: 20, fontWeight: "800", color: Colors.textPrimary, textAlign: "center" },
   guestSub: {
-    fontSize: 14, color: Colors.textMuted, textAlign: "center", lineHeight: 22, paddingHorizontal: 8,
+    fontSize: 13, color: Colors.textMuted, textAlign: "center", lineHeight: 20,
+    paddingHorizontal: 8, marginBottom: 4,
   },
-  guestBtnGroup: { width: "100%", gap: 10, marginTop: 4 },
   guestLoginBtn: {
-    backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 15,
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    width: "100%", backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 13,
+    paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 12,
   },
-  guestLoginBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  guestLoginBtnText: { fontSize: 15, fontWeight: "700", color: "#fff" },
   guestRegisterBtn: {
-    borderWidth: 2, borderColor: Colors.primary, borderRadius: 14, paddingVertical: 13,
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    width: "100%", borderWidth: 2, borderColor: Colors.primary, borderRadius: 14,
+    paddingVertical: 11, paddingHorizontal: 16,
+    flexDirection: "row", alignItems: "center", gap: 12,
   },
   guestRegisterBtnText: { fontSize: 15, fontWeight: "700", color: Colors.primary },
-  guestCancelBtn: {
-    paddingVertical: 10, alignItems: "center",
+  guestBtnInfo: { flex: 1, alignItems: "flex-end" },
+  guestBtnInfoSub: { fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 1 },
+  guestOrRow: { flexDirection: "row", alignItems: "center", gap: 8, width: "100%" },
+  guestOrLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  guestOrText: { fontSize: 12, color: Colors.textMuted, fontWeight: "600" },
+  guestDirectBtn: {
+    width: "100%", borderWidth: 1.5, borderColor: "#D69E2E40",
+    backgroundColor: "#D69E2E0C", borderRadius: 14, paddingVertical: 12,
+    paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 12,
   },
-  guestCancelText: { fontSize: 14, color: Colors.textMuted, fontWeight: "500" },
+  guestDirectBtnText: { fontSize: 15, fontWeight: "700", color: "#D69E2E" },
+  guestCancelBtn: { paddingVertical: 8, alignItems: "center" },
+  guestCancelText: { fontSize: 13, color: Colors.textMuted, fontWeight: "500" },
+  guestBackBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    alignSelf: "flex-end", marginBottom: 4,
+  },
+  guestBackText: { fontSize: 13, color: Colors.textMuted, fontWeight: "600" },
+  guestPhoneWrap: {
+    width: "100%", flexDirection: "row", alignItems: "center",
+    backgroundColor: Colors.surfaceAlt, borderRadius: 12,
+    borderWidth: 1.5, borderColor: Colors.border, paddingHorizontal: 14,
+  },
+  guestPhoneInput: {
+    flex: 1, paddingVertical: 14, fontSize: 16, color: Colors.textPrimary,
+  },
+  guestPhoneIcon: { paddingHorizontal: 4 },
+  guestPhoneError: {
+    fontSize: 12, color: Colors.error, textAlign: "right", alignSelf: "flex-end",
+  },
+  guestPrivacyNote: {
+    fontSize: 11, color: Colors.textMuted, textAlign: "center",
+    lineHeight: 16, paddingHorizontal: 8,
+  },
 });
