@@ -11,6 +11,9 @@ export interface PaymentMethodConfig {
   category: "cash" | "card" | "wallet" | "social";
   enabled: boolean;
   description: string;
+  accountNumber: string;
+  accountPlaceholder: string;
+  showAccount: boolean;
 }
 
 const DEFAULT_METHODS: PaymentMethodConfig[] = [
@@ -24,6 +27,9 @@ const DEFAULT_METHODS: PaymentMethodConfig[] = [
     category: "cash",
     enabled: true,
     description: "ادفع نقداً عند استلام طلبك",
+    accountNumber: "",
+    accountPlaceholder: "لا يوجد حساب — الدفع عند الاستلام",
+    showAccount: false,
   },
   {
     id: "card",
@@ -35,6 +41,9 @@ const DEFAULT_METHODS: PaymentMethodConfig[] = [
     category: "card",
     enabled: true,
     description: "Visa · Mastercard · FIB Card",
+    accountNumber: "",
+    accountPlaceholder: "IBAN أو رقم الحساب المصرفي",
+    showAccount: true,
   },
   {
     id: "zaincash",
@@ -46,6 +55,9 @@ const DEFAULT_METHODS: PaymentMethodConfig[] = [
     category: "wallet",
     enabled: true,
     description: "محفظة زين كاش الإلكترونية",
+    accountNumber: "",
+    accountPlaceholder: "07XX XXX XXXX (زين كاش)",
+    showAccount: true,
   },
   {
     id: "fastpay",
@@ -57,6 +69,9 @@ const DEFAULT_METHODS: PaymentMethodConfig[] = [
     category: "wallet",
     enabled: true,
     description: "محفظة فاست باي",
+    accountNumber: "",
+    accountPlaceholder: "07XX XXX XXXX (فاست باي)",
+    showAccount: true,
   },
   {
     id: "asiahawala",
@@ -68,6 +83,9 @@ const DEFAULT_METHODS: PaymentMethodConfig[] = [
     category: "wallet",
     enabled: true,
     description: "حوالة آسيا سيل",
+    accountNumber: "",
+    accountPlaceholder: "07XX XXX XXXX (آسيا سيل)",
+    showAccount: true,
   },
   {
     id: "qicard",
@@ -79,6 +97,9 @@ const DEFAULT_METHODS: PaymentMethodConfig[] = [
     category: "wallet",
     enabled: true,
     description: "بطاقة كي العراقية",
+    accountNumber: "",
+    accountPlaceholder: "رقم بطاقة كي (16 رقم)",
+    showAccount: true,
   },
   {
     id: "nasswallet",
@@ -90,6 +111,9 @@ const DEFAULT_METHODS: PaymentMethodConfig[] = [
     category: "wallet",
     enabled: false,
     description: "محفظة ناس الإلكترونية",
+    accountNumber: "",
+    accountPlaceholder: "07XX XXX XXXX (ناس ولت)",
+    showAccount: true,
   },
   {
     id: "tabadul",
@@ -101,6 +125,9 @@ const DEFAULT_METHODS: PaymentMethodConfig[] = [
     category: "wallet",
     enabled: false,
     description: "منصة تبادل المالية",
+    accountNumber: "",
+    accountPlaceholder: "رقم حساب تبادل",
+    showAccount: true,
   },
   {
     id: "mahali",
@@ -112,6 +139,9 @@ const DEFAULT_METHODS: PaymentMethodConfig[] = [
     category: "wallet",
     enabled: false,
     description: "محفظة محلي — إقليم كردستان",
+    accountNumber: "",
+    accountPlaceholder: "07XX XXX XXXX (محلي)",
+    showAccount: true,
   },
   {
     id: "fib",
@@ -123,6 +153,9 @@ const DEFAULT_METHODS: PaymentMethodConfig[] = [
     category: "wallet",
     enabled: true,
     description: "فرست إيراقي بنك",
+    accountNumber: "",
+    accountPlaceholder: "رقم حساب FIB أو IBAN",
+    showAccount: true,
   },
   {
     id: "whatsapp",
@@ -134,6 +167,9 @@ const DEFAULT_METHODS: PaymentMethodConfig[] = [
     category: "social",
     enabled: true,
     description: "تواصل مع الصيدلية عبر واتساب",
+    accountNumber: "",
+    accountPlaceholder: "رقم واتساب (+964 7XX XXX XXXX)",
+    showAccount: true,
   },
 ];
 
@@ -144,6 +180,7 @@ interface PaymentMethodsContextType {
   setEnabled: (id: PaymentMethod, enabled: boolean) => void;
   isEnabled: (id: PaymentMethod) => boolean;
   getMethod: (id: PaymentMethod) => PaymentMethodConfig | undefined;
+  setAccountNumber: (id: PaymentMethod, account: string) => void;
   enabledCount: number;
 }
 
@@ -168,6 +205,10 @@ export function PaymentMethodsProvider({ children }: { children: React.ReactNode
     return methods.find(m => m.id === id);
   }, [methods]);
 
+  const setAccountNumber = useCallback((id: PaymentMethod, account: string) => {
+    setMethods(prev => prev.map(m => m.id === id ? { ...m, accountNumber: account } : m));
+  }, []);
+
   const enabledMethods = methods.filter(m => m.enabled);
   const enabledCount = enabledMethods.length;
 
@@ -179,6 +220,7 @@ export function PaymentMethodsProvider({ children }: { children: React.ReactNode
       setEnabled,
       isEnabled,
       getMethod,
+      setAccountNumber,
       enabledCount,
     }}>
       {children}

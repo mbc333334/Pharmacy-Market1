@@ -367,11 +367,41 @@ export default function CartScreen() {
                 </View>
               )}
 
+              {/* ─ Admin account number (transfer destination) ─ */}
+              {(() => {
+                const m = getMethod(paymentMethod);
+                if (!m || !m.showAccount || !m.accountNumber) return null;
+                return (
+                  <View style={[styles.adminAccountBox, { borderColor: m.color + "40", backgroundColor: m.bg }]}>
+                    <View style={styles.adminAccountHeader}>
+                      <View style={[styles.adminAccountIcon, { backgroundColor: m.color + "20" }]}>
+                        <Ionicons name="arrow-up-circle-outline" size={18} color={m.color} />
+                      </View>
+                      <Text style={[styles.adminAccountTitle, { color: m.color }]}>
+                        حوّل المبلغ إلى حساب المنصة
+                      </Text>
+                    </View>
+                    <View style={[styles.adminAccountNumBox, { borderColor: m.color + "30" }]}>
+                      <Ionicons name="copy-outline" size={14} color={m.color} />
+                      <Text style={[styles.adminAccountNum, { color: Colors.textPrimary }]}>
+                        {m.accountNumber}
+                      </Text>
+                      <Text style={[styles.adminAccountMethodName, { color: m.color }]}>
+                        {m.label}
+                      </Text>
+                    </View>
+                    <Text style={styles.adminAccountHint}>
+                      احتفظ بإيصال التحويل — سيُطلب منك عند التأكيد
+                    </Text>
+                  </View>
+                );
+              })()}
+
               {/* ─ Wallet phone input ─ */}
               {isWallet(paymentMethod) && (
                 <View style={styles.walletPhoneBox}>
                   <Text style={styles.walletPhoneLabel}>
-                    رقم هاتف محفظة {PAY_LABELS[paymentMethod]}
+                    رقم هاتف محفظتك ({PAY_LABELS[paymentMethod]})
                   </Text>
                   <View style={styles.walletPhoneRow}>
                     <TextInput
@@ -760,6 +790,21 @@ const styles = StyleSheet.create({
   },
   walletDot: { width: 8, height: 8, borderRadius: 4 },
   walletBtnText: { fontSize: 12, fontWeight: "700" },
+  adminAccountBox: {
+    borderWidth: 1.5, borderRadius: 14, padding: 14, gap: 10,
+  },
+  adminAccountHeader: { flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "flex-end" },
+  adminAccountIcon: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  adminAccountTitle: { fontSize: 13, fontWeight: "800", textAlign: "right" },
+  adminAccountNumBox: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "rgba(255,255,255,0.7)", borderWidth: 1, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 10, justifyContent: "flex-end",
+  },
+  adminAccountNum: { flex: 1, fontSize: 15, fontWeight: "800", textAlign: "right", letterSpacing: 0.5 },
+  adminAccountMethodName: { fontSize: 11, fontWeight: "700" },
+  adminAccountHint: { fontSize: 11, color: Colors.textMuted, textAlign: "right" },
+
   walletPhoneBox: {
     backgroundColor: Colors.surfaceAlt, borderRadius: 12, padding: 12, gap: 8, marginTop: 4,
   },
