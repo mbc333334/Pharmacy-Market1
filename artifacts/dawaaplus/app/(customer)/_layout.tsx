@@ -97,7 +97,7 @@ export default function CustomerTabLayout() {
       <View style={{ flex: 1, flexDirection: "row", backgroundColor: Colors.background }}>
         <SidebarNav />
         <View style={{ flex: 1 }}>
-          <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
+          <Tabs initialRouteName="index" screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
             <Tabs.Screen name="index" />
             <Tabs.Screen name="browse" />
             <Tabs.Screen name="cart" />
@@ -110,6 +110,7 @@ export default function CustomerTabLayout() {
 
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,

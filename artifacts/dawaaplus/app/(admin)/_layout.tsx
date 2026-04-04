@@ -77,7 +77,7 @@ export default function AdminTabLayout() {
       <View style={{ flex: 1, flexDirection: "row", backgroundColor: Colors.background }}>
         <SidebarNav />
         <View style={{ flex: 1 }}>
-          <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
+          <Tabs initialRouteName="index" screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
             <Tabs.Screen name="index" />
             <Tabs.Screen name="subscriptions" />
             <Tabs.Screen name="ads" />
@@ -90,6 +90,7 @@ export default function AdminTabLayout() {
 
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
         tabBarActiveTintColor: ADMIN_COLOR,
         tabBarInactiveTintColor: Colors.textMuted,

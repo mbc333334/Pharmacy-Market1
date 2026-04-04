@@ -81,7 +81,7 @@ export default function WarehouseTabLayout() {
       <View style={{ flex: 1, flexDirection: "row", backgroundColor: Colors.background }}>
         <SidebarNav />
         <View style={{ flex: 1 }}>
-          <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
+          <Tabs initialRouteName="index" screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
             <Tabs.Screen name="index" />
             <Tabs.Screen name="inventory" />
             <Tabs.Screen name="orders" />
@@ -96,6 +96,7 @@ export default function WarehouseTabLayout() {
 
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
         tabBarActiveTintColor: WH_COLOR,
         tabBarInactiveTintColor: Colors.textMuted,
