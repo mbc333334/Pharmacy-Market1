@@ -15,7 +15,7 @@ export interface InventoryItem {
 
 export interface SyncEvent {
   id: string;
-  type: "sale" | "restock" | "import" | "adjustment";
+  type: "sale" | "restock" | "import" | "adjustment" | "manual_sync";
   itemId: string;
   itemName: string;
   quantityChange: number;
@@ -31,6 +31,7 @@ export interface SyncSettings {
   syncOnRestock: boolean;
   lowStockThreshold: number;
   lastFullSync?: string;
+  lastManualSync?: string;
   connectedDbType?: "csv" | "api" | "mysql" | "postgres" | null;
   connectedDbUrl?: string;
   isConnected: boolean;
@@ -51,6 +52,7 @@ interface InventoryContextValue {
   clearSyncLog: () => void;
   getLowStockItems: () => InventoryItem[];
   getOutOfStockItems: () => InventoryItem[];
+  manualSyncNow: (owner: "pharmacy" | "warehouse") => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextValue | null>(null);
@@ -77,9 +79,9 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   const [warehouseInventory, setWarehouseInventory] = useState<InventoryItem[]>(INITIAL_WAREHOUSE_INVENTORY);
   const [syncEvents, setSyncEvents] = useState<SyncEvent[]>([]);
   const [syncSettings, setSyncSettings] = useState<SyncSettings>({
-    autoSyncEnabled: true,
-    syncOnSale: true,
-    syncOnRestock: true,
+    autoSyncEnabled: false,
+    syncOnSale: false,
+    syncOnRestock: false,
     lowStockThreshold: 10,
     isConnected: false,
     connectedDbType: null,
@@ -122,7 +124,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   }, [logEvent]);
 
   const decrementOnSale = useCallback((items: { name: string; qty: number }[]) => {
-    if (!syncSettings.autoSyncEnabled || !syncSettings.syncOnSale) return;
+    if (!syncSettings.syncOnSale) return;
     setPharmacyInventory(prev => {
       const updated = [...prev];
       items.forEach(soldItem => {
@@ -147,10 +149,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       });
       return updated;
     });
-  }, [syncSettings.autoSyncEnabled, syncSettings.syncOnSale, logEvent]);
+  }, [syncSettings.syncOnSale, logEvent]);
 
   const restockFromWarehouse = useCallback((items: { name: string; qty: number; price?: number }[]) => {
-    if (!syncSettings.autoSyncEnabled || !syncSettings.syncOnRestock) return;
+    if (!syncSettings.syncOnRestock) return;
     setPharmacyInventory(prev => {
       const updated = [...prev];
       items.forEach(restockItem => {
@@ -196,7 +198,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       });
       return updated;
     });
-  }, [syncSettings.autoSyncEnabled, syncSettings.syncOnRestock, logEvent]);
+  }, [syncSettings.syncOnRestock, logEvent]);
 
   const importItems = useCallback((items: Omit<InventoryItem, "id">[], owner: "pharmacy" | "warehouse") => {
     const mapped = items.map((item, i) => ({ ...item, id: `imp-${Date.now()}-${i}` }));
@@ -238,6 +240,24 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     });
   }, [logEvent]);
 
+  const manualSyncNow = useCallback(async (owner: "pharmacy" | "warehouse") => {
+    await new Promise(res => setTimeout(res, 1200));
+    const now = new Date().toISOString();
+    setSyncSettings(prev => ({ ...prev, lastManualSync: now, lastFullSync: now }));
+    const mockUpdates = owner === "pharmacy" ? pharmacyInventory : warehouseInventory;
+    mockUpdates.slice(0, 3).forEach(item => {
+      logEvent({
+        type: "manual_sync",
+        itemId: item.id,
+        itemName: item.name,
+        quantityChange: 0,
+        stockBefore: item.stock,
+        stockAfter: item.stock,
+        reason: `مزامنة يدوية من ${owner === "pharmacy" ? "الصيدلية" : "المذخر"}`,
+      });
+    });
+  }, [pharmacyInventory, warehouseInventory, logEvent]);
+
   const updateSyncSettings = useCallback((settings: Partial<SyncSettings>) => {
     setSyncSettings(prev => ({ ...prev, ...settings }));
   }, []);
@@ -259,6 +279,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       pharmacyInventory, warehouseInventory, syncEvents, syncSettings,
       addPharmacyItem, updatePharmacyStock, decrementOnSale, restockFromWarehouse,
       importItems, updateSyncSettings, clearSyncLog, getLowStockItems, getOutOfStockItems,
+      manualSyncNow,
     }}>
       {children}
     </InventoryContext.Provider>

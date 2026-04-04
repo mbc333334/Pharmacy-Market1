@@ -2,14 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, Alert, TextInput, ActivityIndicator,
+  Platform, Alert, TextInput, ActivityIndicator, Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { useTranslation } from "@/i18n";
 import BarcodeScanner, { ScannedMedicine } from "@/components/BarcodeScanner";
+import { useInventory } from "@/contexts/InventoryContext";
 
-type ImportTab = "barcode" | "database";
+const ACCENT = "#0D7A54";
+
+type ImportTab = "barcode" | "database" | "sync";
 type DbType = "csv" | "api" | "mysql" | "postgres";
 
 interface ScannedItem {
@@ -22,39 +24,42 @@ interface ScannedItem {
 }
 
 const DB_TYPES: { key: DbType; icon: any; label: string; color: string }[] = [
-  { key: "csv", icon: "document-text-outline", label: "CSV / Excel", color: "#0D7A54" },
-  { key: "api", icon: "cloud-outline", label: "REST API", color: Colors.primary },
+  { key: "csv", icon: "document-text-outline", label: "CSV / Excel", color: ACCENT },
+  { key: "api", icon: "cloud-outline", label: "REST API", color: "#7C3AED" },
   { key: "mysql", icon: "server-outline", label: "MySQL", color: "#E48900" },
   { key: "postgres", icon: "layers-outline", label: "PostgreSQL", color: "#336791" },
 ];
 
 export default function WarehouseImport() {
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
   const topInset = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const { warehouseInventory, syncEvents, syncSettings, updateSyncSettings, importItems, clearSyncLog, manualSyncNow } = useInventory();
 
   const [activeTab, setActiveTab] = useState<ImportTab>("barcode");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null);
-
   const [selectedDb, setSelectedDb] = useState<DbType>("csv");
   const [apiUrl, setApiUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [importing, setImporting] = useState(false);
-  const [promoted, setPromoted] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const outOfStock = warehouseInventory.filter(i => i.stock === 0).length;
+  const lowStock = warehouseInventory.filter(i => i.stock > 0 && i.stock <= 50).length;
 
   const handleScanned = (result: ScannedMedicine) => {
     setScannerOpen(false);
-    const item: ScannedItem = {
+    const existing = warehouseInventory.find(i => i.barcode === result.barcode);
+    setEditingItem({
       barcode: result.barcode,
-      name: result.name ?? result.barcode,
-      brand: result.brand ?? "",
-      quantity: "100",
-      price: "5000",
+      name: result.name ?? existing?.name ?? result.barcode,
+      brand: result.brand ?? existing?.brand ?? "",
+      quantity: existing ? String(existing.stock) : "500",
+      price: existing ? String(existing.price) : "3000",
       promoted: false,
-    };
-    setEditingItem(item);
+    });
   };
 
   const confirmItem = () => {
@@ -67,13 +72,19 @@ export default function WarehouseImport() {
     setEditingItem(null);
   };
 
-  const promoteAll = () => {
-    setScannedItems(prev => prev.map(i => ({ ...i, promoted: true })));
-    setPromoted(true);
-    Alert.alert(
-      "تمت الترويج ✅",
-      `تم إرسال ${scannedItems.length} منتج لجميع الصيدليات المشاركة`,
+  const saveScannedToInventory = () => {
+    if (scannedItems.length === 0) return;
+    importItems(
+      scannedItems.map(i => ({
+        barcode: i.barcode, name: i.name, brand: i.brand,
+        categoryId: "1", price: parseInt(i.price) || 0,
+        stock: parseInt(i.quantity) || 0,
+        requiresPrescription: false, source: "barcode" as const,
+      })),
+      "warehouse"
     );
+    setScannedItems([]);
+    Alert.alert("تم الحفظ ✅", `تم إضافة ${scannedItems.length} منتج لمخزون المذخر`);
   };
 
   const handleDatabaseImport = async () => {
@@ -81,93 +92,140 @@ export default function WarehouseImport() {
     await new Promise(r => setTimeout(r, 2000));
     setImporting(false);
     const mockImported: ScannedItem[] = [
-      { barcode: "5900000000001", name: "باراسیتامول 500mg", brand: "Panadol", quantity: "1000", price: "1500", promoted: false },
-      { barcode: "5900000000002", name: "أموكسيسيلين 500mg", brand: "Amoxil", quantity: "500", price: "8000", promoted: false },
-      { barcode: "5900000000003", name: "أسبرين 100mg", brand: "Aspirin Bayer", quantity: "800", price: "2500", promoted: false },
-      { barcode: "5900000000004", name: "أوميبرازول 20mg", brand: "Omeprazole", quantity: "300", price: "5000", promoted: false },
-      { barcode: "5900000000005", name: "إيبوبروفين 400mg", brand: "Advil", quantity: "600", price: "3000", promoted: false },
+      { barcode: "5900000000001", name: "باراسیتامول 500mg", brand: "Panadol", quantity: "5000", price: "1000", promoted: false },
+      { barcode: "5900000000002", name: "أموكسيسيلين 500mg", brand: "Amoxil", quantity: "2000", price: "6000", promoted: true },
+      { barcode: "5900000000003", name: "أسبرين 100mg", brand: "Aspirin Bayer", quantity: "3500", price: "1800", promoted: false },
+      { barcode: "5900000000006", name: "ميتفورمين 500mg", brand: "Glucophage", quantity: "1500", price: "3000", promoted: false },
+      { barcode: "5900000000008", name: "فيتامين د 1000IU", brand: "D3 Caps", quantity: "800", price: "4500", promoted: true },
     ];
     setScannedItems(mockImported);
-    Alert.alert("تم الاستيراد ✅", `تم استيراد ${mockImported.length} منتج بنجاح من قاعدة البيانات`);
+    Alert.alert("تم الاستيراد ✅", `تم استيراد ${mockImported.length} منتج من قاعدة بيانات المذخر`);
+  };
+
+  const testConnection = async () => {
+    setTesting(true);
+    await new Promise(r => setTimeout(r, 1500));
+    setTesting(false);
+    updateSyncSettings({ isConnected: true, connectedDbType: selectedDb, connectedDbUrl: apiUrl, lastFullSync: new Date().toISOString() });
+    Alert.alert("الاتصال ناجح ✅", "تم الاتصال بقاعدة بيانات نظام المذخر بنجاح");
+  };
+
+  const saveAllToInventory = () => {
+    if (scannedItems.length === 0) return;
+    importItems(
+      scannedItems.map(i => ({
+        barcode: i.barcode, name: i.name, brand: i.brand,
+        categoryId: "1", price: parseInt(i.price) || 0,
+        stock: parseInt(i.quantity) || 0,
+        requiresPrescription: false, source: "database" as const,
+      })),
+      "warehouse"
+    );
+    setScannedItems([]);
+    Alert.alert("تمت المزامنة ✅", "تم تحديث مخزون المذخر بالكامل");
   };
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>استيراد المنتجات</Text>
-        {scannedItems.length > 0 && (
-          <TouchableOpacity style={styles.promoteBtn} onPress={promoteAll}>
-            <Ionicons name="megaphone-outline" size={16} color="#fff" />
-            <Text style={styles.promoteBtnText}>ترويج ({scannedItems.length})</Text>
-          </TouchableOpacity>
-        )}
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: ACCENT }]}>
+        <View style={styles.headerRight}>
+          <Text style={styles.headerTitle}>استيراد المخزون</Text>
+          {syncSettings.isConnected && (
+            <View style={styles.connectedBadge}>
+              <View style={styles.connectedDot} />
+              <Text style={styles.connectedText}>متصل بـ {syncSettings.connectedDbType?.toUpperCase()}</Text>
+            </View>
+          )}
+        </View>
+        <Ionicons name="cloud-download-outline" size={26} color="#fff" />
       </View>
 
+      {/* Stats */}
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNum, { color: ACCENT }]}>{warehouseInventory.length}</Text>
+          <Text style={styles.statLabel}>إجمالي المنتجات</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNum, { color: Colors.warning }]}>{lowStock}</Text>
+          <Text style={styles.statLabel}>مخزون منخفض</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNum, { color: Colors.error }]}>{outOfStock}</Text>
+          <Text style={styles.statLabel}>نفد المخزون</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNum, { color: Colors.textSecondary }]}>{syncEvents.length}</Text>
+          <Text style={styles.statLabel}>سجل المزامنة</Text>
+        </View>
+      </View>
+
+      {/* Tabs */}
       <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "barcode" && styles.tabActive]}
-          onPress={() => setActiveTab("barcode")}
-        >
-          <Ionicons name="barcode-outline" size={18} color={activeTab === "barcode" ? "#0D7A54" : Colors.textMuted} />
-          <Text style={[styles.tabText, activeTab === "barcode" && styles.tabTextActive]}>باركود</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "database" && styles.tabActive]}
-          onPress={() => setActiveTab("database")}
-        >
-          <Ionicons name="server-outline" size={18} color={activeTab === "database" ? "#0D7A54" : Colors.textMuted} />
-          <Text style={[styles.tabText, activeTab === "database" && styles.tabTextActive]}>قاعدة بيانات</Text>
-        </TouchableOpacity>
+        {(["barcode", "database", "sync"] as ImportTab[]).map(tab => {
+          const labels: Record<ImportTab, string> = { barcode: "باركود", database: "قاعدة البيانات", sync: "المزامنة" };
+          const icons: Record<ImportTab, any> = { barcode: "scan-outline", database: "server-outline", sync: "sync-outline" };
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Ionicons name={icons[tab]} size={16} color={activeTab === tab ? ACCENT : Colors.textMuted} />
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{labels[tab]}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}>
-        {activeTab === "barcode" ? (
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+
+        {/* ── Barcode Tab ── */}
+        {activeTab === "barcode" && (
           <View style={styles.section}>
-            <TouchableOpacity style={styles.scanButton} onPress={() => setScannerOpen(true)}>
-              <Ionicons name="scan-outline" size={36} color="#fff" />
-              <Text style={styles.scanButtonText}>مسح باركود الدواء</Text>
-              <Text style={styles.scanButtonSub}>وجّه الكاميرا نحو العبوة</Text>
+            <View style={styles.infoBanner}>
+              <Ionicons name="information-circle-outline" size={20} color={ACCENT} />
+              <Text style={styles.infoBannerText}>امسح باركود الدواء لإضافته أو تحديث كميته في مخزون المذخر</Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.scanButton, { backgroundColor: ACCENT }]}
+              onPress={() => setScannerOpen(true)}
+            >
+              <Ionicons name="scan" size={56} color="#fff" />
+              <Text style={styles.scanButtonText}>مسح الباركود</Text>
+              <Text style={styles.scanButtonSub}>اضغط لتشغيل كاميرا الباركود</Text>
             </TouchableOpacity>
 
             {editingItem && (
-              <View style={styles.editCard}>
-                <Text style={styles.editCardTitle}>تفاصيل الدواء المُسحوب</Text>
-                <View style={styles.editRow}>
-                  <Text style={styles.editLabel}>الباركود</Text>
-                  <Text style={styles.editValue}>{editingItem.barcode}</Text>
-                </View>
-                <View style={styles.editField}>
-                  <Text style={styles.editLabel}>اسم الدواء</Text>
-                  <TextInput
-                    style={styles.editInput}
-                    value={editingItem.name}
-                    onChangeText={v => setEditingItem(e => e ? { ...e, name: v } : e)}
-                    textAlign="right"
-                    placeholderTextColor={Colors.textMuted}
-                  />
-                </View>
-                <View style={styles.editField}>
-                  <Text style={styles.editLabel}>العلامة التجارية</Text>
-                  <TextInput
-                    style={styles.editInput}
-                    value={editingItem.brand}
-                    onChangeText={v => setEditingItem(e => e ? { ...e, brand: v } : e)}
-                    textAlign="right"
-                    placeholderTextColor={Colors.textMuted}
-                  />
-                </View>
+              <View style={[styles.editCard, { borderColor: ACCENT }]}>
+                <Text style={styles.editCardTitle}>تأكيد بيانات المنتج</Text>
                 <View style={styles.editRow}>
                   <View style={styles.editField}>
-                    <Text style={styles.editLabel}>السعر (د.ع)</Text>
-                    <TextInput
-                      style={styles.editInput}
-                      value={editingItem.price}
-                      onChangeText={v => setEditingItem(e => e ? { ...e, price: v } : e)}
-                      keyboardType="numeric"
-                      textAlign="right"
-                      placeholderTextColor={Colors.textMuted}
-                    />
+                    <Text style={styles.editLabel}>الباركود</Text>
+                    <Text style={styles.editValue}>{editingItem.barcode}</Text>
                   </View>
+                </View>
+                <View style={styles.editRow}>
+                  <TextInput
+                    style={[styles.editInput, { flex: 1 }]}
+                    value={editingItem.name}
+                    onChangeText={v => setEditingItem(e => e ? { ...e, name: v } : e)}
+                    placeholder="اسم الدواء"
+                    textAlign="right"
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                  <TextInput
+                    style={[styles.editInput, { flex: 1 }]}
+                    value={editingItem.brand}
+                    onChangeText={v => setEditingItem(e => e ? { ...e, brand: v } : e)}
+                    placeholder="الشركة المصنعة"
+                    textAlign="right"
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                </View>
+                <View style={styles.editRow}>
                   <View style={styles.editField}>
                     <Text style={styles.editLabel}>الكمية</Text>
                     <TextInput
@@ -179,14 +237,25 @@ export default function WarehouseImport() {
                       placeholderTextColor={Colors.textMuted}
                     />
                   </View>
+                  <View style={styles.editField}>
+                    <Text style={styles.editLabel}>السعر (د.ع)</Text>
+                    <TextInput
+                      style={styles.editInput}
+                      value={editingItem.price}
+                      onChangeText={v => setEditingItem(e => e ? { ...e, price: v } : e)}
+                      keyboardType="numeric"
+                      textAlign="right"
+                      placeholderTextColor={Colors.textMuted}
+                    />
+                  </View>
                 </View>
                 <View style={styles.editActions}>
                   <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingItem(null)}>
                     <Text style={styles.cancelBtnText}>إلغاء</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.confirmBtn} onPress={confirmItem}>
-                    <Ionicons name="checkmark" size={18} color="#fff" />
-                    <Text style={styles.confirmBtnText}>إضافة للمذخر</Text>
+                  <TouchableOpacity style={[styles.confirmBtn, { backgroundColor: ACCENT }]} onPress={confirmItem}>
+                    <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                    <Text style={styles.confirmBtnText}>إضافة للقائمة</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -195,80 +264,59 @@ export default function WarehouseImport() {
             {scannedItems.length > 0 && (
               <View style={styles.itemsList}>
                 <View style={styles.itemsHeader}>
-                  <TouchableOpacity
-                    style={[styles.promoteAllBtn, promoted && styles.promoteAllBtnDone]}
-                    onPress={promoteAll}
-                    disabled={promoted}
-                  >
-                    <Ionicons name="megaphone-outline" size={16} color={promoted ? Colors.success : "#fff"} />
-                    <Text style={[styles.promoteAllBtnText, promoted && { color: Colors.success }]}>
-                      {promoted ? "تمت الترويج ✓" : "ترويج للصيدليات"}
-                    </Text>
+                  <TouchableOpacity style={[styles.saveAllBtn, { backgroundColor: ACCENT }]} onPress={saveScannedToInventory}>
+                    <Ionicons name="checkmark-done-outline" size={16} color="#fff" />
+                    <Text style={styles.saveAllBtnText}>حفظ الكل ({scannedItems.length})</Text>
                   </TouchableOpacity>
-                  <Text style={styles.itemsTitle}>{scannedItems.length} منتج مضاف</Text>
+                  <Text style={styles.itemsTitle}>{scannedItems.length} منتج ممسوح</Text>
                 </View>
                 {scannedItems.map(item => (
                   <View key={item.barcode} style={styles.itemCard}>
                     <View style={styles.itemRight}>
                       <Text style={styles.itemName}>{item.name}</Text>
-                      <Text style={styles.itemBrand}>{item.brand} • {item.barcode}</Text>
+                      <Text style={styles.itemBrand}>{item.brand}</Text>
                     </View>
                     <View style={styles.itemLeft}>
-                      <Text style={styles.itemPrice}>{parseInt(item.price).toLocaleString()} د.ع</Text>
+                      <Text style={[styles.itemPrice, { color: ACCENT }]}>{parseInt(item.price).toLocaleString()} د.ع</Text>
                       <Text style={styles.itemQty}>كمية: {item.quantity}</Text>
-                      {item.promoted && (
-                        <View style={styles.promotedBadge}>
-                          <Text style={styles.promotedBadgeText}>مُروَّج ✓</Text>
-                        </View>
-                      )}
                     </View>
                   </View>
                 ))}
               </View>
             )}
           </View>
-        ) : (
+        )}
+
+        {/* ── Database Tab ── */}
+        {activeTab === "database" && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>اختر نوع قاعدة البيانات</Text>
             <View style={styles.dbGrid}>
               {DB_TYPES.map(db => (
                 <TouchableOpacity
                   key={db.key}
-                  style={[styles.dbCard, selectedDb === db.key && { borderColor: db.color, backgroundColor: db.color + "12" }]}
+                  style={[styles.dbCard, selectedDb === db.key && { borderColor: db.color, backgroundColor: db.color + "08" }]}
                   onPress={() => setSelectedDb(db.key)}
                 >
-                  <Ionicons name={db.icon} size={28} color={selectedDb === db.key ? db.color : Colors.textMuted} />
+                  <Ionicons name={db.icon} size={32} color={db.color} />
                   <Text style={[styles.dbLabel, selectedDb === db.key && { color: db.color }]}>{db.label}</Text>
+                  {syncSettings.connectedDbType === db.key && syncSettings.isConnected && (
+                    <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>متصل</Text></View>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
 
-            {(selectedDb === "api") && (
+            {selectedDb === "api" && (
               <View style={styles.connectionForm}>
                 <Text style={styles.formTitle}>إعدادات الاتصال بـ API</Text>
                 <View style={styles.formField}>
                   <Text style={styles.formLabel}>رابط API</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="https://api.example.com/medicines"
-                    value={apiUrl}
-                    onChangeText={setApiUrl}
-                    textAlign="right"
-                    placeholderTextColor={Colors.textMuted}
-                    autoCapitalize="none"
-                  />
+                  <TextInput style={styles.formInput} placeholder="https://api.warehouse.com/inventory" value={apiUrl} onChangeText={setApiUrl} textAlign="right" placeholderTextColor={Colors.textMuted} autoCapitalize="none" />
                 </View>
                 <View style={styles.formField}>
                   <Text style={styles.formLabel}>مفتاح API</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="Bearer eyJ..."
-                    value={apiKey}
-                    onChangeText={setApiKey}
-                    textAlign="right"
-                    placeholderTextColor={Colors.textMuted}
-                    secureTextEntry
-                  />
+                  <TextInput style={styles.formInput} placeholder="Bearer eyJ..." value={apiKey} onChangeText={setApiKey} textAlign="right" placeholderTextColor={Colors.textMuted} secureTextEntry />
                 </View>
               </View>
             )}
@@ -279,60 +327,50 @@ export default function WarehouseImport() {
                 {["المضيف (Host)", "المنفذ (Port)", "اسم قاعدة البيانات", "اسم المستخدم", "كلمة المرور"].map(field => (
                   <View key={field} style={styles.formField}>
                     <Text style={styles.formLabel}>{field}</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      placeholder={field}
-                      textAlign="right"
-                      placeholderTextColor={Colors.textMuted}
-                      secureTextEntry={field === "كلمة المرور"}
-                    />
+                    <TextInput style={styles.formInput} placeholder={field} textAlign="right" placeholderTextColor={Colors.textMuted} secureTextEntry={field === "كلمة المرور"} />
                   </View>
                 ))}
               </View>
             )}
 
             {selectedDb === "csv" && (
-              <View style={styles.csvBox}>
-                <Ionicons name="cloud-upload-outline" size={48} color="#0D7A54" />
+              <View style={[styles.csvBox, { borderColor: ACCENT }]}>
+                <Ionicons name="cloud-upload-outline" size={48} color={ACCENT} />
                 <Text style={styles.csvTitle}>رفع ملف CSV أو Excel</Text>
                 <Text style={styles.csvSub}>اسحب الملف هنا أو اضغط لاختيار ملف من جهازك</Text>
-                <TouchableOpacity style={styles.csvBtn} onPress={handleDatabaseImport}>
+                <TouchableOpacity style={[styles.csvBtn, { backgroundColor: ACCENT }]} onPress={handleDatabaseImport}>
                   <Ionicons name="folder-open-outline" size={18} color="#fff" />
                   <Text style={styles.csvBtnText}>اختيار ملف</Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            <TouchableOpacity
-              style={[styles.importBtn, importing && styles.importBtnDisabled]}
-              onPress={handleDatabaseImport}
-              disabled={importing}
-            >
-              {importing ? (
-                <>
-                  <ActivityIndicator color="#fff" size="small" />
-                  <Text style={styles.importBtnText}>جارٍ الاستيراد...</Text>
-                </>
-              ) : (
-                <>
-                  <Ionicons name="cloud-download-outline" size={20} color="#fff" />
-                  <Text style={styles.importBtnText}>استيراد الآن</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <View style={styles.dbActionsRow}>
+              <TouchableOpacity
+                style={[styles.testBtn, { borderColor: ACCENT }, testing && { opacity: 0.7 }]}
+                onPress={testConnection} disabled={testing}
+              >
+                {testing ? <ActivityIndicator color={ACCENT} size="small" /> : <Ionicons name="wifi-outline" size={18} color={ACCENT} />}
+                <Text style={[styles.testBtnText, { color: ACCENT }]}>{testing ? "جارٍ الاختبار..." : "اختبار الاتصال"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.importBtn, { backgroundColor: ACCENT }, importing && styles.importBtnDisabled]}
+                onPress={handleDatabaseImport} disabled={importing}
+              >
+                {importing ? (
+                  <><ActivityIndicator color="#fff" size="small" /><Text style={styles.importBtnText}>جارٍ الاستيراد...</Text></>
+                ) : (
+                  <><Ionicons name="cloud-download-outline" size={18} color="#fff" /><Text style={styles.importBtnText}>استيراد الآن</Text></>
+                )}
+              </TouchableOpacity>
+            </View>
 
             {scannedItems.length > 0 && (
               <View style={styles.itemsList}>
                 <View style={styles.itemsHeader}>
-                  <TouchableOpacity
-                    style={[styles.promoteAllBtn, promoted && styles.promoteAllBtnDone]}
-                    onPress={promoteAll}
-                    disabled={promoted}
-                  >
-                    <Ionicons name="megaphone-outline" size={16} color={promoted ? Colors.success : "#fff"} />
-                    <Text style={[styles.promoteAllBtnText, promoted && { color: Colors.success }]}>
-                      {promoted ? "تمت الترويج ✓" : "ترويج للصيدليات"}
-                    </Text>
+                  <TouchableOpacity style={[styles.saveAllBtn, { backgroundColor: ACCENT }]} onPress={saveAllToInventory}>
+                    <Ionicons name="sync-outline" size={16} color="#fff" />
+                    <Text style={styles.saveAllBtnText}>مزامنة المخزون ({scannedItems.length})</Text>
                   </TouchableOpacity>
                   <Text style={styles.itemsTitle}>{scannedItems.length} منتج مستورد</Text>
                 </View>
@@ -343,18 +381,123 @@ export default function WarehouseImport() {
                       <Text style={styles.itemBrand}>{item.brand}</Text>
                     </View>
                     <View style={styles.itemLeft}>
-                      <Text style={styles.itemPrice}>{parseInt(item.price).toLocaleString()} د.ع</Text>
+                      <Text style={[styles.itemPrice, { color: ACCENT }]}>{parseInt(item.price).toLocaleString()} د.ع</Text>
                       <Text style={styles.itemQty}>كمية: {item.quantity}</Text>
-                      {item.promoted && (
-                        <View style={styles.promotedBadge}>
-                          <Text style={styles.promotedBadgeText}>مُروَّج ✓</Text>
-                        </View>
-                      )}
                     </View>
                   </View>
                 ))}
               </View>
             )}
+          </View>
+        )}
+
+        {/* ── Sync Tab ── */}
+        {activeTab === "sync" && (
+          <View style={styles.section}>
+            {/* Manual Sync Button */}
+            <TouchableOpacity
+              style={[styles.manualSyncBtn, syncing && { opacity: 0.7 }]}
+              disabled={syncing}
+              onPress={async () => {
+                setSyncing(true);
+                await manualSyncNow("warehouse");
+                setSyncing(false);
+                Alert.alert("تمت المزامنة ✅", "تم تحديث مخزون المذخر بنجاح من قاعدة البيانات المتصلة");
+              }}
+            >
+              {syncing
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Ionicons name="sync-outline" size={26} color="#fff" />}
+              <View style={styles.manualSyncBtnInfo}>
+                <Text style={styles.manualSyncBtnTitle}>{syncing ? "جارٍ المزامنة..." : "مزامنة الآن"}</Text>
+                <Text style={styles.manualSyncBtnSub}>
+                  {syncSettings.lastManualSync
+                    ? `آخر مزامنة: ${new Date(syncSettings.lastManualSync).toLocaleTimeString("ar-IQ")}`
+                    : "اضغط لمزامنة مخزون المذخر مع قاعدة البيانات"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.syncCard}>
+              <View style={styles.syncCardHeader}>
+                <Switch
+                  value={syncSettings.syncOnSale}
+                  onValueChange={v => updateSyncSettings({ syncOnSale: v })}
+                  thumbColor={syncSettings.syncOnSale ? Colors.error : "#ccc"}
+                  trackColor={{ false: Colors.border, true: Colors.error + "50" }}
+                />
+                <View style={styles.syncCardInfo}>
+                  <Text style={styles.syncCardTitle}>خصم تلقائي عند الشحن للصيدلية</Text>
+                  <Text style={styles.syncCardSub}>عند تسليم طلب صيدلية → تنقص كمية المذخر تلقائياً</Text>
+                </View>
+                <Ionicons name="arrow-down-circle" size={24} color={Colors.error} />
+              </View>
+            </View>
+
+            <View style={styles.syncCard}>
+              <View style={styles.syncCardHeader}>
+                <Switch
+                  value={syncSettings.syncOnRestock}
+                  onValueChange={v => updateSyncSettings({ syncOnRestock: v })}
+                  thumbColor={syncSettings.syncOnRestock ? Colors.success : "#ccc"}
+                  trackColor={{ false: Colors.border, true: Colors.success + "50" }}
+                />
+                <View style={styles.syncCardInfo}>
+                  <Text style={styles.syncCardTitle}>إضافة تلقائية عند الاستلام من المورد</Text>
+                  <Text style={styles.syncCardSub}>عند وصول بضاعة من مورد → تزيد الكمية تلقائياً</Text>
+                </View>
+                <Ionicons name="arrow-up-circle" size={24} color={Colors.success} />
+              </View>
+            </View>
+
+            <View style={styles.thresholdRow}>
+              <TextInput
+                style={styles.thresholdInput}
+                value={String(syncSettings.lowStockThreshold)}
+                onChangeText={v => updateSyncSettings({ lowStockThreshold: parseInt(v) || 50 })}
+                keyboardType="numeric"
+                textAlign="center"
+              />
+              <Text style={styles.thresholdLabel}>حد تنبيه المخزون المنخفض (وحدات)</Text>
+            </View>
+
+            {/* Sync Event Log */}
+            <View style={styles.logSection}>
+              <View style={styles.logHeader}>
+                {syncEvents.length > 0 && (
+                  <TouchableOpacity onPress={clearSyncLog}>
+                    <Text style={styles.clearLogBtn}>مسح السجل</Text>
+                  </TouchableOpacity>
+                )}
+                <Text style={styles.logTitle}>سجل التزامن ({syncEvents.length})</Text>
+              </View>
+              {syncEvents.length === 0 ? (
+                <View style={styles.emptyLog}>
+                  <Ionicons name="time-outline" size={36} color={Colors.border} />
+                  <Text style={styles.emptyLogText}>لا توجد عمليات مزامنة بعد</Text>
+                </View>
+              ) : (
+                syncEvents.slice(0, 20).map(evt => (
+                  <View key={evt.id} style={styles.logRow}>
+                    <View style={styles.logLeft}>
+                      <Text style={[styles.logQty, { color: evt.quantityChange < 0 ? Colors.error : Colors.success }]}>
+                        {evt.quantityChange > 0 ? "+" : ""}{evt.quantityChange}
+                      </Text>
+                      <Ionicons
+                        name={evt.type === "sale" ? "arrow-down-circle" : evt.type === "restock" ? "arrow-up-circle" : "sync-circle"}
+                        size={18}
+                        color={evt.type === "sale" ? Colors.error : Colors.success}
+                      />
+                    </View>
+                    <View style={styles.logRight}>
+                      <Text style={styles.logItemName}>{evt.itemName}</Text>
+                      <Text style={styles.logReason}>{evt.reason}</Text>
+                      <Text style={styles.logStock}>{evt.stockBefore} → {evt.stockAfter}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -372,130 +515,97 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#0D7A54", paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16,
   },
   headerTitle: { fontSize: 20, fontWeight: "800", color: "#fff" },
-  promoteBtn: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 6,
-  },
-  promoteBtnText: { fontSize: 13, fontWeight: "700", color: "#fff" },
-  tabs: {
-    flexDirection: "row", backgroundColor: Colors.surface,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  tab: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, paddingVertical: 14,
-    borderBottomWidth: 3, borderBottomColor: "transparent",
-  },
-  tabActive: { borderBottomColor: "#0D7A54" },
-  tabText: { fontSize: 14, fontWeight: "600", color: Colors.textMuted },
-  tabTextActive: { color: "#0D7A54", fontWeight: "700" },
-  section: { padding: 16, gap: 16 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  connectedBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  connectedDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#4ADE80" },
+  connectedText: { fontSize: 12, fontWeight: "700", color: "#fff" },
+  statsRow: { flexDirection: "row", paddingHorizontal: 16, paddingTop: 12, gap: 10 },
+  statCard: { flex: 1, backgroundColor: Colors.surface, borderRadius: 14, padding: 12, alignItems: "center", gap: 4 },
+  statNum: { fontSize: 22, fontWeight: "800" },
+  statLabel: { fontSize: 11, color: Colors.textMuted, textAlign: "center" },
+  tabs: { flexDirection: "row", backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border, marginTop: 10 },
+  tab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 12, borderBottomWidth: 3, borderBottomColor: "transparent" },
+  tabActive: { borderBottomColor: ACCENT },
+  tabText: { fontSize: 12, fontWeight: "600", color: Colors.textMuted },
+  tabTextActive: { color: ACCENT, fontWeight: "700" },
+  section: { padding: 16, gap: 14 },
   sectionTitle: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
-  scanButton: {
-    backgroundColor: "#0D7A54", borderRadius: 20,
-    padding: 32, alignItems: "center", gap: 10,
-    shadowColor: "#0D7A54", shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35, shadowRadius: 14, elevation: 8,
-  },
+  infoBanner: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#E8F5F0", borderRadius: 12, padding: 12 },
+  infoBannerText: { flex: 1, fontSize: 13, textAlign: "right", lineHeight: 20 },
+  scanButton: { borderRadius: 20, padding: 32, alignItems: "center", gap: 10, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 14, elevation: 8 },
   scanButtonText: { fontSize: 18, fontWeight: "800", color: "#fff" },
   scanButtonSub: { fontSize: 13, color: "rgba(255,255,255,0.8)" },
-  editCard: {
-    backgroundColor: Colors.surface, borderRadius: 16, padding: 16, gap: 12,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
-    borderWidth: 2, borderColor: "#0D7A54",
-  },
+  editCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 16, gap: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4, borderWidth: 2 },
   editCardTitle: { fontSize: 15, fontWeight: "800", color: Colors.textPrimary, textAlign: "right" },
-  editRow: { flexDirection: "row", gap: 10 },
+  editRow: { flexDirection: "row", gap: 10, justifyContent: "space-between", alignItems: "center" },
   editField: { flex: 1, gap: 4 },
   editLabel: { fontSize: 12, fontWeight: "600", color: Colors.textMuted, textAlign: "right" },
   editValue: { fontSize: 14, color: Colors.textPrimary, textAlign: "right" },
-  editInput: {
-    backgroundColor: Colors.surfaceAlt, borderRadius: 10,
-    borderWidth: 1, borderColor: Colors.border,
-    paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: Colors.textPrimary,
-  },
+  editInput: { backgroundColor: Colors.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: Colors.textPrimary },
   editActions: { flexDirection: "row", gap: 10, marginTop: 4 },
-  cancelBtn: {
-    flex: 1, borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
-    paddingVertical: 12, alignItems: "center",
-  },
+  cancelBtn: { flex: 1, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, paddingVertical: 12, alignItems: "center" },
   cancelBtnText: { fontSize: 14, fontWeight: "600", color: Colors.textSecondary },
-  confirmBtn: {
-    flex: 2, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, backgroundColor: "#0D7A54", borderRadius: 12, paddingVertical: 12,
-  },
+  confirmBtn: { flex: 2, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, paddingVertical: 12 },
   confirmBtnText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+  dbGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  dbCard: { width: "47%", borderRadius: 14, borderWidth: 2, borderColor: Colors.border, padding: 16, alignItems: "center", gap: 8, backgroundColor: Colors.surface },
+  dbLabel: { fontSize: 13, fontWeight: "700", color: Colors.textMuted, textAlign: "center" },
+  activeBadge: { backgroundColor: "#D1FAE5", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  activeBadgeText: { fontSize: 10, fontWeight: "700", color: "#059669" },
+  connectionForm: { backgroundColor: Colors.surface, borderRadius: 16, padding: 16, gap: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  formTitle: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, textAlign: "right", marginBottom: 4 },
+  formField: { gap: 6 },
+  formLabel: { fontSize: 13, fontWeight: "600", color: Colors.textSecondary, textAlign: "right" },
+  formInput: { backgroundColor: Colors.surfaceAlt, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: Colors.textPrimary },
+  csvBox: { backgroundColor: Colors.surface, borderRadius: 16, padding: 24, alignItems: "center", gap: 12, borderWidth: 2, borderStyle: "dashed" },
+  csvTitle: { fontSize: 16, fontWeight: "800", color: Colors.textPrimary },
+  csvSub: { fontSize: 13, color: Colors.textMuted, textAlign: "center", lineHeight: 20 },
+  csvBtn: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10, marginTop: 4 },
+  csvBtnText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+  dbActionsRow: { flexDirection: "row", gap: 10 },
+  testBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 14, borderWidth: 1.5 },
+  testBtnText: { fontSize: 14, fontWeight: "700" },
+  importBtn: { flex: 2, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 14 },
+  importBtnDisabled: { backgroundColor: Colors.textMuted },
+  importBtnText: { fontSize: 14, fontWeight: "700", color: "#fff" },
   itemsList: { gap: 8 },
-  itemsHeader: {
-    flexDirection: "row", alignItems: "center",
-    justifyContent: "space-between", marginBottom: 4,
-  },
+  itemsHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
   itemsTitle: { fontSize: 14, fontWeight: "700", color: Colors.textPrimary },
-  promoteAllBtn: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "#0D7A54", borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 8,
-  },
-  promoteAllBtnDone: { backgroundColor: Colors.successLight },
-  promoteAllBtnText: { fontSize: 13, fontWeight: "700", color: "#fff" },
-  itemCard: {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: Colors.surface, borderRadius: 12, padding: 12, gap: 10,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1,
-  },
+  saveAllBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  saveAllBtnText: { fontSize: 13, fontWeight: "700", color: "#fff" },
+  itemCard: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface, borderRadius: 12, padding: 12, gap: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 },
   itemRight: { flex: 1, gap: 3 },
   itemLeft: { alignItems: "flex-end", gap: 4 },
   itemName: { fontSize: 14, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
   itemBrand: { fontSize: 11, color: Colors.textMuted, textAlign: "right" },
-  itemPrice: { fontSize: 13, fontWeight: "800", color: "#0D7A54" },
+  itemPrice: { fontSize: 13, fontWeight: "800" },
   itemQty: { fontSize: 11, color: Colors.textSecondary },
-  promotedBadge: {
-    backgroundColor: "#E8F5E9", borderRadius: 6,
-    paddingHorizontal: 8, paddingVertical: 3,
-  },
-  promotedBadgeText: { fontSize: 10, fontWeight: "700", color: "#0D7A54" },
-  dbGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  dbCard: {
-    width: "47%", borderRadius: 14, borderWidth: 2,
-    borderColor: Colors.border, padding: 16,
-    alignItems: "center", gap: 8,
-    backgroundColor: Colors.surface,
-  },
-  dbLabel: { fontSize: 13, fontWeight: "700", color: Colors.textMuted, textAlign: "center" },
-  connectionForm: {
-    backgroundColor: Colors.surface, borderRadius: 16, padding: 16, gap: 12,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
-  },
-  formTitle: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, textAlign: "right", marginBottom: 4 },
-  formField: { gap: 6 },
-  formLabel: { fontSize: 13, fontWeight: "600", color: Colors.textSecondary, textAlign: "right" },
-  formInput: {
-    backgroundColor: Colors.surfaceAlt, borderRadius: 12,
-    borderWidth: 1, borderColor: Colors.border,
-    paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: Colors.textPrimary,
-  },
-  csvBox: {
-    backgroundColor: Colors.surface, borderRadius: 16, padding: 24,
-    alignItems: "center", gap: 12,
-    borderWidth: 2, borderStyle: "dashed", borderColor: "#0D7A54",
-  },
-  csvTitle: { fontSize: 16, fontWeight: "800", color: Colors.textPrimary },
-  csvSub: { fontSize: 13, color: Colors.textMuted, textAlign: "center", lineHeight: 20 },
-  csvBtn: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: "#0D7A54", borderRadius: 12,
-    paddingHorizontal: 20, paddingVertical: 10, marginTop: 4,
-  },
-  csvBtnText: { fontSize: 14, fontWeight: "700", color: "#fff" },
-  importBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, backgroundColor: "#0D7A54", borderRadius: 14,
-    paddingVertical: 16,
-  },
-  importBtnDisabled: { backgroundColor: Colors.textMuted },
-  importBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  manualSyncBtn: { flexDirection: "row", alignItems: "center", gap: 16, backgroundColor: ACCENT, borderRadius: 20, padding: 20, shadowColor: ACCENT, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8 },
+  manualSyncBtnInfo: { flex: 1 },
+  manualSyncBtnTitle: { fontSize: 18, fontWeight: "800", color: "#fff", textAlign: "right" },
+  manualSyncBtnSub: { fontSize: 12, color: "rgba(255,255,255,0.8)", textAlign: "right", marginTop: 3 },
+  syncCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  syncCardHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  syncCardInfo: { flex: 1 },
+  syncCardTitle: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
+  syncCardSub: { fontSize: 12, color: Colors.textMuted, textAlign: "right", marginTop: 2 },
+  thresholdRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: Colors.surface, borderRadius: 14, padding: 16 },
+  thresholdInput: { width: 64, height: 44, backgroundColor: Colors.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, fontSize: 18, fontWeight: "800", color: Colors.textPrimary },
+  thresholdLabel: { flex: 1, fontSize: 14, color: Colors.textSecondary, textAlign: "right" },
+  logSection: { gap: 8 },
+  logHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  logTitle: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
+  clearLogBtn: { fontSize: 13, fontWeight: "600", color: Colors.error },
+  emptyLog: { alignItems: "center", padding: 24, gap: 8 },
+  emptyLogText: { fontSize: 14, color: Colors.textMuted },
+  logRow: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface, borderRadius: 12, padding: 12, gap: 10 },
+  logRight: { flex: 1, gap: 2 },
+  logLeft: { flexDirection: "row", alignItems: "center", gap: 4 },
+  logItemName: { fontSize: 13, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
+  logReason: { fontSize: 11, color: Colors.textMuted, textAlign: "right" },
+  logStock: { fontSize: 11, color: Colors.textSecondary, textAlign: "right" },
+  logQty: { fontSize: 14, fontWeight: "800" },
 });

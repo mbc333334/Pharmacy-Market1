@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { DEMO_SUBSCRIBERS, DEMO_ADS } from "@/data/subscriptionData";
+import { usePlatformDelivery } from "@/contexts/PlatformDeliveryContext";
 
 const ADMIN_COLOR = "#7C3AED";
 
@@ -26,13 +27,18 @@ function StatCard({ icon, label, value, sub, color }: { icon: any; label: string
 export default function AdminDashboard() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const { deliveryCompanies, getTotalRevenue: getDeliveryRevenue, getPendingCount } = usePlatformDelivery();
 
   const pharmacies = DEMO_SUBSCRIBERS.filter(s => s.type === "pharmacy");
   const warehouses = DEMO_SUBSCRIBERS.filter(s => s.type === "warehouse");
   const activePharmacies = pharmacies.filter(s => s.status === "active");
   const activeWarehouses = warehouses.filter(s => s.status === "active");
-  const totalRevenue = DEMO_SUBSCRIBERS.reduce((acc, s) => acc + s.revenue, 0);
+  const subRevenue = DEMO_SUBSCRIBERS.filter(s => s.status === "active").reduce((acc, s) => acc + s.revenue, 0);
+  const deliveryRevenue = deliveryCompanies.filter(c => c.status === "approved").reduce((acc, c) => acc + c.monthlyFee, 0);
+  const totalRevenue = subRevenue + deliveryRevenue;
   const activeAds = DEMO_ADS.filter(a => a.status === "active");
+  const pendingDelivery = getPendingCount();
+  const approvedDelivery = deliveryCompanies.filter(c => c.status === "approved").length;
 
   const premiumCount = DEMO_SUBSCRIBERS.filter(s => s.plan === "premium" && s.status === "active").length;
   const standardCount = DEMO_SUBSCRIBERS.filter(s => s.plan === "standard" && s.status === "active").length;
@@ -74,7 +80,7 @@ export default function AdminDashboard() {
         <View style={styles.statsGrid}>
           <StatCard icon="storefront" label="الصيدليات النشطة" value={`${activePharmacies.length}`} sub={`إجمالي: ${pharmacies.length}`} color={Colors.primary} />
           <StatCard icon="cube" label="المذاخر النشطة" value={`${activeWarehouses.length}`} sub={`إجمالي: ${warehouses.length}`} color="#0D7A54" />
-          <StatCard icon="star" label="باقة مميزة" value={`${premiumCount}`} sub={`أساسي: ${standardCount}`} color="#F59E0B" />
+          <StatCard icon="car" label="شركات توصيل معتمدة" value={`${approvedDelivery}`} sub={pendingDelivery > 0 ? `${pendingDelivery} طلبات بانتظار الموافقة` : "لا طلبات معلقة"} color="#059669" />
           <StatCard icon="megaphone" label="إعلانات نشطة" value={`${activeAds.length}`} sub={`إجمالي: ${DEMO_ADS.length}`} color={ADMIN_COLOR} />
         </View>
 

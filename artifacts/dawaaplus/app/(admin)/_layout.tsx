@@ -11,7 +11,9 @@ const ADMIN_COLOR = "#7C3AED";
 
 const ADMIN_TABS = [
   { name: "index", title: "الرئيسية", icon: "grid", iconOff: "grid-outline" },
+  { name: "finance", title: "المالية", icon: "cash", iconOff: "cash-outline" },
   { name: "subscriptions", title: "الاشتراكات", icon: "card", iconOff: "card-outline" },
+  { name: "delivery", title: "التوصيل", icon: "car", iconOff: "car-outline" },
   { name: "ads", title: "الإعلانات", icon: "megaphone", iconOff: "megaphone-outline" },
   { name: "pharmacies", title: "الصيادلة", icon: "storefront", iconOff: "storefront-outline" },
 ];
@@ -79,7 +81,9 @@ export default function AdminTabLayout() {
         <View style={{ flex: 1 }}>
           <Tabs initialRouteName="index" screenOptions={{ headerShown: false, tabBarStyle: { display: "none" } }}>
             <Tabs.Screen name="index" />
+            <Tabs.Screen name="finance" />
             <Tabs.Screen name="subscriptions" />
+            <Tabs.Screen name="delivery" />
             <Tabs.Screen name="ads" />
             <Tabs.Screen name="pharmacies" />
           </Tabs>
@@ -110,7 +114,9 @@ export default function AdminTabLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: "الرئيسية", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "grid" : "grid-outline"} size={24} color={color} /> }} />
+      <Tabs.Screen name="finance" options={{ title: "المالية", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "cash" : "cash-outline"} size={24} color={color} /> }} />
       <Tabs.Screen name="subscriptions" options={{ title: "الاشتراكات", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "card" : "card-outline"} size={24} color={color} /> }} />
+      <Tabs.Screen name="delivery" options={{ title: "التوصيل", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "car" : "car-outline"} size={24} color={color} /> }} />
       <Tabs.Screen name="ads" options={{ title: "الإعلانات", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "megaphone" : "megaphone-outline"} size={24} color={color} /> }} />
       <Tabs.Screen name="pharmacies" options={{ title: "الصيادلة", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "storefront" : "storefront-outline"} size={24} color={color} /> }} />
     </Tabs>

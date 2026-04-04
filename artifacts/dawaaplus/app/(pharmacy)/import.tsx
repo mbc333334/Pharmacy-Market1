@@ -32,7 +32,7 @@ const DB_TYPES: { key: DbType; icon: any; label: string; color: string }[] = [
 export default function PharmacyImport() {
   const insets = useSafeAreaInsets();
   const topInset = insets.top + (Platform.OS === "web" ? 67 : 0);
-  const { pharmacyInventory, syncEvents, syncSettings, updateSyncSettings, importItems, decrementOnSale, clearSyncLog } = useInventory();
+  const { pharmacyInventory, syncEvents, syncSettings, updateSyncSettings, importItems, clearSyncLog, manualSyncNow } = useInventory();
 
   const [activeTab, setActiveTab] = useState<ImportTab>("barcode");
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -43,6 +43,7 @@ export default function PharmacyImport() {
   const [apiKey, setApiKey] = useState("");
   const [importing, setImporting] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const handleScanned = (result: ScannedMedicine) => {
     setScannerOpen(false);
@@ -368,23 +369,32 @@ export default function PharmacyImport() {
           </View>
         )}
 
-        {/* ── Auto Sync Tab ── */}
+        {/* ── Sync Tab ── */}
         {activeTab === "sync" && (
           <View style={styles.section}>
-            <View style={styles.syncCard}>
-              <View style={styles.syncCardHeader}>
-                <Switch
-                  value={syncSettings.autoSyncEnabled}
-                  onValueChange={v => updateSyncSettings({ autoSyncEnabled: v })}
-                  thumbColor={syncSettings.autoSyncEnabled ? ACCENT : "#ccc"}
-                  trackColor={{ false: Colors.border, true: ACCENT + "50" }}
-                />
-                <View style={styles.syncCardInfo}>
-                  <Text style={styles.syncCardTitle}>المزامنة التلقائية</Text>
-                  <Text style={styles.syncCardSub}>تحديث المخزون فور حدوث أي بيع أو توريد</Text>
-                </View>
+            {/* Manual Sync Button */}
+            <TouchableOpacity
+              style={[styles.manualSyncBtn, syncing && { opacity: 0.7 }]}
+              disabled={syncing}
+              onPress={async () => {
+                setSyncing(true);
+                await manualSyncNow("pharmacy");
+                setSyncing(false);
+                Alert.alert("تمت المزامنة ✅", "تم تحديث المخزون بنجاح من قاعدة البيانات المتصلة");
+              }}
+            >
+              {syncing
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Ionicons name="sync-outline" size={26} color="#fff" />}
+              <View style={styles.manualSyncBtnInfo}>
+                <Text style={styles.manualSyncBtnTitle}>{syncing ? "جارٍ المزامنة..." : "مزامنة الآن"}</Text>
+                <Text style={styles.manualSyncBtnSub}>
+                  {syncSettings.lastManualSync
+                    ? `آخر مزامنة: ${new Date(syncSettings.lastManualSync).toLocaleTimeString("ar-IQ")}`
+                    : "اضغط لمزامنة مخزونك مع قاعدة البيانات"}
+                </Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.syncCard}>
               <View style={styles.syncCardHeader}>
@@ -551,6 +561,10 @@ const styles = StyleSheet.create({
   itemBrand: { fontSize: 11, color: Colors.textMuted, textAlign: "right" },
   itemPrice: { fontSize: 13, fontWeight: "800" },
   itemQty: { fontSize: 11, color: Colors.textSecondary },
+  manualSyncBtn: { flexDirection: "row", alignItems: "center", gap: 16, backgroundColor: ACCENT, borderRadius: 20, padding: 20, shadowColor: ACCENT, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8 },
+  manualSyncBtnInfo: { flex: 1 },
+  manualSyncBtnTitle: { fontSize: 18, fontWeight: "800", color: "#fff", textAlign: "right" },
+  manualSyncBtnSub: { fontSize: 12, color: "rgba(255,255,255,0.8)", textAlign: "right", marginTop: 3 },
   syncCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
   syncCardHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
   syncCardInfo: { flex: 1 },
