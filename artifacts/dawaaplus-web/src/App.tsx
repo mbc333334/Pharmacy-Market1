@@ -382,45 +382,178 @@ function AdminDeliv({ db }:{ db:any }) {
 }
 
 function AdminSubs({ db }:{ db:any }) {
+  const rdLS = (k:string,d:any)=>{ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch{ return d; } };
+  const [reqs, setReqs] = useState<any[]>(()=>rdLS("sub_requests",[]));
+  const [tab, setTab] = useState<"pending"|"all">("pending");
+  const [changePlanModal, setChangePlanModal] = useState<any>(null);
+  const [newPlan, setNewPlan] = useState("standard");
+
+  const pending = reqs.filter(r=>r.status==="pending");
   const all = [
-    ...db.pharmacies.map((p:any)=>({...p,type:"صيدلية",tc:C.pharmacy,ti:"💊"})),
-    ...db.warehouses.map((w:any)=>({...w,type:"مذخر",tc:C.warehouse,ti:"🏭"})),
-    ...db.deliveries.map((d:any)=>({...d,type:"شركة توصيل",tc:C.delivery,ti:"🚛"})),
+    ...db.pharmacies.map((p:any)=>({...p,_type:"pharmacy",_label:"صيدلية",_icon:"💊",_color:C.pharmacy,_lsKey:`ph_profile_${p.id}`})),
+    ...db.warehouses.map((w:any)=>({...w,_type:"warehouse",_label:"مذخر",_icon:"🏭",_color:C.warehouse,_lsKey:`wh_profile_${w.id}`})),
+    ...db.deliveries.map((d:any)=>({...d,_type:"delivery",_label:"شركة توصيل",_icon:"🚛",_color:C.delivery,_lsKey:`dc_profile_${d.id}`})),
   ];
+
+  const updateReqs = (newReqs:any[]) => {
+    localStorage.setItem("sub_requests", JSON.stringify(newReqs));
+    setReqs(newReqs);
+    try{ new BroadcastChannel("dawapl_sync").postMessage("update"); }catch{}
+  };
+  const updateSubscriberPlan = (lsKey:string, defData:any, plan:string, active?:boolean) => {
+    const cur = rdLS(lsKey, defData);
+    const updated = { ...cur, plan, ...(active!==undefined?{active}:{}) };
+    localStorage.setItem(lsKey, JSON.stringify(updated));
+    try{ new BroadcastChannel("dawapl_sync").postMessage("update"); }catch{}
+  };
+  const findSubByReq = (req:any) => all.find(a=>a.id===req.subscriberId);
+
+  const approveReq = (req:any) => {
+    const sub = findSubByReq(req);
+    if (sub) updateSubscriberPlan(sub._lsKey, sub, req.requestedPlan);
+    const updated = reqs.map(r=>r.id===req.id ? {...r, status:"approved", approvedAt:new Date().toISOString().slice(0,10)} : r);
+    updateReqs(updated);
+    window.location.reload();
+  };
+  const rejectReq = (req:any) => {
+    const updated = reqs.map(r=>r.id===req.id ? {...r, status:"rejected", rejectedAt:new Date().toISOString().slice(0,10)} : r);
+    updateReqs(updated);
+  };
+  const applyPlanChange = () => {
+    if (!changePlanModal) return;
+    updateSubscriberPlan(changePlanModal._lsKey, changePlanModal, newPlan);
+    setChangePlanModal(null);
+    window.location.reload();
+  };
+  const toggleBlock = (sub:any) => {
+    updateSubscriberPlan(sub._lsKey, sub, sub.plan, !sub.active);
+    window.location.reload();
+  };
+
+  const planPills = [
+    {id:"free",label:"مجاني",color:C.muted},
+    {id:"standard",label:"ستاندرد",color:C.blue},
+    {id:"premium",label:"بريميوم",color:"#7C3AED"},
+  ];
+
+  const subTypeColor=(t:string)=>t==="pharmacy"?C.pharmacy:t==="warehouse"?C.warehouse:C.delivery;
+  const getPayIcon=(m:string)=>m==="zainCash"?"📱":m==="fastPay"?"⚡":m==="fib"?"🏦":m==="asiaHawala"?"💳":"💵";
+  const getTypeLabel=(t:string)=>t==="pharmacy"?"صيدلية":t==="warehouse"?"مذخر":"شركة توصيل";
+
   return (
     <div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:16 }}>
-        {[{l:"بريميوم",v:all.filter(a=>a.plan==="premium").length,c:"#7C3AED"},
-          {l:"ستاندرد",v:all.filter(a=>a.plan==="standard").length,c:C.blue},
-          {l:"مجاني",v:all.filter(a=>a.plan==="free").length,c:C.muted},
-          {l:"الكل",v:all.length,c:C.text}].map(s=>(
-          <Card key={s.l} style={{ textAlign:"center", borderTop:`3px solid ${s.c}` }}>
-            <div style={{ fontSize:26, fontWeight:900, color:s.c }}>{s.v}</div>
-            <div style={{ fontSize:12, color:C.muted }}>{s.l}</div>
-          </Card>
+      {/* ── Stats Bar ── */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:10, marginBottom:18 }}>
+        {[
+          {l:"طلبات معلّقة",v:pending.length,c:C.orange,icon:"⏳"},
+          {l:"بريميوم 👑",v:all.filter(a=>a.plan==="premium").length,c:"#7C3AED",icon:""},
+          {l:"ستاندرد ⭐",v:all.filter(a=>a.plan==="standard").length,c:C.blue,icon:""},
+          {l:"مجاني 🆓",v:all.filter(a=>a.plan==="free").length,c:C.muted,icon:""},
+          {l:"محظورون 🚫",v:all.filter(a=>!a.active).length,c:C.red,icon:""},
+        ].map(s=>(
+          <div key={s.l} onClick={()=>{ if(s.l.includes("معلّق")) setTab("pending"); }} style={{ background:"#fff",borderRadius:14,padding:"12px 10px",textAlign:"center",borderTop:`3px solid ${s.c}`,cursor:s.l.includes("معلّق")?"pointer":"default",boxShadow:"0 1px 4px #0001" }}>
+            <div style={{ fontSize:24,fontWeight:900,color:s.c }}>{s.v}</div>
+            <div style={{ fontSize:11,color:C.muted,marginTop:2 }}>{s.l}</div>
+          </div>
         ))}
       </div>
-      <Card>
-        <H icon="💎" title="جميع الاشتراكات" />
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
-          <thead><tr style={{ background:C.bg }}>
-            {["النوع","الاسم","المدينة","الاشتراك","الحالة","الإيراد","تاريخ الانضمام"].map(h=>(
-              <th key={h} style={{ padding:"9px 12px", textAlign:"right", color:C.muted, borderBottom:`2px solid ${C.border}` }}>{h}</th>
+
+      {/* ── Tabs ── */}
+      <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+        {[{id:"pending",l:`⏳ طلبات الترقية (${pending.length})`},{id:"all",l:"📋 جميع المشتركين"}].map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id as any)} style={{ padding:"9px 20px",borderRadius:10,border:`2px solid ${tab===t.id?C.admin:C.border}`,background:tab===t.id?C.admin:"#fff",color:tab===t.id?"#fff":C.text,fontWeight:700,cursor:"pointer",fontSize:13 }}>{t.l}</button>
+        ))}
+      </div>
+
+      {/* ── Pending Requests ── */}
+      {tab==="pending"&&<div>
+        {pending.length===0?<div style={{ textAlign:"center",padding:"40px 20px",color:C.muted,fontSize:15 }}>✅ لا توجد طلبات معلّقة</div>:(
+          pending.map((req,i)=>(
+            <div key={req.id} style={{ background:"#fff",borderRadius:16,padding:"16px 18px",marginBottom:12,border:`2px solid ${C.orange}33`,boxShadow:"0 2px 8px #0001" }}>
+              <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10 }}>
+                <div style={{ flex:1,minWidth:260 }}>
+                  <div style={{ display:"flex",gap:8,alignItems:"center",marginBottom:8 }}>
+                    <span style={{ fontSize:18 }}>{getPayIcon(req.paymentMethod)}</span>
+                    <span style={{ fontWeight:800,fontSize:15 }}>{req.subscriberName}</span>
+                    <Bdg label={getTypeLabel(req.subscriberType)} color={subTypeColor(req.subscriberType)} bg={`${subTypeColor(req.subscriberType)}15`} />
+                  </div>
+                  <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:"4px 20px",fontSize:12,color:C.muted }}>
+                    <span>📱 {req.subscriberPhone}</span>
+                    <span>📍 {req.subscriberCity}</span>
+                    <span>💳 {req.paymentLabel}</span>
+                    <span>📅 {req.date}</span>
+                  </div>
+                  <div style={{ marginTop:10,background:"#F7FAFC",borderRadius:10,padding:"10px 12px",display:"flex",gap:16,flexWrap:"wrap",alignItems:"center" }}>
+                    <div><div style={{ fontSize:10,color:C.muted,marginBottom:2 }}>من</div><Bdg {...planBadge(req.currentPlan)} /></div>
+                    <div style={{ color:C.muted,fontSize:16 }}>→</div>
+                    <div><div style={{ fontSize:10,color:C.muted,marginBottom:2 }}>إلى</div><Bdg {...planBadge(req.requestedPlan)} /></div>
+                    <div style={{ borderRight:`1px solid ${C.border}`,paddingRight:16,marginRight:4 }}><div style={{ fontSize:10,color:C.muted,marginBottom:2 }}>المبلغ</div><span style={{ fontWeight:800,color:C.green,fontSize:14 }}>{req.amount.toLocaleString()} د.ع</span></div>
+                    <div><div style={{ fontSize:10,color:C.muted,marginBottom:2 }}>مرجع الدفع</div><span style={{ fontWeight:700,fontSize:13,fontFamily:"monospace",color:"#2D3748" }}>{req.transactionRef}</span></div>
+                  </div>
+                </div>
+                <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+                  <button onClick={()=>approveReq(req)} style={{ background:`linear-gradient(135deg,${C.green},#276749)`,color:"#fff",border:"none",borderRadius:10,padding:"11px 20px",fontWeight:800,cursor:"pointer",fontSize:13 }}>✅ قبول وتفعيل</button>
+                  <button onClick={()=>rejectReq(req)} style={{ background:"#fff",color:C.red,border:`2px solid ${C.red}`,borderRadius:10,padding:"9px 20px",fontWeight:700,cursor:"pointer",fontSize:13 }}>❌ رفض</button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+        {reqs.filter(r=>r.status!=="pending").length>0&&<div>
+          <div style={{ fontSize:12,color:C.muted,fontWeight:700,marginBottom:8,marginTop:4 }}>الطلبات المعالجة:</div>
+          {reqs.filter(r=>r.status!=="pending").slice(0,6).map((req,i)=>(
+            <div key={req.id} style={{ background:C.bg,borderRadius:10,padding:"10px 14px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12 }}>
+              <span style={{ fontWeight:700 }}>{req.subscriberName}</span>
+              <span style={{ color:C.muted }}>{req.paymentLabel} · {req.transactionRef}</span>
+              <Bdg label={req.status==="approved"?"✅ مقبول":"❌ مرفوض"} color={req.status==="approved"?C.green:C.red} bg={req.status==="approved"?"#F0FFF4":"#FFF5F5"} />
+            </div>
+          ))}
+        </div>}
+      </div>}
+
+      {/* ── All Subscribers ── */}
+      {tab==="all"&&<div>
+        {all.map((a,i)=>(
+          <div key={i} style={{ background:"#fff",borderRadius:14,padding:"14px 16px",marginBottom:10,border:`1px solid ${C.border}`,boxShadow:"0 1px 4px #0001",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10 }}>
+            <div style={{ display:"flex",gap:12,alignItems:"center",flex:1,minWidth:260 }}>
+              <div style={{ width:42,height:42,borderRadius:12,background:`${a._color}15`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0 }}>{a._icon}</div>
+              <div>
+                <div style={{ fontWeight:800,fontSize:14,color:a.active?C.text:C.muted }}>{a.name} {!a.active&&<span style={{ fontSize:11,color:C.red }}>(محظور)</span>}</div>
+                <div style={{ fontSize:11,color:C.muted }}>{a._label} · {a.city} · {a.phone}</div>
+                <div style={{ display:"flex",gap:6,marginTop:4 }}><Bdg {...planBadge(a.plan)} />{!a.active&&<Bdg label="محظور 🚫" color={C.red} bg="#FFF5F5" />}</div>
+              </div>
+            </div>
+            <div style={{ display:"flex",gap:8,alignItems:"center",flexWrap:"wrap" }}>
+              <div style={{ textAlign:"center",background:C.bg,borderRadius:8,padding:"6px 12px" }}>
+                <div style={{ fontWeight:800,fontSize:14,color:C.green }}>{(a.revenue/1000000).toFixed(1)}M</div>
+                <div style={{ fontSize:10,color:C.muted }}>إيرادات</div>
+              </div>
+              <button onClick={()=>{ setChangePlanModal(a); setNewPlan(a.plan); }} style={{ background:`${C.admin}15`,color:C.admin,border:`1px solid ${C.admin}40`,borderRadius:9,padding:"8px 14px",fontWeight:700,cursor:"pointer",fontSize:12 }}>✏️ تغيير الخطة</button>
+              <button onClick={()=>toggleBlock(a)} style={{ background:a.active?"#FFF5F5":"#F0FFF4",color:a.active?C.red:C.green,border:`1px solid ${a.active?C.red+"40":C.green+"40"}`,borderRadius:9,padding:"8px 14px",fontWeight:700,cursor:"pointer",fontSize:12 }}>{a.active?"🚫 حظر":"✅ رفع الحظر"}</button>
+            </div>
+          </div>
+        ))}
+      </div>}
+
+      {/* ── Change Plan Modal ── */}
+      {changePlanModal&&<div style={{ position:"fixed",inset:0,background:"#00000055",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center" }} onClick={()=>setChangePlanModal(null)}>
+        <div style={{ background:"#fff",borderRadius:20,padding:"28px 24px",minWidth:340,boxShadow:"0 20px 60px #0004" }} onClick={e=>e.stopPropagation()}>
+          <div style={{ fontWeight:900,fontSize:17,marginBottom:4 }}>✏️ تغيير خطة الاشتراك</div>
+          <div style={{ fontSize:12,color:C.muted,marginBottom:16 }}>{changePlanModal.name}</div>
+          <div style={{ display:"flex",flexDirection:"column",gap:8,marginBottom:20 }}>
+            {planPills.map(p=>(
+              <div key={p.id} onClick={()=>setNewPlan(p.id)} style={{ display:"flex",alignItems:"center",gap:12,padding:"11px 14px",borderRadius:10,border:`2px solid ${newPlan===p.id?p.color:C.border}`,cursor:"pointer",background:newPlan===p.id?`${p.color}08`:"#fff" }}>
+                <div style={{ width:18,height:18,borderRadius:"50%",border:`2px solid ${newPlan===p.id?p.color:C.border}`,background:newPlan===p.id?p.color:"#fff",flexShrink:0 }} />
+                <span style={{ fontWeight:700,color:newPlan===p.id?p.color:C.text }}>{p.label}</span>
+              </div>
             ))}
-          </tr></thead>
-          <tbody>{all.map((a,i)=>(
-            <tr key={i} style={{ borderBottom:`1px solid ${C.border}`, background:i%2?C.bg:C.surface }}>
-              <td style={{ padding:"9px 12px" }}><Bdg label={`${a.ti} ${a.type}`} color={a.tc} bg={`${a.tc}15`} /></td>
-              <td style={{ padding:"9px 12px", fontWeight:700 }}>{a.name}</td>
-              <td style={{ padding:"9px 12px", color:C.muted }}>{a.city}</td>
-              <td style={{ padding:"9px 12px" }}><Bdg {...planBadge(a.plan)} /></td>
-              <td style={{ padding:"9px 12px" }}><Bdg label={a.active?"نشط":"معطّل"} color={a.active?C.green:C.red} bg={a.active?"#F0FFF4":"#FFF5F5"} /></td>
-              <td style={{ padding:"9px 12px", fontWeight:700, color:C.green }}>{a.revenue?.toLocaleString()} د.ع</td>
-              <td style={{ padding:"9px 12px", color:C.muted }}>{a.joined}</td>
-            </tr>
-          ))}</tbody>
-        </table>
-      </Card>
+          </div>
+          <div style={{ display:"flex",gap:10 }}>
+            <button onClick={()=>setChangePlanModal(null)} style={{ flex:1,padding:"10px",borderRadius:10,border:`1px solid ${C.border}`,background:"#fff",cursor:"pointer",fontWeight:700 }}>إلغاء</button>
+            <button onClick={applyPlanChange} style={{ flex:2,padding:"10px",borderRadius:10,border:"none",background:`linear-gradient(135deg,${C.admin},#5B21B6)`,color:"#fff",cursor:"pointer",fontWeight:800 }}>✅ تطبيق التغيير</button>
+          </div>
+        </div>
+      </div>}
     </div>
   );
 }

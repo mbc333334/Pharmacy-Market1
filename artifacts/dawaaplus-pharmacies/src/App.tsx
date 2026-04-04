@@ -48,6 +48,21 @@ const INIT_ORDERS = [
 
 const LS = (key:string,def:any)=>{ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch{ return def; } };
 const planBadge = (p:string)=>p==="premium"?{l:"بريميوم ✨",c:"#7C3AED",b:"#F3F0FF"}:p==="standard"?{l:"ستاندرد",c:C.blue,b:"#EBF8FF"}:{l:"مجاني",c:C.muted,b:"#EDF2F7"};
+
+// ─── Subscription Plans (Pharmacy) ────────────────────────────────────────────
+const PH_PLANS = [
+  { id:"free",     icon:"🆓", name:"مجاني",      price:0,      color:"#718096", features:["حتى 50 منتج في المخزون","ظهور أساسي في التطبيق","دعم واتساب","بدون عروض أو إعلانات"] },
+  { id:"standard", icon:"⭐", name:"ستاندرد",    price:35000,  color:"#3182CE", recommended:true, features:["حتى 500 منتج في المخزون","ظهور محسّن في نتائج البحث","إنشاء عروض وتخفيضات","إعلان واحد شهرياً في التطبيق","تقارير مبيعات أساسية","دعم أولوية"] },
+  { id:"premium",  icon:"👑", name:"بريميوم ✨",  price:75000,  color:"#7C3AED", features:["منتجات غير محدودة","أولوية قصوى في البحث","عروض وتخفيضات غير محدودة","3 إعلانات شهرياً في التطبيق","تحليلات مبيعات متقدمة","مدير حساب خاص","دعم 24/7 عبر واتساب"] },
+];
+// ─── Platform Payment Accounts ────────────────────────────────────────────────
+const PLATFORM_ACCOUNTS = [
+  { id:"zainCash",   label:"زين كاش",     icon:"📱", color:"#8B1538", num:"07501000001", hint:"أرسل المبلغ ثم ضع رقم العملية هنا" },
+  { id:"fastPay",    label:"فاست باي",    icon:"⚡", color:"#0066CC", num:"07509000001", hint:"احتفظ بصورة الإيصال" },
+  { id:"fib",        label:"FIB",         icon:"🏦", color:"#004E87", num:"IQ98FIBK0000001", hint:"تحويل مصرفي عبر تطبيق FIB" },
+  { id:"asiaHawala", label:"آسيا حوالة", icon:"💳", color:"#B45309", num:"AH-DAWAPLUS-001", hint:"أذكر اسم المستفيد: دواء+" },
+  { id:"cashAdmin",  label:"كاش / واتساب",icon:"💵", color:"#38A169", num:"07501234567",   hint:"تواصل مع المدير مباشرة" },
+];
 const orderBadge=(s:string)=>s==="new"?{l:"جديد",c:"#D97706",b:"#FFF3E0"}:s==="processing"?{l:"قيد التجهيز",c:C.blue,b:"#EBF8FF"}:s==="completed"?{l:"مكتمل",c:C.green,b:"#F0FFF4"}:{l:"ملغي",c:C.red,b:"#FFF5F5"};
 
 export default function App() {
@@ -90,7 +105,7 @@ export default function App() {
           {sec==="acc"    && <PhAccount ph={profile||ph} onSave={saveProfile} />}
           {sec==="inv"    && <Inventory products={products} onUpdate={setProducts} color={C.primary} />}
           {sec==="orders" && <Orders orders={orders} onUpdate={setOrders} color={C.primary} />}
-          {sec==="sub"    && <SubPage plan={ph.plan} color={C.primary} />}
+          {sec==="sub"    && <SubPage ph={ph} plan={ph.plan} color={C.primary} />}
           {sec==="fin"    && <FinPage revenue={ph.revenue} color={C.primary} />}
           {sec==="social" && <SocialMedia social={social} onSave={saveSocial} color={C.primary} name={ph.name} />}
           {sec==="sup"    && <Support name={ph.name} color={C.primary} />}
@@ -285,26 +300,93 @@ function Orders({ orders, onUpdate, color }:any) {
   );
 }
 
-function SubPage({ plan, color }:any) {
-  const plans=[
-    { id:"free",name:"مجاني",price:0,features:["5 منتجات","طلبات محدودة","دعم أساسي"] },
-    { id:"standard",name:"ستاندرد",price:25000,features:["200 منتج","طلبات غير محدودة","دعم أولوية","تقارير شهرية"] },
-    { id:"premium",name:"بريميوم ✨",price:65000,features:["منتجات غير محدودة","دعم 24/7","مدير حساب خاص","إعلانات في التطبيق","تقارير تفصيلية"] },
-  ];
-  const [up,setUp]=useState<string|null>(null);
+function SubPage({ ph, plan, color }:any) {
+  const [step, setStep] = useState<"plans"|"pay"|"done">("plans");
+  const [selPlanId, setSelPlanId] = useState<string|null>(null);
+  const [payMethod, setPayMethod] = useState("zainCash");
+  const [txRef, setTxRef] = useState("");
+  const [myReqs, setMyReqs] = useState<any[]>(()=>{ try{ return (JSON.parse(localStorage.getItem("sub_requests")||"[]")).filter((r:any)=>r.subscriberId===ph.id); }catch{ return []; } });
+  const pendingReq = myReqs.find((r:any)=>r.status==="pending");
+  const selPlan = PH_PLANS.find(p=>p.id===selPlanId);
+  const acct = PLATFORM_ACCOUNTS.find(a=>a.id===payMethod)||PLATFORM_ACCOUNTS[0];
+  const curPlan = PH_PLANS.find(p=>p.id===plan)||PH_PLANS[0];
+
+  const submitReq = () => {
+    if (!selPlanId||!txRef.trim()) return;
+    const req = { id:`REQ-${Date.now()}`, subscriberId:ph.id, subscriberType:"pharmacy", subscriberName:ph.name, subscriberPhone:ph.phone, subscriberCity:ph.city, currentPlan:plan, requestedPlan:selPlanId, paymentMethod:payMethod, paymentLabel:acct.label, transactionRef:txRef.trim(), amount:selPlan?.price||0, date:new Date().toISOString().slice(0,10), status:"pending" };
+    try{ const all=JSON.parse(localStorage.getItem("sub_requests")||"[]"); all.unshift(req); localStorage.setItem("sub_requests",JSON.stringify(all)); broadcastSync(); }catch{}
+    setMyReqs(p=>[req,...p]); setStep("done"); setTxRef("");
+  };
   return (
-    <div><AppSync text="ترقية اشتراكك تُفعَّل فوراً في التطبيق وتظهر لمدير المنصة" />
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:14 }}>
-        {plans.map(p=>(
-          <Card key={p.id} style={{ border:`2px solid ${p.id===plan?color:C.border}`, position:"relative" }}>
-            {p.id===plan&&<div style={{ position:"absolute",top:-10,right:14,background:color,color:"#fff",borderRadius:9,padding:"2px 10px",fontSize:11,fontWeight:700 }}>اشتراكك الحالي</div>}
-            <div style={{ fontWeight:800,fontSize:17,marginBottom:4 }}>{p.name}</div>
-            <div style={{ fontSize:20,fontWeight:900,color,marginBottom:12 }}>{p.price===0?"مجاني":`${p.price.toLocaleString()} د.ع/شهر`}</div>
-            {p.features.map(f=><div key={f} style={{ fontSize:12,marginBottom:5,display:"flex",gap:5 }}><span style={{ color:C.green }}>✓</span>{f}</div>)}
-            {p.id!==plan&&<Btn label={up===p.id?"⏳ جاري الترقية...":"ترقية الآن"} color={color} onClick={()=>{ setUp(p.id); setTimeout(()=>setUp(null),1500); }} />}
-          </Card>
-        ))}
-      </div>
+    <div>
+      <Card style={{ background:`linear-gradient(135deg,${color}12,${color}06)`, border:`2px solid ${color}35`, marginBottom:16 }}>
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+          <div>
+            <div style={{ fontSize:11,color:C.muted,marginBottom:3 }}>اشتراكك الحالي</div>
+            <div style={{ fontWeight:900,fontSize:20 }}>{curPlan.icon} {curPlan.name}</div>
+            <div style={{ fontSize:12,color:C.muted,marginTop:2 }}>{plan==="free"?"50 منتج · بدون إعلانات":plan==="standard"?"500 منتج · إعلان/شهر · عروض":"غير محدود · 3 إعلانات · مدير حساب"}</div>
+          </div>
+          <div style={{ textAlign:"center" }}>
+            {pendingReq?<Bdg l="طلب معلّق ⏳" c={C.orange} b="#FFF3E0" />:<Bdg l={plan==="free"?"مجاني":"نشط ✓"} c={plan==="free"?C.muted:C.green} b={plan==="free"?"#EDF2F7":"#F0FFF4"} />}
+          </div>
+        </div>
+      </Card>
+      {pendingReq&&<div style={{ background:"#FFFDE7",border:"2px dashed #D69E2E",borderRadius:14,padding:"14px 16px",marginBottom:16,display:"flex",gap:12,alignItems:"center" }}>
+        <div style={{ fontSize:28 }}>⏳</div>
+        <div><div style={{ fontWeight:800,fontSize:14 }}>طلب ترقية قيد المراجعة</div>
+        <div style={{ fontSize:12,color:C.muted }}>ترقية إلى {PH_PLANS.find(p=>p.id===pendingReq.requestedPlan)?.name} · المرجع: <b>{pendingReq.transactionRef}</b></div>
+        <div style={{ fontSize:11,color:C.muted }}>بتاريخ {pendingReq.date} — سيراجعه المدير خلال 24 ساعة</div></div>
+      </div>}
+      {step==="plans"&&<div>
+        <div style={{ fontSize:14,fontWeight:700,marginBottom:12,color:C.text }}>📋 مقارنة خطط الاشتراك:</div>
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14,marginBottom:16 }}>
+          {PH_PLANS.map(p=>(
+            <div key={p.id} onClick={()=>{ if(p.id!==plan&&!pendingReq) setSelPlanId(selPlanId===p.id?null:p.id); }}
+              style={{ border:`2px solid ${selPlanId===p.id?p.color:p.id===plan?color:C.border}`,borderRadius:16,padding:"16px 14px",cursor:p.id===plan||pendingReq?"default":"pointer",position:"relative",background:selPlanId===p.id?`${p.color}08`:C.surface,transition:"all 0.15s" }}>
+              {p.id===plan&&<div style={{ position:"absolute",top:-10,right:14,background:color,color:"#fff",borderRadius:9,padding:"2px 10px",fontSize:11,fontWeight:700 }}>اشتراكك الحالي</div>}
+              {(p as any).recommended&&p.id!==plan&&<div style={{ position:"absolute",top:-10,left:14,background:"#F59E0B",color:"#fff",borderRadius:9,padding:"2px 10px",fontSize:11,fontWeight:700 }}>⭐ الأكثر طلباً</div>}
+              <div style={{ fontWeight:800,fontSize:17,marginBottom:4,color:p.color }}>{p.icon} {p.name}</div>
+              <div style={{ fontSize:22,fontWeight:900,color:p.id==="free"?C.muted:p.color,marginBottom:10 }}>{p.price===0?"مجاني":`${p.price.toLocaleString()} د.ع/شهر`}</div>
+              {p.features.map(f=><div key={f} style={{ fontSize:12,marginBottom:4,display:"flex",gap:5 }}><span style={{ color:C.green,flexShrink:0 }}>✓</span>{f}</div>)}
+              {selPlanId===p.id&&<div style={{ marginTop:10,background:`${p.color}20`,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:700,color:p.color,textAlign:"center" }}>✓ تم الاختيار</div>}
+            </div>
+          ))}
+        </div>
+        {selPlanId&&selPlanId!==plan&&!pendingReq&&<button onClick={()=>setStep("pay")} style={{ background:`linear-gradient(135deg,${color},${C.dark})`,color:"#fff",border:"none",borderRadius:12,padding:"13px 28px",fontWeight:800,cursor:"pointer",fontSize:14 }}>متابعة للدفع →</button>}
+      </div>}
+      {step==="pay"&&selPlan&&<Card style={{ border:`2px solid ${color}40` }}>
+        <SH icon="💳" title={`الدفع — الترقية إلى ${selPlan.name}`} />
+        <div style={{ background:C.bg,borderRadius:10,padding:"12px 14px",marginBottom:14 }}>
+          <div style={{ fontWeight:700,fontSize:13 }}>المبلغ: <span style={{ color,fontSize:16 }}>{selPlan.price.toLocaleString()} د.ع / شهرياً</span></div>
+        </div>
+        <div style={{ fontSize:13,fontWeight:700,marginBottom:8 }}>اختر وسيلة الدفع:</div>
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14 }}>
+          {PLATFORM_ACCOUNTS.map(a=>(
+            <div key={a.id} onClick={()=>setPayMethod(a.id)} style={{ border:`2px solid ${payMethod===a.id?a.color:C.border}`,borderRadius:10,padding:"10px 6px",cursor:"pointer",textAlign:"center",background:payMethod===a.id?`${a.color}10`:C.surface }}>
+              <div style={{ fontSize:20,marginBottom:3 }}>{a.icon}</div>
+              <div style={{ fontSize:11,fontWeight:700,color:payMethod===a.id?a.color:C.text }}>{a.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ background:`${acct.color}08`,border:`1px solid ${acct.color}40`,borderRadius:12,padding:"14px 16px",marginBottom:14 }}>
+          <div style={{ fontSize:11,color:C.muted,marginBottom:4 }}>📤 حوّل المبلغ إلى حساب منصة دواء+ ({acct.label})</div>
+          <div style={{ fontSize:20,fontWeight:900,color:acct.color,letterSpacing:2,marginBottom:4 }}>{acct.num}</div>
+          <div style={{ fontSize:11,color:C.muted }}>باسم: دواء+ · {acct.hint}</div>
+        </div>
+        <label style={{ fontSize:12,fontWeight:700,color:C.muted,display:"block",marginBottom:6 }}>رقم العملية / مرجع الدفع *</label>
+        <input value={txRef} onChange={e=>setTxRef(e.target.value)} placeholder="مثال: ZC-20250404-123456"
+          style={{ width:"100%",border:`1.5px solid ${C.border}`,borderRadius:10,padding:"11px 14px",fontSize:13,boxSizing:"border-box",marginBottom:14 }} />
+        <div style={{ display:"flex",gap:10 }}>
+          <button onClick={()=>setStep("plans")} style={{ background:C.bg,color:C.text,border:`1px solid ${C.border}`,borderRadius:10,padding:"11px 18px",fontWeight:700,cursor:"pointer",fontSize:13 }}>← رجوع</button>
+          <button onClick={submitReq} disabled={!txRef.trim()} style={{ flex:1,background:txRef.trim()?`linear-gradient(135deg,${color},${C.dark})`:"#ccc",color:"#fff",border:"none",borderRadius:10,padding:11,fontWeight:800,cursor:txRef.trim()?"pointer":"not-allowed",fontSize:14 }}>📨 إرسال طلب الترقية</button>
+        </div>
+      </Card>}
+      {step==="done"&&<div style={{ textAlign:"center",background:"#F0FFF4",border:"2px solid #38A169",borderRadius:16,padding:"32px 24px" }}>
+        <div style={{ fontSize:52,marginBottom:8 }}>✅</div>
+        <h3 style={{ color:C.green,margin:"0 0 8px" }}>تم إرسال طلب الترقية!</h3>
+        <p style={{ color:C.muted,fontSize:13,margin:"0 0 16px" }}>سيراجع مدير المنصة طلبك خلال 24 ساعة ويُفعَّل الاشتراك فور تأكيد الدفع.</p>
+        <button onClick={()=>setStep("plans")} style={{ background:color,color:"#fff",border:"none",borderRadius:10,padding:"10px 24px",fontWeight:700,cursor:"pointer" }}>العودة</button>
+      </div>}
     </div>
   );
 }
