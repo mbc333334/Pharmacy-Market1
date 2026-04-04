@@ -8,9 +8,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useTranslation } from "@/i18n";
-import { LANGUAGES } from "@/data/locales";
+import { LANGUAGES, Language } from "@/data/locales";
 import FlagDisplay from "@/components/FlagDisplay";
 import { useAuth } from "@/contexts/AuthContext";
+
+const MAIN_LANGS = LANGUAGES.slice(0, 3); // ar, ku, en
 
 const { height } = Dimensions.get("window");
 const ADMIN_PHONE = "+9647700000001";
@@ -60,11 +62,32 @@ export default function WelcomeScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.heroSection, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 40) }]}>
-        <TouchableOpacity style={styles.langBtn} onPress={() => setShowLangModal(true)}>
-          <FlagDisplay langCode={language.code} size={20} />
-          <Text style={styles.langBtnText}>{language.nativeName}</Text>
-          <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.85)" />
-        </TouchableOpacity>
+        {/* ── 3 Main Language Pills ── */}
+        <View style={styles.langRow}>
+          {MAIN_LANGS.map(lang => {
+            const active = language.code === lang.code;
+            return (
+              <TouchableOpacity
+                key={lang.code}
+                style={[styles.langPill, active && styles.langPillActive]}
+                onPress={() => setLanguage(lang)}
+                activeOpacity={0.75}
+              >
+                <FlagDisplay langCode={lang.code} size={16} />
+                <Text style={[styles.langPillText, active && styles.langPillTextActive]}>
+                  {lang.nativeName}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+          {/* More languages button */}
+          <TouchableOpacity
+            style={styles.langMoreBtn}
+            onPress={() => setShowLangModal(true)}
+          >
+            <Ionicons name="ellipsis-horizontal" size={16} color="rgba(255,255,255,0.75)" />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={styles.logoCircle}
@@ -243,12 +266,28 @@ const styles = StyleSheet.create({
   heroSection: {
     flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24,
   },
-  langBtn: {
+  langRow: {
     flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
-    alignSelf: "flex-end", marginBottom: 16,
+    alignSelf: "stretch", marginBottom: 20, justifyContent: "center",
   },
-  langBtnText: { fontSize: 13, color: "rgba(255,255,255,0.95)", fontWeight: "600" },
+  langPill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1.5, borderColor: "transparent",
+  },
+  langPillActive: {
+    backgroundColor: "#fff",
+    borderColor: "#fff",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 6, elevation: 3,
+  },
+  langPillText: { fontSize: 13, color: "rgba(255,255,255,0.85)", fontWeight: "600" },
+  langPillTextActive: { color: Colors.primary, fontWeight: "800" },
+  langMoreBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center", justifyContent: "center",
+  },
   logoCircle: {
     width: 100, height: 100, borderRadius: 50,
     backgroundColor: "rgba(255,255,255,0.2)",
