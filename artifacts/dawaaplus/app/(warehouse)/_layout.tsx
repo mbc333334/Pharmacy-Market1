@@ -16,6 +16,7 @@ const WAREHOUSE_TABS = [
   { name: "inventory", icon: "layers", iconOff: "layers-outline", tKey: "myInventory" },
   { name: "orders", icon: "cube", iconOff: "cube-outline", tKey: "orders" },
   { name: "pharmacies", icon: "storefront", iconOff: "storefront-outline", tKey: "linkedPharmacies" },
+  { name: "delivery", icon: "car", iconOff: "car-outline", tKey: "settings" as const, label: "التوصيل" },
   { name: "import", icon: "cloud-download", iconOff: "cloud-download-outline", tKey: "import" as const },
   { name: "settings", icon: "settings", iconOff: "settings-outline", tKey: "settings" },
 ];
@@ -42,7 +43,7 @@ function SidebarNav() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sidebarNav}>
         {WAREHOUSE_TABS.map(tab => {
           const active = currentRoute === tab.name || (currentRoute === "(warehouse)" && tab.name === "index");
-          const label = tab.tKey === "import" ? "استيراد" : t(tab.tKey as any);
+          const label = (tab as any).label ?? (tab.tKey === "import" ? "استيراد" : t(tab.tKey as any));
           return (
             <TouchableOpacity
               key={tab.name}
@@ -86,6 +87,7 @@ export default function WarehouseTabLayout() {
             <Tabs.Screen name="inventory" />
             <Tabs.Screen name="orders" />
             <Tabs.Screen name="pharmacies" />
+            <Tabs.Screen name="delivery" />
             <Tabs.Screen name="import" />
             <Tabs.Screen name="settings" />
           </Tabs>
@@ -152,6 +154,15 @@ export default function WarehouseTabLayout() {
           title: t("linkedPharmacies"),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "storefront" : "storefront-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="delivery"
+        options={{
+          title: "التوصيل",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "car" : "car-outline"} size={24} color={color} />
           ),
         }}
       />

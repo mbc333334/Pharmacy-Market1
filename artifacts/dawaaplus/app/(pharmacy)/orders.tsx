@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useOrders, CustomerOrder, OrderStatus } from "@/contexts/OrdersContext";
 import { ALL_DELIVERY_COMPANIES } from "@/data/deliveryCompanies";
+import InvoiceModal, { InvoiceData } from "@/components/InvoiceModal";
 
 const PHARMACY_ID = "p1";
 
@@ -34,6 +35,8 @@ export default function PharmacyOrdersScreen() {
   const [selectedOrder, setSelectedOrder] = useState<CustomerOrder | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [showDeliveryPicker, setShowDeliveryPicker] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
 
   const filtered = orders.filter(o => o.status === activeTab);
 
@@ -72,6 +75,32 @@ export default function PharmacyOrdersScreen() {
   };
 
   const callCustomer = (phone: string) => Linking.openURL(`tel:${phone.replace(/\s/g, "")}`);
+  const openInvoice = (order: CustomerOrder) => {
+    const inv: InvoiceData = {
+      invoiceNumber: order.id,
+      date: order.createdAt,
+      type: "pharmacy_to_customer",
+      sellerName: order.pharmacyName,
+      sellerCity: order.city,
+      sellerPhone: "+964 750 111 0001",
+      buyerName: order.customerName,
+      buyerCity: order.city,
+      buyerAddress: order.address,
+      buyerPhone: order.customerPhone,
+      items: order.items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
+      subtotal: order.total,
+      deliveryFee: order.deliveryFee,
+      total: order.total + order.deliveryFee,
+      paymentMethod: order.paymentMethod,
+      isPaid: order.isPaid,
+      deliveryCompany: order.deliveryCompanyName,
+      trackingCode: order.trackingCode,
+      notes: order.notes,
+    };
+    setInvoiceData(inv);
+    setShowInvoice(true);
+  };
+
   const whatsappCustomer = (phone: string, name: string, orderId: string) => {
     const msg = encodeURIComponent(`مرحباً ${name}،\nطلبك رقم ${orderId} جاهز وسيتم توصيله قريباً.\nشكراً لثقتك بنا.`);
     const num = phone.replace(/\D/g, "");
@@ -135,6 +164,7 @@ export default function PharmacyOrdersScreen() {
             onCall={() => callCustomer(item.customerPhone)}
             onWhatsApp={() => whatsappCustomer(item.customerPhone, item.customerName, item.id)}
             onAssignDelivery={item.status === "processing" ? () => openDeliveryPicker(item) : undefined}
+            onInvoice={() => openInvoice(item)}
           />
         )}
         ListEmptyComponent={() => (
@@ -161,6 +191,14 @@ export default function PharmacyOrdersScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Invoice Modal */}
+      <InvoiceModal
+        visible={showInvoice}
+        onClose={() => setShowInvoice(false)}
+        invoice={invoiceData}
+        accentColor={Colors.primary}
+      />
 
       {/* Delivery Picker Modal */}
       <Modal visible={showDeliveryPicker} animationType="slide" transparent onRequestClose={() => setShowDeliveryPicker(false)}>
@@ -208,7 +246,7 @@ export default function PharmacyOrdersScreen() {
 }
 
 function OrderCard({
-  order, onAccept, onComplete, onCancel, onDetail, onCall, onWhatsApp, onAssignDelivery,
+  order, onAccept, onComplete, onCancel, onDetail, onCall, onWhatsApp, onAssignDelivery, onInvoice,
 }: {
   order: CustomerOrder;
   onAccept?: () => void;
@@ -218,6 +256,7 @@ function OrderCard({
   onCall: () => void;
   onWhatsApp: () => void;
   onAssignDelivery?: () => void;
+  onInvoice: () => void;
 }) {
   const statusConfig: Record<string, { bg: string; color: string; label: string; icon: string }> = {
     new: { bg: Colors.accentLight, color: Colors.warning, label: "طلب جديد 🔔", icon: "notifications" },
@@ -319,6 +358,9 @@ function OrderCard({
             <Text style={styles.completeBtnText}>تم التسليم</Text>
           </TouchableOpacity>
         )}
+        <TouchableOpacity style={styles.invoiceBtn} onPress={onInvoice}>
+          <Ionicons name="receipt-outline" size={18} color="#7C3AED" />
+        </TouchableOpacity>
         {onCancel && (
           <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
             <Ionicons name="close-circle-outline" size={20} color={Colors.error} />
@@ -542,6 +584,7 @@ const styles = StyleSheet.create({
   },
   completeBtnText: { fontSize: 13, fontWeight: "700", color: "#fff" },
   cancelBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.errorLight, alignItems: "center", justifyContent: "center" },
+  invoiceBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#F3E8FF", alignItems: "center", justifyContent: "center" },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   detailModal: { backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "90%" },
   deliveryModal: { backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "70%" },

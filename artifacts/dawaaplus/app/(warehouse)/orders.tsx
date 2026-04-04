@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useTranslation } from "@/i18n";
 import { useOrders, WarehouseOrder, WarehouseOrderStatus } from "@/contexts/OrdersContext";
+import InvoiceModal, { InvoiceData } from "@/components/InvoiceModal";
 
 const WAREHOUSE_ID = "w1";
 
@@ -24,6 +25,8 @@ export default function WarehouseOrders() {
   const { t } = useTranslation();
   const topInset = insets.top + (Platform.OS === "web" ? 67 : 0);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
   const { getWarehouseIncomingOrders, updateWarehouseOrderStatus } = useOrders();
   const orders = getWarehouseIncomingOrders(WAREHOUSE_ID);
   const filtered = filter === "all" ? orders : orders.filter(o => o.status === filter);
@@ -50,6 +53,29 @@ export default function WarehouseOrders() {
       { text: "تراجع", style: "cancel" },
       { text: "إلغاء", style: "destructive", onPress: () => updateWarehouseOrderStatus(orderId, "cancelled") },
     ]);
+  };
+
+  const openInvoice = (order: WarehouseOrder) => {
+    const inv: InvoiceData = {
+      invoiceNumber: order.id,
+      date: order.createdAt,
+      type: "warehouse_to_pharmacy",
+      sellerName: order.warehouseName,
+      sellerCity: "هەولێر",
+      sellerPhone: "+964 750 000 0010",
+      buyerName: order.pharmacyName,
+      buyerCity: order.pharmacyCity,
+      buyerPhone: order.pharmacyPhone,
+      items: order.items.map(i => ({ name: i.name, quantity: i.qty, price: i.price })),
+      subtotal: order.total,
+      deliveryFee: 0,
+      total: order.total,
+      paymentMethod: order.paymentMethod,
+      isPaid: order.isPaid,
+      notes: order.notes,
+    };
+    setInvoiceData(inv);
+    setShowInvoice(true);
   };
 
   const callPharmacy = (phone: string) => Linking.openURL(`tel:${phone.replace(/\s/g, "")}`);
@@ -113,16 +139,23 @@ export default function WarehouseOrders() {
               onCancel={order.status !== "completed" && order.status !== "cancelled" ? () => handleCancel(order.id) : undefined}
               onCall={() => callPharmacy(order.pharmacyPhone)}
               onWhatsApp={() => whatsappPharmacy(order.pharmacyPhone, order.pharmacyName, order.id)}
+              onInvoice={() => openInvoice(order)}
             />
           ))
         )}
       </ScrollView>
+      <InvoiceModal
+        visible={showInvoice}
+        onClose={() => setShowInvoice(false)}
+        invoice={invoiceData}
+        accentColor="#0D7A54"
+      />
     </View>
   );
 }
 
 function WarehouseOrderCard({
-  order, onAccept, onShip, onCancel, onCall, onWhatsApp,
+  order, onAccept, onShip, onCancel, onCall, onWhatsApp, onInvoice,
 }: {
   order: WarehouseOrder;
   onAccept?: () => void;
@@ -130,6 +163,7 @@ function WarehouseOrderCard({
   onCancel?: () => void;
   onCall: () => void;
   onWhatsApp: () => void;
+  onInvoice: () => void;
 }) {
   const statusMap: Record<string, { bg: string; color: string; label: string }> = {
     new: { bg: "#FFF3E0", color: "#DD6B20", label: "طلب جديد 🔔" },
@@ -204,27 +238,28 @@ function WarehouseOrderCard({
       )}
 
       {/* Actions */}
-      {(onAccept || onShip || onCancel) && (
-        <View style={styles.orderFooter}>
-          {onAccept && (
-            <TouchableOpacity style={styles.acceptBtn} onPress={onAccept}>
-              <Ionicons name="checkmark-circle" size={18} color="#fff" />
-              <Text style={styles.acceptBtnText}>قبول الطلب</Text>
-            </TouchableOpacity>
-          )}
-          {onShip && (
-            <TouchableOpacity style={styles.shipBtn} onPress={onShip}>
-              <Ionicons name="car" size={18} color="#fff" />
-              <Text style={styles.shipBtnText}>تم الشحن</Text>
-            </TouchableOpacity>
-          )}
-          {onCancel && (
-            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-              <Ionicons name="close-circle-outline" size={20} color={Colors.error} />
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+      <View style={styles.orderFooter}>
+        {onAccept && (
+          <TouchableOpacity style={styles.acceptBtn} onPress={onAccept}>
+            <Ionicons name="checkmark-circle" size={18} color="#fff" />
+            <Text style={styles.acceptBtnText}>قبول الطلب</Text>
+          </TouchableOpacity>
+        )}
+        {onShip && (
+          <TouchableOpacity style={styles.shipBtn} onPress={onShip}>
+            <Ionicons name="car" size={18} color="#fff" />
+            <Text style={styles.shipBtnText}>تم الشحن</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={styles.invoiceBtn} onPress={onInvoice}>
+          <Ionicons name="receipt-outline" size={18} color="#7C3AED" />
+        </TouchableOpacity>
+        {onCancel && (
+          <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
+            <Ionicons name="close-circle-outline" size={20} color={Colors.error} />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -317,6 +352,7 @@ const styles = StyleSheet.create({
   },
   shipBtnText: { fontSize: 13, fontWeight: "700", color: "#fff" },
   cancelBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.errorLight, alignItems: "center", justifyContent: "center" },
+  invoiceBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#F3E8FF", alignItems: "center", justifyContent: "center" },
   empty: { alignItems: "center", paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 16, color: Colors.textMuted },
 });
