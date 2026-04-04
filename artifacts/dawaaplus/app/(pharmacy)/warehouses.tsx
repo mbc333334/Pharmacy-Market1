@@ -147,6 +147,48 @@ export default function WarehousesScreen() {
           ))}
         </ScrollView>
 
+        {/* Social Media */}
+        {item.social && (item.social.facebook || item.social.instagram || item.social.tiktok || item.social.website) && (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6, marginBottom: 2 }}>
+            {item.social.facebook && (
+              <TouchableOpacity
+                onPress={() => Linking.openURL(`https://facebook.com/${item.social!.facebook}`)}
+                style={{ backgroundColor: "#1877F2", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                <Ionicons name="logo-facebook" size={14} color="#fff" />
+                <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>Facebook</Text>
+              </TouchableOpacity>
+            )}
+            {item.social.instagram && (
+              <TouchableOpacity
+                onPress={() => Linking.openURL(`https://instagram.com/${item.social!.instagram}`)}
+                style={{ backgroundColor: "#E4405F", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                <Ionicons name="logo-instagram" size={14} color="#fff" />
+                <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>Instagram</Text>
+              </TouchableOpacity>
+            )}
+            {item.social.tiktok && (
+              <TouchableOpacity
+                onPress={() => Linking.openURL(`https://tiktok.com/@${item.social!.tiktok}`)}
+                style={{ backgroundColor: "#010101", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                <Ionicons name="musical-notes" size={14} color="#fff" />
+                <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>TikTok</Text>
+              </TouchableOpacity>
+            )}
+            {item.social.website && (
+              <TouchableOpacity
+                onPress={() => Linking.openURL(item.social!.website!.startsWith("http") ? item.social!.website! : `https://${item.social!.website}`)}
+                style={{ backgroundColor: Colors.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                <Ionicons name="globe" size={14} color="#fff" />
+                <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>الموقع</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         {/* Medicines Toggle */}
         <TouchableOpacity
           style={styles.toggleBtn}

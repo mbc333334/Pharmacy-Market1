@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
 
+function broadcastSync() {
+  try { new BroadcastChannel("dawapl_sync").postMessage("update"); } catch {}
+}
+
 const C = {
   primary:"#1A9E6E", dark:"#0D7A54", light:"#E6F7F2", text:"#1a202c",
   muted:"#718096", border:"#e2e8f0", bg:"#f7fafc", surface:"#fff",
@@ -36,30 +40,43 @@ const orderBadge=(s:string)=>s==="new"?{l:"جديد",c:"#D97706",b:"#FFF3E0"}:s=
 export default function App() {
   const [ph, setPh] = useState<typeof PHARMACIES[0]|null>(null);
   const [sec, setSec] = useState("dash");
-  const [products, setProducts] = useState(()=>LS("ph_products",INIT_PRODUCTS));
-  const [orders, setOrders] = useState(()=>LS("ph_orders",INIT_ORDERS));
+  const [products, setProductsState] = useState<any[]>([]);
+  const [orders, setOrdersState] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
+  const [social, setSocialState] = useState<any>({ facebook:"", instagram:"", tiktok:"", website:"", whatsapp:"" });
 
-  useEffect(()=>{ if(ph) setProfile(LS(`ph_profile_${ph.id}`,ph)); },[ph]);
-  useEffect(()=>{ localStorage.setItem("ph_products",JSON.stringify(products)); },[products]);
-  useEffect(()=>{ localStorage.setItem("ph_orders",JSON.stringify(orders)); },[orders]);
+  useEffect(()=>{
+    if (!ph) return;
+    setProductsState(LS(`ph_products_${ph.id}`, INIT_PRODUCTS));
+    setOrdersState(LS(`ph_orders_${ph.id}`, INIT_ORDERS));
+    setProfile(LS(`ph_profile_${ph.id}`, ph));
+    setSocialState(LS(`ph_social_${ph.id}`, { facebook:"", instagram:"", tiktok:"", website:"", whatsapp: ph.phone }));
+  }, [ph?.id]);
 
-  if (!ph) return <Login onLogin={p=>setPh(p)} />;
+  const setProducts = (v:any)=>{ setProductsState(v); if(ph){ localStorage.setItem(`ph_products_${ph.id}`,JSON.stringify(v)); broadcastSync(); } };
+  const setOrders = (v:any)=>{ setOrdersState(v); if(ph){ localStorage.setItem(`ph_orders_${ph.id}`,JSON.stringify(v)); broadcastSync(); } };
+  const saveSocial = (v:any)=>{ setSocialState(v); if(ph){ localStorage.setItem(`ph_social_${ph.id}`,JSON.stringify(v)); broadcastSync(); } };
+  const saveProfile = (d:any)=>{ setProfile(d); if(ph){ localStorage.setItem(`ph_profile_${ph.id}`,JSON.stringify(d)); broadcastSync(); } };
+
+  const MENU = [{id:"dash",l:"لوحة التحكم",i:"📊"},{id:"acc",l:"حسابي",i:"👤"},{id:"inv",l:"المخزون",i:"📦"},
+    {id:"orders",l:"الطلبات",i:"🛒"},{id:"sub",l:"الاشتراك",i:"💎"},{id:"fin",l:"المالية",i:"💰"},
+    {id:"social",l:"وسائل التواصل",i:"📱"},{id:"sup",l:"الدعم",i:"💬"}];
+
+  if (!ph) return <Login onLogin={p=>{ setPh(p); setSec("dash"); }} />;
   return (
     <div dir="rtl" style={{ display:"flex", height:"100vh", fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif", overflow:"hidden" }}>
       <Sidebar color={C.primary} icon="💊" title="بوابة الصيدلية" name={ph.name}
-        menu={[{id:"dash",l:"لوحة التحكم",i:"📊"},{id:"acc",l:"حسابي",i:"👤"},{id:"inv",l:"المخزون",i:"📦"},
-          {id:"orders",l:"الطلبات",i:"🛒"},{id:"sub",l:"الاشتراك",i:"💎"},{id:"fin",l:"المالية",i:"💰"},{id:"sup",l:"الدعم",i:"💬"}]}
-        active={sec} onNav={setSec} onLogout={()=>setPh(null)} />
+        menu={MENU} active={sec} onNav={setSec} onLogout={()=>setPh(null)} />
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        <TopBar color={C.primary} label={[{id:"dash",l:"لوحة التحكم"},{id:"acc",l:"حسابي"},{id:"inv",l:"المخزون"},{id:"orders",l:"الطلبات"},{id:"sub",l:"الاشتراك"},{id:"fin",l:"المالية"},{id:"sup",l:"الدعم"}].find(m=>m.id===sec)?.l||""} name={ph.name} />
+        <TopBar color={C.primary} label={MENU.find(m=>m.id===sec)?.l||""} name={ph.name} />
         <div style={{ flex:1, overflowY:"auto", padding:20, background:C.bg }}>
           {sec==="dash"   && <PhDash ph={ph} products={products} orders={orders} />}
-          {sec==="acc"    && <PhAccount ph={profile||ph} onSave={(d:any)=>{ setProfile(d); localStorage.setItem(`ph_profile_${ph.id}`,JSON.stringify(d)); }} />}
+          {sec==="acc"    && <PhAccount ph={profile||ph} onSave={saveProfile} />}
           {sec==="inv"    && <Inventory products={products} onUpdate={setProducts} color={C.primary} />}
           {sec==="orders" && <Orders orders={orders} onUpdate={setOrders} color={C.primary} />}
           {sec==="sub"    && <SubPage plan={ph.plan} color={C.primary} />}
           {sec==="fin"    && <FinPage revenue={ph.revenue} color={C.primary} />}
+          {sec==="social" && <SocialMedia social={social} onSave={saveSocial} color={C.primary} name={ph.name} />}
           {sec==="sup"    && <Support name={ph.name} color={C.primary} />}
         </div>
       </div>
@@ -284,6 +301,67 @@ function FinPage({ revenue, color }:any) {
           </div>
         ))}
       </Card>
+    </div>
+  );
+}
+
+function SocialMedia({ social, onSave, color, name }:any) {
+  const [f, setF] = useState({...social});
+  const [saved, setSaved] = useState(false);
+  useEffect(()=>setF({...social}),[social]);
+  const save=()=>{ onSave(f); setSaved(true); setTimeout(()=>setSaved(false),3000); };
+  const FIELDS = [
+    { k:"facebook",  l:"Facebook",  icon:"📘", ph:"pharmacy.name", prefix:"facebook.com/", color:"#1877F2" },
+    { k:"instagram", l:"Instagram", icon:"📸", ph:"pharmacy_name", prefix:"instagram.com/@", color:"#E4405F" },
+    { k:"tiktok",    l:"TikTok",    icon:"🎵", ph:"pharmacyname",  prefix:"tiktok.com/@",  color:"#010101" },
+    { k:"website",   l:"الموقع الإلكتروني", icon:"🌐", ph:"https://dawaplus.iq/pharmacy", prefix:"", color:"#3182CE" },
+    { k:"whatsapp",  l:"WhatsApp",  icon:"💬", ph:"07xxxxxxxxx",   prefix:"wa.me/",        color:"#25D366" },
+  ];
+  return (
+    <div>
+      <AppSync text="روابط التواصل الاجتماعي تظهر في تطبيق دواء+ أمام عملائك" />
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:14 }}>
+        <Card style={{ border:`2px solid ${color}` }}>
+          <SH icon="📱" title={`روابط التواصل — ${name}`} />
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            {FIELDS.map(field=>(
+              <div key={field.k}>
+                <label style={{ fontSize:12, fontWeight:700, color:field.color, display:"flex", alignItems:"center", gap:5, marginBottom:4 }}>
+                  {field.icon} {field.l}
+                </label>
+                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <input value={f[field.k]||""} onChange={e=>setF({...f,[field.k]:e.target.value})}
+                    placeholder={field.ph}
+                    style={{ flex:1, border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box" }} />
+                  {f[field.k] && <a href={field.k==="website"?(f[field.k].startsWith("http")?f[field.k]:`https://${f[field.k]}`):field.k==="whatsapp"?`https://wa.me/${f[field.k].replace(/\D/g,"")}`:`https://${field.prefix}${f[field.k]}`} target="_blank" rel="noreferrer"
+                    style={{ background:field.color, color:"#fff", borderRadius:9, padding:"8px 12px", fontSize:12, fontWeight:700, textDecoration:"none", whiteSpace:"nowrap" }}>معاينة</a>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop:14 }}>
+            <Btn label={saved?"✅ تم الحفظ والمزامنة مع التطبيق!":"💾 حفظ ومزامنة مع التطبيق"} color={saved?C.green:color} onClick={save} full />
+          </div>
+        </Card>
+        <Card>
+          <SH icon="👁️" title="معاينة كما يراها العملاء" />
+          <div style={{ background:C.bg, borderRadius:12, padding:16 }}>
+            <div style={{ fontWeight:800, fontSize:16, marginBottom:4 }}>💊 {name}</div>
+            <div style={{ fontSize:12, color:C.muted, marginBottom:14 }}>تواصل معنا على:</div>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+              {FIELDS.map(field=>f[field.k]&&(
+                <div key={field.k} style={{ background:"#fff", border:`1.5px solid ${field.color}`, borderRadius:10, padding:"7px 12px", display:"flex", gap:6, alignItems:"center", fontSize:13, fontWeight:600, color:field.color }}>
+                  {field.icon} {field.l}
+                </div>
+              ))}
+              {!FIELDS.some(field=>f[field.k]) && <div style={{ fontSize:12, color:C.muted }}>أضف روابط لتظهر هنا</div>}
+            </div>
+          </div>
+          <div style={{ marginTop:14, background:"#F0FFF4", borderRadius:10, padding:"10px 14px", fontSize:12, color:C.green }}>
+            ✅ سيرى العملاء هذه الأزرار في صفحة صيدليتك بالتطبيق
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }

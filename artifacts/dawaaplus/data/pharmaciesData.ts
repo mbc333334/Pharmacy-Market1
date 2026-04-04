@@ -1,3 +1,10 @@
+export interface SocialLinks {
+  facebook?: string;
+  instagram?: string;
+  tiktok?: string;
+  website?: string;
+}
+
 export interface PharmacyProfile {
   id: string;
   name: string;
@@ -25,6 +32,7 @@ export interface PharmacyProfile {
   medicineCount: number;
   color: string;
   badges: string[];
+  social?: SocialLinks;
 }
 
 export const IRAQ_CITIES = [
@@ -59,6 +67,7 @@ export const PHARMACIES_DATA: PharmacyProfile[] = [
     medicineCount: 420,
     color: "#1A9E6E",
     badges: ["الأعلى تقييماً", "توصيل سريع", "مميّز"],
+    social: { facebook: "dawaashifa", instagram: "dawaashifa", tiktok: "dawaashifa", website: "shifa-pharmacy.iq" },
   },
   {
     id: "p2",

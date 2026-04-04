@@ -484,6 +484,54 @@ function PharmacyDetailModal({ pharmacy, onClose }: { pharmacy: PharmacyProfile;
             </View>
           )}
 
+          {/* Social Media Links */}
+          {pharmacy.social && (pharmacy.social.facebook || pharmacy.social.instagram || pharmacy.social.tiktok || pharmacy.social.website) && (
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="share-social" size={18} color={Colors.primary} />
+                <Text style={styles.sectionTitle}>وسائل التواصل الاجتماعي</Text>
+              </View>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                {pharmacy.social.facebook && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(`https://facebook.com/${pharmacy.social!.facebook}`)}
+                    style={{ backgroundColor: "#1877F2", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 6 }}
+                  >
+                    <Ionicons name="logo-facebook" size={18} color="#fff" />
+                    <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>Facebook</Text>
+                  </TouchableOpacity>
+                )}
+                {pharmacy.social.instagram && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(`https://instagram.com/${pharmacy.social!.instagram}`)}
+                    style={{ backgroundColor: "#E4405F", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 6 }}
+                  >
+                    <Ionicons name="logo-instagram" size={18} color="#fff" />
+                    <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>Instagram</Text>
+                  </TouchableOpacity>
+                )}
+                {pharmacy.social.tiktok && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(`https://tiktok.com/@${pharmacy.social!.tiktok}`)}
+                    style={{ backgroundColor: "#010101", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 6 }}
+                  >
+                    <Ionicons name="musical-notes" size={18} color="#fff" />
+                    <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>TikTok</Text>
+                  </TouchableOpacity>
+                )}
+                {pharmacy.social.website && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(pharmacy.social!.website!.startsWith("http") ? pharmacy.social!.website! : `https://${pharmacy.social!.website}`)}
+                    style={{ backgroundColor: Colors.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 6 }}
+                  >
+                    <Ionicons name="globe" size={18} color="#fff" />
+                    <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>الموقع</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Quick Action Buttons */}
           <View style={styles.quickActions}>
             <TouchableOpacity

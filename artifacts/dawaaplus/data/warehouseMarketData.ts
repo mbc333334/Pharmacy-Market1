@@ -10,6 +10,13 @@ export interface WarehouseMed {
   requiresPrescription: boolean;
 }
 
+export interface WarehouseSocialLinks {
+  facebook?: string;
+  instagram?: string;
+  tiktok?: string;
+  website?: string;
+}
+
 export interface WarehouseMarket {
   id: string;
   name: string;
@@ -27,6 +34,7 @@ export interface WarehouseMarket {
   minOrderTotal: number;
   productsCount: number;
   medicines: WarehouseMed[];
+  social?: WarehouseSocialLinks;
 }
 
 export const WAREHOUSE_CITIES = [
@@ -58,6 +66,7 @@ export const WAREHOUSE_MARKET: WarehouseMarket[] = [
       { id: "m5", name: "سيتريزين 10mg", brand: "Zyrtec", category: "حساسية", form: "أقراص", unitPrice: 4500, minOrder: 10, stock: 650, requiresPrescription: false },
       { id: "m6", name: "بنادول 500mg", brand: "Panadol", category: "مسكنات", form: "أقراص", unitPrice: 3200, minOrder: 20, stock: 900, requiresPrescription: false },
     ],
+    social: { facebook: "kogaydawa", instagram: "kogaydawa", tiktok: "kogaydawa", website: "kogaydawa.iq" },
   },
   {
     id: "wh2",
