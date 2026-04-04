@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
-  Platform, ScrollView,
+  Platform, ScrollView, Modal, KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -56,6 +56,52 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [showFp, setShowFp] = useState(false);
+  const [fpStep, setFpStep] = useState<"phone"|"otp"|"pass"|"done">("phone");
+  const [fpPhone, setFpPhone] = useState(""); const [fpErr, setFpErr] = useState(""); const [fpId, setFpId] = useState("");
+  const [fpOtp, setFpOtp] = useState(""); const [fpOtpIn, setFpOtpIn] = useState(""); const [fpTimer, setFpTimer] = useState(0);
+  const [fpNew, setFpNew] = useState(""); const [fpConfirm, setFpConfirm] = useState("");
+  const fpTimerRef = useRef<ReturnType<typeof setInterval>|null>(null);
+  useEffect(() => {
+    if (fpTimer <= 0) { if (fpTimerRef.current) { clearInterval(fpTimerRef.current); fpTimerRef.current = null; } return; }
+    fpTimerRef.current = setInterval(() => setFpTimer(v => v - 1), 1000);
+    return () => { if (fpTimerRef.current) { clearInterval(fpTimerRef.current); fpTimerRef.current = null; } };
+  }, [fpTimer]);
+
+  const KNOWN_PHONES: Record<string, Record<string, string>> = {
+    pharmacy: { "07501234567":"ph1", "07701234568":"ph2", "07601234569":"ph3", "07801234570":"ph4" },
+    warehouse: { "07501111111":"wh1", "07701111112":"wh2", "07601111113":"wh3", "07801111114":"wh4" },
+  };
+
+  const genFpOtp = () => String(Math.floor(100000 + Math.random() * 900000));
+  const openFp = () => { setFpStep("phone"); setFpPhone(""); setFpErr(""); setFpOtpIn(""); setFpNew(""); setFpConfirm(""); setShowFp(true); };
+  const closeFp = () => { setShowFp(false); };
+  const sendFpOtp = () => {
+    const ph = fpPhone.trim();
+    if (!ph) { setFpErr("أدخل رقم الهاتف"); return; }
+    if (tab === "customer") {
+      const key = `customer_pass_${ph}`;
+      const accs: any[] = JSON.parse(typeof localStorage !== "undefined" ? localStorage.getItem("customer_accounts") || "[]" : "[]");
+      const found = accs.find((a: any) => a.phone === ph);
+      if (!found && !localStorage.getItem(key)) { setFpErr("لا يوجد حساب مسجّل بهذا الرقم"); return; }
+      setFpId(ph); setFpErr(""); const code = genFpOtp(); setFpOtp(code); setFpOtpIn(""); setFpTimer(60); setFpStep("otp");
+    } else {
+      const phones = KNOWN_PHONES[tab] || {};
+      const id = phones[ph];
+      if (!id) { setFpErr("لا يوجد حساب مسجّل بهذا الرقم"); return; }
+      setFpId(id); setFpErr(""); const code = genFpOtp(); setFpOtp(code); setFpOtpIn(""); setFpTimer(60); setFpStep("otp");
+    }
+  };
+  const verifyFpOtp = () => {
+    if (fpOtpIn !== fpOtp) { setFpErr("رمز التحقق غير صحيح"); return; }
+    setFpErr(""); setFpNew(""); setFpConfirm(""); setFpStep("pass");
+  };
+  const saveFpPass = () => {
+    if (!fpNew || fpNew !== fpConfirm) { setFpErr("كلمتا المرور غير متطابقتين"); return; }
+    const key = tab === "customer" ? `customer_pass_${fpId}` : tab === "pharmacy" ? `ph_pass_${fpId}` : `wh_pass_${fpId}`;
+    if (typeof localStorage !== "undefined") localStorage.setItem(key, fpNew);
+    setFpErr(""); setFpStep("done");
+  };
 
   const handleLogin = async () => {
     if (!phone || !password) {
@@ -222,7 +268,7 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.forgotPass}>
+          <TouchableOpacity style={styles.forgotPass} onPress={openFp}>
             <Text style={[styles.forgotPassText, { color: activeColor }]}>{t("forgotPassword")}</Text>
           </TouchableOpacity>
         </View>
@@ -275,9 +321,113 @@ export default function LoginScreen() {
         )}
 
       </ScrollView>
+
+      <Modal visible={showFp} transparent animationType="slide" onRequestClose={closeFp}>
+        <KeyboardAvoidingView behavior={Platform.OS==="ios"?"padding":"height"} style={{ flex:1 }}>
+          <TouchableOpacity style={fpS.overlay} activeOpacity={1} onPress={closeFp}>
+            <TouchableOpacity activeOpacity={1} style={fpS.sheet} onPress={()=>{}}>
+              <View style={fpS.handle} />
+              <View style={fpS.headerRow}>
+                <TouchableOpacity onPress={closeFp}><Ionicons name="close-circle" size={26} color={Colors.textMuted} /></TouchableOpacity>
+                <View style={{ flex:1, alignItems:"flex-end" }}>
+                  <Text style={fpS.title}>🔐 نسيت كلمة المرور؟</Text>
+                  <Text style={fpS.sub}>سنساعدك في استعادة حسابك</Text>
+                </View>
+              </View>
+
+              {fpStep==="phone" && <>
+                <Text style={fpS.lbl}>رقم الهاتف المسجّل</Text>
+                <TextInput style={fpS.inp} placeholder="07xxxxxxxxx" value={fpPhone} onChangeText={t=>{setFpErr("");setFpPhone(t);}}
+                  keyboardType="phone-pad" textAlign="right" placeholderTextColor={Colors.textMuted} />
+                {fpErr ? <Text style={fpS.err}>⚠️ {fpErr}</Text> : null}
+                <TouchableOpacity style={[fpS.btn,{backgroundColor:activeColor}]} onPress={sendFpOtp}>
+                  <Ionicons name="send-outline" size={18} color="#fff" />
+                  <Text style={fpS.btnTxt}>📲 إرسال رمز التحقق</Text>
+                </TouchableOpacity>
+              </>}
+
+              {fpStep==="otp" && <>
+                <View style={fpS.otpBox}>
+                  <Text style={fpS.otpLbl}>📱 رمز التحقق التجريبي</Text>
+                  <Text style={fpS.otpCode}>{fpOtp}</Text>
+                  <Text style={fpS.otpHnt}>سيُرسَل عبر SMS في التطبيق الفعلي</Text>
+                </View>
+                <Text style={fpS.lbl}>أدخل رمز التحقق المكوّن من 6 أرقام</Text>
+                <TextInput style={[fpS.inp,{textAlign:"center",fontSize:22,letterSpacing:10,fontWeight:"800"}]}
+                  placeholder="• • • • • •" value={fpOtpIn} maxLength={6} keyboardType="numeric"
+                  onChangeText={t=>{setFpErr("");setFpOtpIn(t.replace(/[^0-9]/g,"").slice(0,6));}}
+                  placeholderTextColor={Colors.textMuted} />
+                {fpErr ? <Text style={fpS.err}>⚠️ {fpErr}</Text> : null}
+                <View style={{alignItems:"flex-end",marginVertical:8}}>
+                  {fpTimer>0 ? <Text style={fpS.timer}>⏱ إعادة الإرسال بعد {fpTimer}ث</Text>
+                    : <TouchableOpacity onPress={()=>{const c=genFpOtp();setFpOtp(c);setFpOtpIn("");setFpErr("");setFpTimer(60);}}>
+                        <Text style={[fpS.resend,{color:activeColor}]}>إعادة إرسال الرمز</Text>
+                      </TouchableOpacity>}
+                </View>
+                <TouchableOpacity style={[fpS.btn,{backgroundColor:activeColor,opacity:fpOtpIn.length<6?0.4:1}]}
+                  onPress={verifyFpOtp} disabled={fpOtpIn.length<6}>
+                  <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                  <Text style={fpS.btnTxt}>✅ تحقق من الرمز</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={fpS.backRow} onPress={()=>{setFpStep("phone");setFpErr("");}}>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+                  <Text style={fpS.backTxt}>العودة</Text>
+                </TouchableOpacity>
+              </>}
+
+              {fpStep==="pass" && <>
+                <Text style={fpS.lbl}>كلمة المرور الجديدة</Text>
+                <TextInput style={fpS.inp} placeholder="••••••••" secureTextEntry value={fpNew}
+                  onChangeText={t=>{setFpErr("");setFpNew(t);}} textAlign="right" placeholderTextColor={Colors.textMuted} />
+                <Text style={fpS.lbl}>تأكيد كلمة المرور</Text>
+                <TextInput style={[fpS.inp,{borderColor:fpConfirm&&fpConfirm!==fpNew?"#E53E3E":Colors.border}]}
+                  placeholder="••••••••" secureTextEntry value={fpConfirm}
+                  onChangeText={t=>{setFpErr("");setFpConfirm(t);}} textAlign="right" placeholderTextColor={Colors.textMuted} />
+                {fpErr ? <Text style={fpS.err}>⚠️ {fpErr}</Text> : null}
+                <TouchableOpacity style={[fpS.btn,{backgroundColor:activeColor,opacity:(!fpNew||fpNew!==fpConfirm)?0.4:1}]}
+                  onPress={saveFpPass} disabled={!fpNew||fpNew!==fpConfirm}>
+                  <Ionicons name="lock-closed-outline" size={18} color="#fff" />
+                  <Text style={fpS.btnTxt}>🔒 حفظ كلمة المرور الجديدة</Text>
+                </TouchableOpacity>
+              </>}
+
+              {fpStep==="done" && <View style={{alignItems:"center",paddingVertical:20}}>
+                <Ionicons name="checkmark-circle" size={64} color="#38A169" />
+                <Text style={{fontSize:18,fontWeight:"900",color:"#38A169",marginTop:12,marginBottom:8}}>تم تغيير كلمة المرور!</Text>
+                <Text style={{fontSize:13,color:Colors.textMuted,marginBottom:20,textAlign:"center"}}>يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة</Text>
+                <TouchableOpacity style={[fpS.btn,{backgroundColor:activeColor}]} onPress={closeFp}>
+                  <Text style={fpS.btnTxt}>العودة لتسجيل الدخول</Text>
+                </TouchableOpacity>
+              </View>}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
+
+const fpS = StyleSheet.create({
+  overlay: { flex:1, backgroundColor:"rgba(0,0,0,0.5)", justifyContent:"flex-end" },
+  sheet: { backgroundColor:"#fff", borderTopLeftRadius:24, borderTopRightRadius:24, padding:24, paddingBottom:40 },
+  handle: { width:40, height:4, backgroundColor:"#e2e8f0", borderRadius:2, alignSelf:"center", marginBottom:16 },
+  headerRow: { flexDirection:"row", alignItems:"center", gap:12, marginBottom:20 },
+  title: { fontSize:17, fontWeight:"900", color:"#1a202c" },
+  sub: { fontSize:12, color:"#718096" },
+  lbl: { fontSize:13, fontWeight:"700", color:"#1a202c", textAlign:"right", marginBottom:6 },
+  inp: { borderWidth:1.5, borderColor:Colors.border, borderRadius:12, padding:12, fontSize:15, marginBottom:10, backgroundColor:"#f7fafc" },
+  err: { fontSize:12, color:"#E53E3E", textAlign:"right", marginBottom:8 },
+  btn: { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:8, borderRadius:14, padding:14, marginTop:6 },
+  btnTxt: { fontSize:15, fontWeight:"800", color:"#fff" },
+  otpBox: { backgroundColor:"#FFFBEB", borderWidth:1.5, borderColor:"#F6AD55", borderRadius:14, padding:14, alignItems:"center", marginBottom:14 },
+  otpLbl: { fontSize:11, fontWeight:"700", color:"#744210", marginBottom:4 },
+  otpCode: { fontSize:28, fontWeight:"900", letterSpacing:8, color:"#744210" },
+  otpHnt: { fontSize:10, color:"#92400E", marginTop:4, textAlign:"center" },
+  timer: { fontSize:12, color:Colors.textMuted },
+  resend: { fontSize:13, fontWeight:"700", textDecorationLine:"underline" },
+  backRow: { flexDirection:"row", justifyContent:"center", alignItems:"center", gap:4, marginTop:12 },
+  backTxt: { fontSize:13, color:Colors.textMuted },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.surface },

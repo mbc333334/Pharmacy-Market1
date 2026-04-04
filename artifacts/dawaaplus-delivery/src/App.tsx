@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 function broadcastSync() {
   try { new BroadcastChannel("dawapl_sync").postMessage("update"); } catch {}
@@ -100,11 +100,82 @@ export default function App() {
   );
 }
 
+function ForgotModal({ onClose, color, data, passKey }:{ onClose:()=>void; color:string; data:any[]; passKey:(id:string)=>string }) {
+  const [step,setStep]=useState<"phone"|"otp"|"pass"|"done">("phone");
+  const [fpPhone,setFpPhone]=useState(""); const [fpErr,setFpErr]=useState(""); const [fpId,setFpId]=useState("");
+  const [otp,setOtp]=useState(""); const [otpIn,setOtpIn]=useState(""); const [timer,setTimer]=useState(0);
+  const [npw,setNpw]=useState(""); const [cpw,setCpw]=useState("");
+  const timerRef=useRef<any>(null);
+  useEffect(()=>{ if(timer<=0){ if(timerRef.current){ clearInterval(timerRef.current); timerRef.current=null; } return; }
+    timerRef.current=setInterval(()=>setTimer(v=>v-1),1000); return()=>{ if(timerRef.current){ clearInterval(timerRef.current); timerRef.current=null; } }; },[timer]);
+  const genOtp=()=>String(Math.floor(100000+Math.random()*900000));
+  const sendOtp=()=>{ const acc=data.find(a=>a.phone===fpPhone.trim()); if(!acc){ setFpErr("لا يوجد حساب مسجّل بهذا الرقم"); return; }
+    setFpId(acc.id); const code=genOtp(); setOtp(code); setOtpIn(""); setFpErr(""); setTimer(60); setStep("otp"); };
+  const verifyOtp=()=>{ if(otpIn!==otp){ setFpErr("رمز التحقق غير صحيح"); return; } setFpErr(""); setNpw(""); setCpw(""); setStep("pass"); };
+  const resetPass=()=>{ if(!npw||npw!==cpw){ setFpErr("كلمتا المرور غير متطابقتين"); return; }
+    localStorage.setItem(passKey(fpId),npw); setFpErr(""); setStep("done"); };
+  const overlay:React.CSSProperties = { position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px",fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" };
+  const card:React.CSSProperties = { background:"#fff",borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:400,direction:"rtl",position:"relative",boxShadow:"0 20px 60px rgba(0,0,0,0.25)" };
+  const inp:React.CSSProperties = { width:"100%",padding:"10px 14px",borderRadius:10,border:`1.5px solid #e2e8f0`,fontSize:14,textAlign:"right",outline:"none",boxSizing:"border-box",marginBottom:10 };
+  const btn=(bg:string):React.CSSProperties=>({ background:bg,color:"#fff",border:"none",borderRadius:10,padding:"12px 0",width:"100%",fontWeight:800,fontSize:15,cursor:"pointer",marginTop:4 });
+  return (
+    <div style={overlay} onClick={onClose}>
+      <div style={card} onClick={e=>e.stopPropagation()}>
+        <button onClick={onClose} style={{ position:"absolute",top:14,left:14,background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#718096" }}>✕</button>
+        <div style={{ textAlign:"center",marginBottom:20 }}>
+          <div style={{ fontSize:40,marginBottom:6 }}>🔐</div>
+          <h3 style={{ margin:0,fontSize:18,fontWeight:900 }}>نسيت كلمة المرور؟</h3>
+          <p style={{ margin:"4px 0 0",fontSize:12,color:"#718096" }}>سنساعدك في استعادة حسابك</p>
+        </div>
+        {step==="phone" && <>
+          <p style={{ fontSize:13,fontWeight:700,margin:"0 0 6px" }}>رقم الهاتف المسجّل</p>
+          <input style={inp} placeholder="07xxxxxxxxx" value={fpPhone} onChange={e=>{ setFpErr(""); setFpPhone(e.target.value); }} />
+          {fpErr && <div style={{ background:"#FFF5F5",border:"1px solid #FED7D7",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#E53E3E",marginBottom:8 }}>⚠️ {fpErr}</div>}
+          <button style={btn(color)} onClick={sendOtp}>📲 إرسال رمز التحقق</button>
+        </>}
+        {step==="otp" && <>
+          <div style={{ background:"#FFFBEB",border:"1.5px solid #F6AD55",borderRadius:14,padding:"14px",textAlign:"center",marginBottom:14 }}>
+            <div style={{ fontSize:11,fontWeight:700,color:"#744210",marginBottom:4 }}>📱 رمز التحقق التجريبي</div>
+            <div style={{ fontSize:28,fontWeight:900,letterSpacing:8,color:"#744210" }}>{otp}</div>
+            <div style={{ fontSize:10,color:"#92400E",marginTop:4 }}>سيُرسَل عبر SMS في التطبيق الفعلي</div>
+          </div>
+          <p style={{ fontSize:13,fontWeight:700,margin:"0 0 6px" }}>أدخل رمز التحقق</p>
+          <input style={{ ...inp,textAlign:"center",fontSize:22,letterSpacing:10,fontWeight:800 }} placeholder="• • • • • •" maxLength={6}
+            value={otpIn} onChange={e=>{ setFpErr(""); setOtpIn(e.target.value.replace(/\D/g,"").slice(0,6)); }} />
+          {fpErr && <div style={{ background:"#FFF5F5",border:"1px solid #FED7D7",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#E53E3E",marginBottom:8 }}>⚠️ {fpErr}</div>}
+          <div style={{ textAlign:"left",marginBottom:10,fontSize:12 }}>
+            {timer>0 ? <span style={{ color:"#718096" }}>⏱ إعادة الإرسال بعد {timer}ث</span>
+              : <button onClick={()=>{ const c=genOtp(); setOtp(c); setOtpIn(""); setFpErr(""); setTimer(60); }} style={{ background:"none",border:"none",color,fontWeight:700,cursor:"pointer",fontSize:13,textDecoration:"underline",padding:0 }}>إعادة إرسال الرمز</button>}
+          </div>
+          <button style={{ ...btn(color), opacity:otpIn.length<6?0.5:1 }} onClick={verifyOtp} disabled={otpIn.length<6}>✅ تحقق من الرمز</button>
+          <button onClick={()=>{ setStep("phone"); setFpErr(""); }} style={{ background:"none",border:"none",width:"100%",marginTop:10,color:"#718096",cursor:"pointer",fontSize:13,textDecoration:"underline" }}>← العودة</button>
+        </>}
+        {step==="pass" && <>
+          <p style={{ fontSize:13,fontWeight:700,margin:"0 0 6px" }}>كلمة المرور الجديدة</p>
+          <input style={inp} type="password" placeholder="••••••••" value={npw} onChange={e=>{ setFpErr(""); setNpw(e.target.value); }} />
+          <p style={{ fontSize:13,fontWeight:700,margin:"0 0 6px" }}>تأكيد كلمة المرور</p>
+          <input style={{ ...inp, borderColor: cpw&&cpw!==npw?"#E53E3E":"#e2e8f0" }} type="password" placeholder="••••••••" value={cpw} onChange={e=>{ setFpErr(""); setCpw(e.target.value); }} />
+          {fpErr && <div style={{ background:"#FFF5F5",border:"1px solid #FED7D7",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#E53E3E",marginBottom:8 }}>⚠️ {fpErr}</div>}
+          <button style={{ ...btn(color), opacity:(!npw||npw!==cpw)?0.5:1 }} onClick={resetPass} disabled={!npw||npw!==cpw}>🔒 حفظ كلمة المرور الجديدة</button>
+        </>}
+        {step==="done" && <div style={{ textAlign:"center",padding:"20px 0" }}>
+          <div style={{ fontSize:60,marginBottom:12 }}>✅</div>
+          <h3 style={{ color:"#38A169",margin:"0 0 8px",fontWeight:900 }}>تم تغيير كلمة المرور!</h3>
+          <p style={{ color:"#718096",fontSize:13,margin:"0 0 20px" }}>يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة</p>
+          <button style={btn(color)} onClick={onClose}>العودة لتسجيل الدخول</button>
+        </div>}
+      </div>
+    </div>
+  );
+}
+
 function Login({ onLogin }:{ onLogin:(c:any)=>void }) {
   const [phone,setPhone]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState("");
+  const [showFp,setShowFp]=useState(false);
   const login=()=>{ const c=COMPANIES.find(c=>c.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`dc_pass_${c.id}`)||c.pass)); c?onLogin(c):setErr("رقم الهاتف أو كلمة المرور غير صحيحة"); };
   return (
     <div dir="rtl" style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
+      {showFp && <ForgotModal onClose={()=>setShowFp(false)} color={C.primary} data={COMPANIES} passKey={id=>`dc_pass_${id}`} />}
       <div style={{ background:`linear-gradient(135deg,${C.primary},${C.dark})`, padding:"48px 24px 70px", textAlign:"center" }}>
         <div style={{ fontSize:56, marginBottom:8 }}>🚚</div>
         <h1 style={{ color:"#fff", fontSize:32, fontWeight:900, margin:0 }}>بوابة شركات التوصيل</h1>
@@ -117,6 +188,7 @@ function Login({ onLogin }:{ onLogin:(c:any)=>void }) {
           <Inp label="كلمة المرور" val={pass} set={setPass} ph="••••••" type="password" />
           {err && <div style={{ background:"#FFF5F5", border:"1px solid #FED7D7", borderRadius:8, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:10 }}>{err}</div>}
           <Btn label="دخول →" color={C.primary} onClick={login} full />
+          <button onClick={()=>setShowFp(true)} style={{ background:"none",border:"none",width:"100%",marginTop:10,color:C.primary,cursor:"pointer",fontSize:13,fontWeight:700,textDecoration:"underline",textAlign:"center" }}>🔑 نسيت كلمة المرور؟</button>
         </div>
         <div style={{ background:C.surface, borderRadius:16, padding:"16px 18px", boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
           <div style={{ fontSize:12, color:C.muted, textAlign:"center", marginBottom:10 }}>🔑 شركات مسجّلة — اضغط للدخول</div>
