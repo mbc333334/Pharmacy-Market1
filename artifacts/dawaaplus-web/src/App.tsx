@@ -202,6 +202,22 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastS
             </button>
           ))}
         </div>
+        {/* ── Portal Quick-Access ── */}
+        <div style={{ borderTop:"1px solid #2d3748", padding:"8px 0" }}>
+          {open && <div style={{ fontSize:10, color:"#4A5568", fontWeight:700, padding:"4px 14px 6px", textTransform:"uppercase", letterSpacing:1 }}>بوابات المشتركين</div>}
+          {[
+            { label:"الصيدليات",  icon:"💊", color:"#1A9E6E", path:"/dawaaplus-pharmacies/" },
+            { label:"المذاخر",    icon:"🏭", color:"#0D7A54", path:"/dawaaplus-warehouses/" },
+            { label:"التوصيل",    icon:"🚛", color:"#D69E2E", path:"/dawaaplus-delivery/"   },
+          ].map(p=>(
+            <a key={p.path} href={`${window.location.origin}${p.path}`} target="_blank" rel="noreferrer"
+              style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"8px 14px", background:"none", border:"none", cursor:"pointer", textAlign:"right", textDecoration:"none", borderRight:"3px solid transparent" }}>
+              <span style={{ fontSize:16, flexShrink:0 }}>{p.icon}</span>
+              {open && <span style={{ color:"#718096", fontSize:12, whiteSpace:"nowrap" }}>{p.label}</span>}
+              {open && <span style={{ marginRight:"auto", fontSize:10, color:p.color, background:`${p.color}20`, borderRadius:4, padding:"1px 5px" }}>↗</span>}
+            </a>
+          ))}
+        </div>
         <button onClick={onLogout} style={{ padding:14, background:"none", border:"none", borderTop:"1px solid #2d3748", color:"#A0AEC0", cursor:"pointer", display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
           <span>🚪</span>{open && <span>تسجيل الخروج</span>}
         </button>

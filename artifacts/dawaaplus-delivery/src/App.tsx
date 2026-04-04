@@ -574,19 +574,58 @@ function Sidebar({ color,icon,title,name,menu,active,onNav,onLogout }:any) {
     </div>
   );
 }
-function TopBar({ color,label,name,portalUrl }:any) {
+function PlatformHub({ color, portalUrl, currentIcon, currentLabel }:any) {
+  const [open,setOpen]=useState(false);
   const [copied,setCopied]=useState(false);
+  const base=window.location.origin;
+  const portals=[
+    { label:"بوابة الصيدليات",  icon:"💊", color:"#1A9E6E", path:"/dawaaplus-pharmacies/", current:currentLabel==="pharmacy" },
+    { label:"بوابة المذاخر",    icon:"🏭", color:"#0D7A54", path:"/dawaaplus-warehouses/", current:currentLabel==="warehouse" },
+    { label:"بوابة التوصيل",    icon:"🚛", color:"#D69E2E", path:"/dawaaplus-delivery/",   current:currentLabel==="delivery" },
+  ];
   const copy=()=>{ navigator.clipboard.writeText(portalUrl||window.location.href).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); }); };
-  const msg=encodeURIComponent(`🚚 منصة دواء+ | بوابة شركات التوصيل\n${portalUrl||window.location.origin}`);
+  return (
+    <div style={{ position:"relative" }}>
+      <button onClick={()=>setOpen(v=>!v)} style={{ display:"flex",alignItems:"center",gap:6,background:open?`${color}15`:"#F7FAFC",border:`1.5px solid ${open?color:C.border}`,borderRadius:10,padding:"5px 12px",cursor:"pointer",fontWeight:800,fontSize:12,color:open?color:C.text }}>
+        <span style={{ fontSize:15 }}>🌐</span> دواء+ <span style={{ fontSize:10,color:C.muted }}>▾</span>
+      </button>
+      {open&&<div style={{ position:"fixed",inset:0,zIndex:998 }} onClick={()=>setOpen(false)} />}
+      {open&&<div style={{ position:"absolute",top:38,left:0,background:"#fff",borderRadius:14,boxShadow:"0 8px 32px rgba(0,0,0,0.18)",border:`1px solid ${C.border}`,padding:"14px",width:260,zIndex:999 }}>
+        <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:12,paddingBottom:10,borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ width:32,height:32,borderRadius:10,background:`linear-gradient(135deg,${color},#8B6914)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>{currentIcon}</div>
+          <div><div style={{ fontWeight:900,fontSize:13,color:C.text }}>منصة دواء+</div><div style={{ fontSize:10,color:C.muted }}>بوابات المشتركين</div></div>
+        </div>
+        {portals.map(p=>(
+          <a key={p.path} href={`${base}${p.path}`} target={p.current?"_self":"_blank"} rel="noreferrer" onClick={()=>setOpen(false)}
+            style={{ display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:9,marginBottom:4,background:p.current?`${p.color}10`:"transparent",textDecoration:"none",border:p.current?`1px solid ${p.color}30`:"1px solid transparent" }}>
+            <span style={{ fontSize:18 }}>{p.icon}</span>
+            <span style={{ fontSize:13,fontWeight:p.current?800:500,color:p.current?p.color:C.text }}>{p.label}</span>
+            {p.current&&<span style={{ marginRight:"auto",fontSize:10,background:`${p.color}20`,color:p.color,borderRadius:6,padding:"2px 6px",fontWeight:700 }}>هذه البوابة</span>}
+            {!p.current&&<span style={{ marginRight:"auto",fontSize:11,color:C.muted }}>↗</span>}
+          </a>
+        ))}
+        <div style={{ marginTop:10,paddingTop:10,borderTop:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:10,color:C.muted,marginBottom:6 }}>📋 رابط بوابتك الخاصة</div>
+          <div style={{ display:"flex",gap:6 }}>
+            <div style={{ flex:1,background:C.bg,borderRadius:7,padding:"6px 8px",fontSize:10,color:C.muted,wordBreak:"break-all",lineHeight:1.4 }}>{(portalUrl||window.location.href).replace(/https?:\/\//,"")}</div>
+            <button onClick={copy} style={{ background:copied?"#F0FFF4":"#EDF2F7",border:`1px solid ${copied?C.green:C.border}`,borderRadius:7,padding:"6px 10px",fontSize:11,cursor:"pointer",fontWeight:700,color:copied?C.green:C.text,flexShrink:0 }}>{copied?"✅":"📋"}</button>
+          </div>
+        </div>
+      </div>}
+    </div>
+  );
+}
+function TopBar({ color,label,name,portalUrl }:any) {
+  const msg=encodeURIComponent(`🚛 منصة دواء+ | بوابة شركات التوصيل\n${portalUrl||window.location.origin}`);
   return (
     <div style={{ background:"#fff",borderBottom:`1px solid ${C.border}`,padding:"0 20px",height:56,display:"flex",alignItems:"center",gap:12,flexShrink:0 }}>
       <div style={{ flex:1 }}><span style={{ fontWeight:800,fontSize:15 }}>{label}</span></div>
       <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-        <button onClick={copy} style={{ background:copied?"#F0FFF4":"#EDF2F7",border:`1px solid ${copied?C.green:C.border}`,borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700,color:copied?C.green:C.text }}>{copied?"✅ تم":"🔗 الرابط"}</button>
+        <PlatformHub color={color} portalUrl={portalUrl} currentIcon="🚛" currentLabel="delivery" />
         <a href={`https://wa.me/?text=${msg}`} target="_blank" rel="noreferrer" style={{ background:"#25D366",color:"#fff",borderRadius:8,padding:"5px 10px",fontSize:11,textDecoration:"none",fontWeight:700 }}>💬 واتساب</a>
         <div style={{ display:"flex",alignItems:"center",gap:6,background:`${color}15`,borderRadius:20,padding:"5px 12px",border:`1px solid ${color}40` }}>
           <span style={{ width:7,height:7,borderRadius:"50%",background:C.green,display:"block" }} />
-          <span style={{ fontSize:11,color:C.dark,fontWeight:700 }}>🚚 متزامن مع المنصة</span>
+          <span style={{ fontSize:11,color:C.dark,fontWeight:700 }}>📡 متزامن مع المنصة</span>
         </div>
       </div>
     </div>
