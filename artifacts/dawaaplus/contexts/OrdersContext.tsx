@@ -1,6 +1,17 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 
-export type PaymentMethod = "cod" | "card" | "whatsapp";
+export type PaymentMethod =
+  | "cod"
+  | "card"
+  | "zaincash"
+  | "fastpay"
+  | "asiahawala"
+  | "qicard"
+  | "nasswallet"
+  | "tabadul"
+  | "mahali"
+  | "fib"
+  | "whatsapp";
 export type OrderStatus = "new" | "processing" | "shipped" | "completed" | "cancelled";
 
 export interface OrderItem {

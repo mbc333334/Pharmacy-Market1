@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart, CartItem } from "@/contexts/CartContext";
-import { useOrders } from "@/contexts/OrdersContext";
+import { useOrders, PaymentMethod } from "@/contexts/OrdersContext";
 
 const DELIVERY_FEE = 3500;
 const PROMO_CODES: Record<string, number> = {
@@ -19,7 +19,32 @@ const PROMO_CODES: Record<string, number> = {
   WELCOME: 0.15,
 };
 
-type PaymentMethod = "cod" | "card" | "whatsapp";
+// ── Iraqi Payment labels ─────────────────────────────────────────────────
+const PAY_LABELS: Record<PaymentMethod, string> = {
+  cod:         "الدفع عند الاستلام (كاش)",
+  card:        "البطاقة المصرفية (Visa / Mastercard)",
+  zaincash:    "زين كاش",
+  fastpay:     "فاست باي",
+  asiahawala:  "آسيا حوالة",
+  qicard:      "كارت كي (Qi Card)",
+  nasswallet:  "ناس ولت",
+  tabadul:     "تبادل",
+  mahali:      "محلي",
+  fib:         "فرست إيراقي بنك (FIB)",
+  whatsapp:    "التواصل عبر واتساب",
+};
+
+// ── Iraqi wallet buttons ─────────────────────────────────────────────────
+const IRAQ_WALLETS: { id: PaymentMethod; label: string; color: string; bg: string }[] = [
+  { id: "zaincash",   label: "زين كاش",   color: "#E30613", bg: "#FFF0F0" },
+  { id: "fastpay",    label: "فاست باي",  color: "#0057A8", bg: "#EEF4FF" },
+  { id: "asiahawala", label: "آسيا حوالة",color: "#009E4F", bg: "#EFFFEC" },
+  { id: "qicard",     label: "كارت كي",   color: "#FF6900", bg: "#FFF3E8" },
+  { id: "nasswallet", label: "ناس ولت",   color: "#5B2D8E", bg: "#F4EDFF" },
+  { id: "tabadul",    label: "تبادل",      color: "#007AB8", bg: "#EAF5FF" },
+  { id: "mahali",     label: "محلي",       color: "#1A9E6E", bg: "#EDFBF4" },
+  { id: "fib",        label: "FIB",        color: "#D4A017", bg: "#FFF9E6" },
+];
 
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
@@ -36,6 +61,7 @@ export default function CartScreen() {
   const [cardName, setCardName] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
+  const [walletPhone, setWalletPhone] = useState("");
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [guestStep, setGuestStep] = useState<"choice" | "phone">("choice");
   const [guestPhone, setGuestPhone] = useState("");
@@ -65,14 +91,9 @@ export default function CartScreen() {
   const proceedCheckout = (customerPhone?: string) => {
     const phone = customerPhone ?? user?.phone ?? "+964 750 000 0000";
     const name = user?.name ?? "زبون ضيف";
-    const payLabels: Record<PaymentMethod, string> = {
-      cod: "الدفع عند الاستلام (كاش)",
-      card: "البطاقة المصرفية",
-      whatsapp: "التواصل عبر واتساب",
-    };
     Alert.alert(
       "تأكيد الطلب ✅",
-      `إجمالي طلبك: ${finalTotal.toLocaleString()} د.ع\nطريقة الدفع: ${payLabels[paymentMethod]}\nسيتم التواصل معك لتأكيد التوصيل`,
+      `إجمالي طلبك: ${finalTotal.toLocaleString()} د.ع\nطريقة الدفع: ${PAY_LABELS[paymentMethod]}\nسيتم التواصل معك لتأكيد التوصيل`,
       [
         { text: "إلغاء", style: "cancel" },
         {
@@ -94,7 +115,7 @@ export default function CartScreen() {
               deliveryFee: DELIVERY_FEE,
               status: "new",
               paymentMethod,
-              isPaid: paymentMethod === "card",
+              isPaid: paymentMethod !== "cod" && paymentMethod !== "whatsapp",
               address: "حي المنصور، شارع 14",
               city: "هەولێر",
             });
@@ -113,12 +134,18 @@ export default function CartScreen() {
     );
   };
 
+  const isWallet = (m: PaymentMethod) => IRAQ_WALLETS.some(w => w.id === m);
+
   const handleCheckout = () => {
     if (paymentMethod === "card") {
       if (!cardNumber || !cardName || !cardExpiry || !cardCvv) {
         Alert.alert("معلومات البطاقة", "يرجى إدخال جميع بيانات البطاقة المصرفية");
         return;
       }
+    }
+    if (isWallet(paymentMethod) && walletPhone.length < 10) {
+      Alert.alert("رقم المحفظة", "يرجى إدخال رقم هاتف محفظتك الإلكترونية");
+      return;
     }
     // Registered user → checkout directly
     if (user) {
@@ -209,13 +236,15 @@ export default function CartScreen() {
               <Text style={styles.promoHint}>جرّب: SUGAR20 · DAWAA10 · WELCOME</Text>
             </View>
 
-            {/* Payment Method */}
+            {/* ══ PAYMENT METHOD ══ */}
             <View style={styles.paymentSection}>
               <Text style={styles.paymentTitle}>طريقة الدفع</Text>
+
+              {/* ─ Cash & WhatsApp ─ */}
               <View style={styles.paymentOptions}>
                 <PaymentOption
                   icon="cash-outline"
-                  label="عند الاستلام"
+                  label="الدفع عند الاستلام"
                   sublabel="ادفع نقداً عند التوصيل"
                   value="cod"
                   selected={paymentMethod === "cod"}
@@ -225,7 +254,7 @@ export default function CartScreen() {
                 <PaymentOption
                   icon="card-outline"
                   label="بطاقة مصرفية"
-                  sublabel="Visa / Mastercard"
+                  sublabel="Visa / Mastercard / FIB Card"
                   value="card"
                   selected={paymentMethod === "card"}
                   color={Colors.primary}
@@ -234,7 +263,7 @@ export default function CartScreen() {
                 <PaymentOption
                   icon="logo-whatsapp"
                   label="واتساب"
-                  sublabel="تواصل مع الصيدلية"
+                  sublabel="تواصل مع الصيدلية مباشرةً"
                   value="whatsapp"
                   selected={paymentMethod === "whatsapp"}
                   color="#25D366"
@@ -242,6 +271,37 @@ export default function CartScreen() {
                 />
               </View>
 
+              {/* ─ Iraqi E-Wallets ─ */}
+              <View style={styles.walletsHeader}>
+                <View style={styles.walletsDivider} />
+                <Text style={styles.walletsDividerText}>المحافظ الإلكترونية العراقية</Text>
+                <View style={styles.walletsDivider} />
+              </View>
+
+              <View style={styles.walletsGrid}>
+                {IRAQ_WALLETS.map(w => (
+                  <TouchableOpacity
+                    key={w.id}
+                    style={[
+                      styles.walletBtn,
+                      { borderColor: paymentMethod === w.id ? w.color : Colors.border },
+                      paymentMethod === w.id && { backgroundColor: w.bg },
+                    ]}
+                    onPress={() => setPaymentMethod(w.id)}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[styles.walletDot, { backgroundColor: paymentMethod === w.id ? w.color : Colors.border }]} />
+                    <Text style={[
+                      styles.walletBtnText,
+                      { color: paymentMethod === w.id ? w.color : Colors.textSecondary },
+                    ]}>
+                      {w.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* ─ Card form ─ */}
               {paymentMethod === "card" && (
                 <View style={styles.cardForm}>
                   <Text style={styles.cardFormTitle}>بيانات البطاقة المصرفية</Text>
@@ -292,6 +352,31 @@ export default function CartScreen() {
                 </View>
               )}
 
+              {/* ─ Wallet phone input ─ */}
+              {isWallet(paymentMethod) && (
+                <View style={styles.walletPhoneBox}>
+                  <Text style={styles.walletPhoneLabel}>
+                    رقم هاتف محفظة {PAY_LABELS[paymentMethod]}
+                  </Text>
+                  <View style={styles.walletPhoneRow}>
+                    <TextInput
+                      style={styles.walletPhoneInput}
+                      placeholder="+964 7XX XXX XXXX"
+                      value={walletPhone}
+                      onChangeText={setWalletPhone}
+                      keyboardType="phone-pad"
+                      textAlign="right"
+                      placeholderTextColor={Colors.textMuted}
+                    />
+                    <Ionicons name="wallet-outline" size={20} color={Colors.textMuted} />
+                  </View>
+                  <Text style={styles.walletPhoteHint}>
+                    سيتم خصم المبلغ من محفظتك عند تأكيد الطلب
+                  </Text>
+                </View>
+              )}
+
+              {/* ─ WhatsApp note ─ */}
               {paymentMethod === "whatsapp" && (
                 <View style={styles.whatsappNote}>
                   <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
@@ -640,6 +725,33 @@ const styles = StyleSheet.create({
     backgroundColor: "#E8F5E9", borderRadius: 12, padding: 12,
   },
   whatsappNoteText: { flex: 1, fontSize: 13, color: "#1B5E20", textAlign: "right" },
+  walletsHeader: {
+    flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4,
+  },
+  walletsDivider: { flex: 1, height: 1, backgroundColor: Colors.border },
+  walletsDividerText: { fontSize: 11, fontWeight: "700", color: Colors.textMuted, flexShrink: 0 },
+  walletsGrid: {
+    flexDirection: "row", flexWrap: "wrap", gap: 8,
+  },
+  walletBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    borderWidth: 1.5, borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 8,
+    width: "48%",
+  },
+  walletDot: { width: 8, height: 8, borderRadius: 4 },
+  walletBtnText: { fontSize: 12, fontWeight: "700" },
+  walletPhoneBox: {
+    backgroundColor: Colors.surfaceAlt, borderRadius: 12, padding: 12, gap: 8, marginTop: 4,
+  },
+  walletPhoneLabel: { fontSize: 13, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
+  walletPhoneRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: Colors.surface, borderRadius: 10,
+    borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12,
+  },
+  walletPhoneInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: Colors.textPrimary },
+  walletPhoteHint: { fontSize: 11, color: Colors.textMuted, textAlign: "right" },
   summary: {
     backgroundColor: Colors.surface, borderRadius: 16, padding: 16,
     shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,

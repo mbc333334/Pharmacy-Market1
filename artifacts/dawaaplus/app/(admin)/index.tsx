@@ -6,6 +6,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { DEMO_SUBSCRIBERS, DEMO_ADS } from "@/data/subscriptionData";
 import { usePlatformDelivery } from "@/contexts/PlatformDeliveryContext";
+import { useOrders } from "@/contexts/OrdersContext";
 
 const ADMIN_COLOR = "#7C3AED";
 
@@ -27,7 +28,8 @@ function StatCard({ icon, label, value, sub, color }: { icon: any; label: string
 export default function AdminDashboard() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
-  const { deliveryCompanies, getTotalRevenue: getDeliveryRevenue, getPendingCount } = usePlatformDelivery();
+  const { deliveryCompanies, getPendingCount } = usePlatformDelivery();
+  const { customerOrders, warehouseOrders } = useOrders();
 
   const pharmacies = DEMO_SUBSCRIBERS.filter(s => s.type === "pharmacy");
   const warehouses = DEMO_SUBSCRIBERS.filter(s => s.type === "warehouse");
@@ -35,7 +37,8 @@ export default function AdminDashboard() {
   const activeWarehouses = warehouses.filter(s => s.status === "active");
   const subRevenue = DEMO_SUBSCRIBERS.filter(s => s.status === "active").reduce((acc, s) => acc + s.revenue, 0);
   const deliveryRevenue = deliveryCompanies.filter(c => c.status === "approved").reduce((acc, c) => acc + c.monthlyFee, 0);
-  const totalRevenue = subRevenue + deliveryRevenue;
+  const ordersRevenue = customerOrders.reduce((acc, o) => acc + o.total + o.deliveryFee, 0);
+  const totalRevenue = subRevenue + deliveryRevenue + ordersRevenue;
   const activeAds = DEMO_ADS.filter(a => a.status === "active");
   const pendingDelivery = getPendingCount();
   const approvedDelivery = deliveryCompanies.filter(c => c.status === "approved").length;
@@ -43,12 +46,28 @@ export default function AdminDashboard() {
   const premiumCount = DEMO_SUBSCRIBERS.filter(s => s.plan === "premium" && s.status === "active").length;
   const standardCount = DEMO_SUBSCRIBERS.filter(s => s.plan === "standard" && s.status === "active").length;
 
+  // Real orders stats
+  const totalOrders = customerOrders.length + warehouseOrders.length;
+  const pendingOrders = customerOrders.filter(o => o.status === "new" || o.status === "processing").length;
+  const completedOrders = customerOrders.filter(o => o.status === "completed").length;
+  const guestOrders = customerOrders.filter(o => o.customerId === "guest").length;
+
+  // Payment method breakdown
+  const walletOrders = customerOrders.filter(o =>
+    !["cod", "card", "whatsapp"].includes(o.paymentMethod)).length;
+  const cardOrders = customerOrders.filter(o => o.paymentMethod === "card").length;
+  const codOrders = customerOrders.filter(o => o.paymentMethod === "cod").length;
+
   const recentActivity = [
+    ...customerOrders.slice(-3).reverse().map(o => ({
+      icon: "cart",
+      text: `طلب جديد من ${o.customerName} — ${o.total.toLocaleString()} د.ع`,
+      time: "مؤخراً",
+      color: Colors.primary,
+    })),
     { icon: "storefront", text: "دەرمانخانەی شیفا اشتركت في الباقة المميزة", time: "منذ ساعتين", color: Colors.primary },
-    { icon: "cube", text: "كۆگای باشووری جدّد اشتراكه السنوي", time: "منذ 5 ساعات", color: "#0D7A54" },
     { icon: "megaphone", text: "إعلان جديد تمت الموافقة عليه", time: "منذ أمس", color: ADMIN_COLOR },
-    { icon: "storefront", text: "دەرمانخانەی نوێ انضمّت بالباقة المجانية", time: "منذ يومين", color: Colors.primary },
-  ];
+  ].slice(0, 5);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -82,6 +101,41 @@ export default function AdminDashboard() {
           <StatCard icon="cube" label="المذاخر النشطة" value={`${activeWarehouses.length}`} sub={`إجمالي: ${warehouses.length}`} color="#0D7A54" />
           <StatCard icon="car" label="شركات توصيل معتمدة" value={`${approvedDelivery}`} sub={pendingDelivery > 0 ? `${pendingDelivery} طلبات بانتظار الموافقة` : "لا طلبات معلقة"} color="#059669" />
           <StatCard icon="megaphone" label="إعلانات نشطة" value={`${activeAds.length}`} sub={`إجمالي: ${DEMO_ADS.length}`} color={ADMIN_COLOR} />
+        </View>
+
+        {/* Orders Stats */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>إحصائيات الطلبات</Text>
+          <View style={styles.statsGrid}>
+            <StatCard icon="bag-handle" label="إجمالي الطلبات" value={`${totalOrders}`} sub={`${pendingOrders} قيد التنفيذ`} color={Colors.primary} />
+            <StatCard icon="checkmark-circle" label="طلبات مكتملة" value={`${completedOrders}`} sub={`${guestOrders} طلب ضيف`} color="#059669" />
+          </View>
+
+          {/* Payment Method Breakdown */}
+          <Text style={[styles.sectionTitle, { fontSize: 13, marginTop: 12, marginBottom: 8 }]}>وسائل الدفع المستخدمة</Text>
+          {[
+            { label: "الدفع عند الاستلام (كاش)", count: codOrders, color: "#0D7A54", icon: "cash" },
+            { label: "البطاقة المصرفية", count: cardOrders, color: Colors.primary, icon: "card" },
+            { label: "المحافظ الإلكترونية العراقية", count: walletOrders, color: "#D69E2E", icon: "wallet" },
+            { label: "واتساب", count: customerOrders.filter(o => o.paymentMethod === "whatsapp").length, color: "#25D366", icon: "logo-whatsapp" },
+          ].map(item => (
+            <View key={item.label} style={styles.payRow}>
+              <Text style={styles.payCount}>{item.count}</Text>
+              <View style={styles.payBarBg}>
+                <View style={[
+                  styles.payBar,
+                  {
+                    width: totalOrders > 0 ? `${Math.round(item.count / Math.max(totalOrders, 1) * 100)}%` as any : "0%",
+                    backgroundColor: item.color,
+                  }
+                ]} />
+              </View>
+              <View style={[styles.payDot, { backgroundColor: item.color + "20" }]}>
+                <Ionicons name={item.icon as any} size={14} color={item.color} />
+              </View>
+              <Text style={styles.payLabel}>{item.label}</Text>
+            </View>
+          ))}
         </View>
 
         {/* Plan Breakdown */}
@@ -195,4 +249,10 @@ const styles = StyleSheet.create({
   quickItem: { flex: 1, minWidth: "45%", alignItems: "center", gap: 8, padding: 14, backgroundColor: Colors.surfaceAlt, borderRadius: 14 },
   quickIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   quickLabel: { fontSize: 12, fontWeight: "600", color: Colors.textPrimary, textAlign: "center" },
+  payRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  payDot: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  payLabel: { fontSize: 12, color: Colors.textSecondary, flex: 1, textAlign: "right" },
+  payBarBg: { width: 80, height: 6, backgroundColor: Colors.surfaceAlt, borderRadius: 3, overflow: "hidden" },
+  payBar: { height: "100%", borderRadius: 3 },
+  payCount: { fontSize: 13, fontWeight: "800", color: Colors.textPrimary, minWidth: 20, textAlign: "left" },
 });
