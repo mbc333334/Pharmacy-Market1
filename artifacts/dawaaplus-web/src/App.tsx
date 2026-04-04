@@ -77,12 +77,17 @@ function getPlatformPaymentAccounts(){
     { id:"cashAdmin",  label:"كاش / واتساب",icon:"💵", color:"#38A169", num:"07501234567",   hint:"تواصل مع المدير مباشرة" },
   ];
 }
-function loginCheck(phone:string, pass:string): { name:string; role:string } | null {
-  if (phone.trim()===SUPER_ADMIN.phone && pass.trim()===SUPER_ADMIN.password)
-    return { name:SUPER_ADMIN.name, role:"superadmin" };
+function getSuperAdminPassword(){ return rdLS("admin_super_password", SUPER_ADMIN.password) as string; }
+function loginCheck(phone:string, pass:string): { name:string; role:string; phone?:string } | null {
+  // Super admin: accept both hardcoded password AND any overridden password stored in localStorage
+  if (phone.trim()===SUPER_ADMIN.phone) {
+    const customPass = getSuperAdminPassword();
+    if (pass.trim()===SUPER_ADMIN.password || pass.trim()===customPass)
+      return { name:SUPER_ADMIN.name, role:"superadmin", phone:SUPER_ADMIN.phone };
+  }
   const accounts = getAdminAccounts();
   const found = accounts.find((a:any)=>a.phone===phone.trim() && a.password===pass.trim());
-  return found ? { name:found.name, role:found.role } : null;
+  return found ? { name:found.name, role:found.role, phone:found.phone } : null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -222,7 +227,7 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastS
           {sec==="finance"  && <AdminFin     db={db} />}
           {sec==="announce" && <AdminAnn />}
           {sec==="social"   && <AdminSocial  db={db} />}
-          {sec==="settings" && isSuperAdmin && <AdminSettings />}
+          {sec==="settings" && isSuperAdmin && <AdminSettings currentUser={user} />}
         </div>
       </div>
     </div>
@@ -722,10 +727,49 @@ function AdminTable({ rows, cols, color, onSelect, selected }:{ rows:any[]; cols
   );
 }
 
+// ─── Password Change Form (reusable) ──────────────────────────────────────────
+function PassChangeForm({ passForm, setPassForm, showNewPass, setShowNewPass, passErr, passSaved, onSubmit, onCancel }:any) {
+  return (
+    <div style={{ background:"#F7FAFC", borderRadius:10, padding:"14px 14px" }}>
+      {passSaved ? (
+        <div style={{ textAlign:"center", color:C.green, fontWeight:800, fontSize:14, padding:"8px 0" }}>✅ تم تغيير كلمة المرور بنجاح!</div>
+      ) : (
+        <div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>كلمة المرور الجديدة</label>
+              <div style={{ position:"relative" }}>
+                <input type={showNewPass?"text":"password"} value={passForm.newPass} onChange={e=>setPassForm((p:any)=>({...p,newPass:e.target.value}))}
+                  placeholder="••••••••" style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", paddingLeft:34, fontSize:13, boxSizing:"border-box" }} />
+                <button onClick={()=>setShowNewPass((v:boolean)=>!v)} style={{ position:"absolute", left:8, top:9, background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:13 }}>{showNewPass?"🙈":"👁️"}</button>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>تأكيد كلمة المرور</label>
+              <input type="password" value={passForm.confirmPass} onChange={e=>setPassForm((p:any)=>({...p,confirmPass:e.target.value}))}
+                onKeyDown={(e:any)=>e.key==="Enter"&&onSubmit()} placeholder="••••••••"
+                style={{ width:"100%", border:`1.5px solid ${passForm.confirmPass&&passForm.confirmPass!==passForm.newPass?C.red:C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box" }} />
+            </div>
+          </div>
+          {passForm.confirmPass && passForm.confirmPass!==passForm.newPass && <div style={{ fontSize:11, color:C.red, marginBottom:6 }}>⚠️ كلمتا المرور غير متطابقتين</div>}
+          {passErr&&<div style={{ background:"#FFF5F5",border:"1px solid #FED7D7",borderRadius:7,padding:"7px 12px",fontSize:12,color:C.red,marginBottom:8 }}>{passErr}</div>}
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={onCancel} style={{ flex:1, background:"#fff", color:C.muted, border:`1px solid ${C.border}`, borderRadius:9, padding:"9px", fontWeight:700, cursor:"pointer", fontSize:12 }}>إلغاء</button>
+            <button onClick={onSubmit} disabled={!passForm.newPass||passForm.newPass!==passForm.confirmPass}
+              style={{ flex:2, background:passForm.newPass&&passForm.newPass===passForm.confirmPass?`linear-gradient(135deg,${C.admin},#553C9A)`:"#ccc", color:"#fff", border:"none", borderRadius:9, padding:"9px", fontWeight:800, cursor:passForm.newPass&&passForm.newPass===passForm.confirmPass?"pointer":"not-allowed", fontSize:13 }}>
+              💾 حفظ كلمة المرور الجديدة
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADMIN SETTINGS — accounts & payment
 // ═══════════════════════════════════════════════════════════════════════════════
-function AdminSettings() {
+function AdminSettings({ currentUser }:{ currentUser:{name:string;role:string;phone?:string} }) {
   const [tab, setTab] = useState<"accounts"|"payments">("payments");
 
   // ─── Payment Accounts ───────────────────────────────────────────────────────
@@ -758,6 +802,29 @@ function AdminSettings() {
   const [accErr, setAccErr] = useState("");
   const [accSaved, setAccSaved] = useState(false);
   const [showPass, setShowPass] = useState(false);
+
+  // ─── Password Change ─────────────────────────────────────────────────────────
+  const [changingPassId, setChangingPassId] = useState<string|null>(null); // account id or "superadmin"
+  const [passForm, setPassForm] = useState({ newPass:"", confirmPass:"" });
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [passErr, setPassErr] = useState("");
+  const [passSaved, setPassSaved] = useState(false);
+
+  const openPassChange = (id:string) => { setChangingPassId(id); setPassForm({ newPass:"", confirmPass:"" }); setPassErr(""); };
+  const closePassChange = () => { setChangingPassId(null); setPassForm({ newPass:"", confirmPass:"" }); setPassErr(""); };
+  const submitPassChange = () => {
+    setPassErr("");
+    if (!passForm.newPass.trim()) { setPassErr("أدخل كلمة المرور الجديدة"); return; }
+    if (passForm.newPass.length < 4) { setPassErr("كلمة المرور يجب أن تكون 4 أحرف على الأقل"); return; }
+    if (passForm.newPass !== passForm.confirmPass) { setPassErr("كلمتا المرور غير متطابقتين"); return; }
+    if (changingPassId === "superadmin") {
+      wrLS("admin_super_password", passForm.newPass.trim());
+    } else {
+      const updated = accounts.map(a=>a.id===changingPassId ? {...a, password:passForm.newPass.trim()} : a);
+      wrLS("admin_accounts", updated); setAccounts(updated);
+    }
+    setPassSaved(true); setTimeout(()=>{ setPassSaved(false); closePassChange(); }, 1500);
+  };
 
   const saveAccounts = (accs:any[]) => { wrLS("admin_accounts", accs); setAccounts(accs); };
   const addAccount = () => {
@@ -853,27 +920,49 @@ function AdminSettings() {
         {/* Existing accounts */}
         <div style={{ marginBottom:20 }}>
           {/* Super Admin card */}
-          <div style={{ background:`linear-gradient(135deg,${C.admin}12,${C.admin}06)`, border:`2px solid ${C.admin}30`, borderRadius:14, padding:"14px 16px", marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-            <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-              <div style={{ width:38, height:38, borderRadius:12, background:C.admin, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, color:"#fff" }}>🛡️</div>
-              <div><div style={{ fontWeight:800, fontSize:14 }}>مدير المنصة (الرئيسي)</div><div style={{ fontSize:11, color:C.muted }}>معرّف: admin · كلمة مرور: admin</div></div>
-            </div>
-            <span style={{ background:`${C.admin}15`, color:C.admin, borderRadius:8, padding:"4px 10px", fontSize:11, fontWeight:700 }}>مدير كامل الصلاحيات</span>
+          <div style={{ background:`linear-gradient(135deg,${C.admin}12,${C.admin}06)`, border:`2px solid ${C.admin}30`, borderRadius:14, padding:"14px 16px", marginBottom:10 }}>
+            {changingPassId==="superadmin" ? (
+              <PassChangeForm passForm={passForm} setPassForm={setPassForm} showNewPass={showNewPass} setShowNewPass={setShowNewPass} passErr={passErr} passSaved={passSaved} onSubmit={submitPassChange} onCancel={closePassChange} />
+            ) : (
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                  <div style={{ width:38, height:38, borderRadius:12, background:C.admin, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, color:"#fff" }}>🛡️</div>
+                  <div>
+                    <div style={{ fontWeight:800, fontSize:14 }}>مدير المنصة (الرئيسي)</div>
+                    <div style={{ fontSize:11, color:C.muted }}>معرّف: admin · كلمة مرور محفوظة بأمان</div>
+                    <div style={{ fontSize:10, color:C.muted, marginTop:1 }}>💡 الكلمة الافتراضية (admin) تعمل دائماً كاحتياط</div>
+                  </div>
+                </div>
+                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <span style={{ background:`${C.admin}15`, color:C.admin, borderRadius:8, padding:"4px 10px", fontSize:11, fontWeight:700 }}>مدير كامل الصلاحيات</span>
+                  <button onClick={()=>openPassChange("superadmin")} style={{ background:"#fff", color:C.admin, border:`1.5px solid ${C.admin}50`, borderRadius:8, padding:"6px 12px", cursor:"pointer", fontSize:12, fontWeight:700 }}>🔑 تغيير كلمة المرور</button>
+                </div>
+              </div>
+            )}
           </div>
           {accounts.length===0 && <div style={{ textAlign:"center", color:C.muted, fontSize:13, padding:"20px 0" }}>لا توجد حسابات مضافة بعد</div>}
           {accounts.map(acc=>(
-            <div key={acc.id} style={{ background:"#fff", border:`1px solid ${C.border}`, borderRadius:14, padding:"12px 16px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-                <div style={{ width:38, height:38, borderRadius:12, background:acc.role==="supervisor"?"#FFF3E0":"#F3F0FF", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>{acc.role==="supervisor"?"👤":"⚙️"}</div>
+            <div key={acc.id} style={{ background:"#fff", border:`1px solid ${changingPassId===acc.id?C.admin:C.border}`, borderRadius:14, padding:"12px 16px", marginBottom:8 }}>
+              {changingPassId===acc.id ? (
                 <div>
-                  <div style={{ fontWeight:700, fontSize:13 }}>{acc.name}</div>
-                  <div style={{ fontSize:11, color:C.muted }}>📱 {acc.phone}</div>
+                  <div style={{ fontWeight:700, fontSize:13, marginBottom:10, color:C.text }}>🔑 تغيير كلمة مرور: <span style={{ color:C.admin }}>{acc.name}</span></div>
+                  <PassChangeForm passForm={passForm} setPassForm={setPassForm} showNewPass={showNewPass} setShowNewPass={setShowNewPass} passErr={passErr} passSaved={passSaved} onSubmit={submitPassChange} onCancel={closePassChange} />
                 </div>
-              </div>
-              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                <span style={{ background:acc.role==="supervisor"?"#FFF3E0":"#F3F0FF", color:acc.role==="supervisor"?C.orange:C.admin, borderRadius:8, padding:"4px 10px", fontSize:11, fontWeight:700 }}>{acc.role==="supervisor"?"مشرف":"مدير"}</span>
-                <button onClick={()=>deleteAccount(acc.id)} style={{ background:"#FFF5F5", color:C.red, border:"none", borderRadius:8, padding:"6px 10px", cursor:"pointer", fontSize:12 }}>🗑️ حذف</button>
-              </div>
+              ) : (
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                    <div style={{ width:38, height:38, borderRadius:12, background:acc.role==="supervisor"?"#FFF3E0":"#F3F0FF", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>{acc.role==="supervisor"?"👤":"⚙️"}</div>
+                    <div>
+                      <div style={{ fontWeight:700, fontSize:13 }}>{acc.name}</div>
+                      <div style={{ fontSize:11, color:C.muted }}>📱 {acc.phone} · {acc.role==="supervisor"?"مشرف":"مدير"}</div>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                    <button onClick={()=>openPassChange(acc.id)} style={{ background:`${C.admin}10`, color:C.admin, border:`1px solid ${C.admin}40`, borderRadius:8, padding:"6px 10px", cursor:"pointer", fontSize:12, fontWeight:700 }}>🔑 كلمة المرور</button>
+                    <button onClick={()=>deleteAccount(acc.id)} style={{ background:"#FFF5F5", color:C.red, border:"none", borderRadius:8, padding:"6px 10px", cursor:"pointer", fontSize:12 }}>🗑️ حذف</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
