@@ -17,6 +17,7 @@ const PHARMACY_TABS = [
   { name: "medicines", title: "أدويتي", icon: "medkit", iconOff: "medkit-outline" },
   { name: "offers", title: "العروض", icon: "pricetag", iconOff: "pricetag-outline" },
   { name: "rawakid", title: "الرواكد", icon: "alert-circle", iconOff: "alert-circle-outline", badge: URGENT_COUNT },
+  { name: "warehouses", title: "المذاخر", icon: "business", iconOff: "business-outline" },
   { name: "orders", title: "الطلبات", icon: "cube", iconOff: "cube-outline" },
   { name: "settings", title: "إعداداتي", icon: "settings", iconOff: "settings-outline" },
 ];
@@ -92,6 +93,7 @@ export default function PharmacyTabLayout() {
             <Tabs.Screen name="medicines" />
             <Tabs.Screen name="offers" />
             <Tabs.Screen name="rawakid" />
+            <Tabs.Screen name="warehouses" />
             <Tabs.Screen name="orders" />
             <Tabs.Screen name="settings" />
             <Tabs.Screen name="integration" options={{ href: null }} />
@@ -166,6 +168,15 @@ export default function PharmacyTabLayout() {
                 </View>
               )}
             </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="warehouses"
+        options={{
+          title: "المذاخر",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "business" : "business-outline"} size={24} color={color} />
           ),
         }}
       />
