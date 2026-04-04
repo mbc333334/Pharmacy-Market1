@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet, Platform,
   Modal, TextInput, ActivityIndicator, ScrollView,
@@ -12,8 +12,11 @@ import { useTranslation } from "@/i18n";
 import { LANGUAGES } from "@/data/locales";
 import { useAuth } from "@/contexts/AuthContext";
 
-const SUPPORTED_CODES = new Set(["ar", "ku", "en", "fa", "tr", "fr", "de", "es", "ru", "zh", "ko", "ja", "ur"]);
+const SUPPORTED_CODES = ["ar", "ku", "en", "fa", "tr", "fr", "de", "es", "ru", "zh", "ko", "ja", "ur"];
 const SECRET_TAPS = 7;
+
+const SUPPORTED_LANGS = (LANGUAGES || []).filter(l => l && SUPPORTED_CODES.indexOf(l.code) >= 0);
+const OTHER_LANGS     = (LANGUAGES || []).filter(l => l && SUPPORTED_CODES.indexOf(l.code) < 0);
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -56,20 +59,15 @@ export default function WelcomeScreen() {
   };
 
   // Language data
-  const currentLang = LANGUAGES.find(l => l.code === rawCode) ?? LANGUAGES[0];
-  const supported = useMemo(() => LANGUAGES.filter(l => SUPPORTED_CODES.has(l.code)), []);
-  const others    = useMemo(() => LANGUAGES.filter(l => !SUPPORTED_CODES.has(l.code)), []);
+  const allLangs = LANGUAGES || [];
+  const currentLang = allLangs.find(l => l.code === rawCode) ?? allLangs[0] ?? { code: "ar", nativeName: "العربية", flag: "🇮🇶", name: "Arabic", rtl: true };
 
-  const filterLangs = (list: typeof LANGUAGES) =>
-    langSearch.trim()
-      ? list.filter(l =>
-          l.nativeName.toLowerCase().includes(langSearch.toLowerCase()) ||
-          l.name.toLowerCase().includes(langSearch.toLowerCase())
-        )
-      : list;
+  const q = langSearch.trim().toLowerCase();
+  const matchesSearch = (l: typeof allLangs[0]) =>
+    !q || (l.nativeName || "").toLowerCase().indexOf(q) >= 0 || (l.name || "").toLowerCase().indexOf(q) >= 0;
 
-  const filteredSupported = filterLangs(supported);
-  const filteredOthers    = filterLangs(others);
+  const filteredSupported = SUPPORTED_LANGS.filter(matchesSearch);
+  const filteredOthers    = OTHER_LANGS.filter(matchesSearch);
 
   const openLang = () => { setLangSearch(""); setShowLangModal(true); };
 
