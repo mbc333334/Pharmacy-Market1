@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet, Platform,
   Modal, TextInput, ActivityIndicator, ScrollView,
@@ -12,60 +12,18 @@ import { useTranslation } from "@/i18n";
 import { LANGUAGES } from "@/data/locales";
 import { useAuth } from "@/contexts/AuthContext";
 
-const ADMIN_PHONE = "+9647700000001";
+const SUPPORTED_CODES = new Set(["ar", "ku", "en", "fa", "tr", "fr", "de", "es", "ru", "zh", "ko", "ja", "ur"]);
 const SECRET_TAPS = 7;
-
-// ── Inline flag renderers ────────────────────────────────────────────────
-function IraqFlag({ size = 22 }: { size?: number }) {
-  const w = Math.round(size * 1.5);
-  const s = Math.round(size / 3);
-  return (
-    <View style={{ width: w, height: size, borderRadius: 3, overflow: "hidden" }}>
-      <View style={{ height: s, backgroundColor: "#CE1126" }} />
-      <View style={{ height: s, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ fontSize: s * 0.85, lineHeight: s }}>🌿</Text>
-      </View>
-      <View style={{ height: s, backgroundColor: "#000000" }} />
-    </View>
-  );
-}
-
-function KurdistanFlag({ size = 22 }: { size?: number }) {
-  const w = Math.round(size * 1.5);
-  const s = Math.round(size / 3);
-  const sun = Math.round(size * 0.55);
-  return (
-    <View style={{ width: w, height: size, borderRadius: 3, overflow: "hidden" }}>
-      <View style={{ height: s, backgroundColor: "#EF2B2D" }} />
-      <View style={{ height: s, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }}>
-        <View style={{
-          width: sun, height: sun, borderRadius: sun / 2,
-          backgroundColor: "#F7C847",
-          position: "absolute",
-        }} />
-      </View>
-      <View style={{ height: s, backgroundColor: "#007A3D" }} />
-    </View>
-  );
-}
-
-function UKFlag({ size = 22 }: { size?: number }) {
-  return <Text style={{ fontSize: size * 0.9, lineHeight: size + 2 }}>🇬🇧</Text>;
-}
-
-const MAIN_LANGS = [
-  { code: "ar", label: "العربية", Flag: IraqFlag },
-  { code: "ku", label: "کوردی",   Flag: KurdistanFlag },
-  { code: "en", label: "English",  Flag: UKFlag },
-] as const;
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { language, setLanguage } = useSettings();
-  const { t } = useTranslation();
+  const { t, rawCode } = useTranslation();
   const { loginDemo } = useAuth();
+
   const [showLangModal, setShowLangModal] = useState(false);
+  const [langSearch, setLangSearch] = useState("");
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [adminLoading, setAdminLoading] = useState(false);
@@ -97,33 +55,36 @@ export default function WelcomeScreen() {
     setShowAdminModal(false);
   };
 
+  // Language data
+  const currentLang = LANGUAGES.find(l => l.code === rawCode) ?? LANGUAGES[0];
+  const supported = useMemo(() => LANGUAGES.filter(l => SUPPORTED_CODES.has(l.code)), []);
+  const others    = useMemo(() => LANGUAGES.filter(l => !SUPPORTED_CODES.has(l.code)), []);
+
+  const filterLangs = (list: typeof LANGUAGES) =>
+    langSearch.trim()
+      ? list.filter(l =>
+          l.nativeName.toLowerCase().includes(langSearch.toLowerCase()) ||
+          l.name.toLowerCase().includes(langSearch.toLowerCase())
+        )
+      : list;
+
+  const filteredSupported = filterLangs(supported);
+  const filteredOthers    = filterLangs(others);
+
+  const openLang = () => { setLangSearch(""); setShowLangModal(true); };
+
   return (
     <View style={styles.root}>
-      {/* ══ FIXED LANGUAGE BAR ══ */}
-      <View style={[styles.langBar, { paddingTop: topPad + 10 }]}>
-        {MAIN_LANGS.map(({ code, label, Flag }) => {
-          const active = language.code === code;
-          const lang = LANGUAGES.find(l => l.code === code)!;
-          return (
-            <TouchableOpacity
-              key={code}
-              style={[styles.langPill, active && styles.langPillActive]}
-              onPress={() => setLanguage(lang)}
-              activeOpacity={0.75}
-            >
-              <Flag size={18} />
-              <Text style={[styles.langPillText, active && styles.langPillTextActive]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-        <TouchableOpacity style={styles.langMoreBtn} onPress={() => setShowLangModal(true)}>
-          <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.8)" />
+      {/* ── TOP LANGUAGE BUTTON ── */}
+      <View style={[styles.topBar, { paddingTop: topPad + 10 }]}>
+        <TouchableOpacity style={styles.langBtn} onPress={openLang} activeOpacity={0.8}>
+          <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.75)" />
+          <Text style={styles.langBtnText}>{currentLang.nativeName}</Text>
+          <Text style={styles.langBtnFlag}>{currentLang.flag}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* ══ HERO (scrollable) ══ */}
+      {/* ── HERO (scrollable) ── */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[styles.scroll, { paddingTop: topPad + 64 }]}
@@ -147,22 +108,22 @@ export default function WelcomeScreen() {
           </View>
         </View>
 
-        {/* ══ BOTTOM CARD ══ */}
+        {/* ── BOTTOM CARD ── */}
         <View style={[styles.card, { paddingBottom: botPad }]}>
           {/* Features */}
           <View style={styles.features}>
-            <FeatureRow icon="location-outline"       text={t("fastDelivery")} />
+            <FeatureRow icon="location-outline"         text={t("fastDelivery")} />
             <FeatureRow icon="shield-checkmark-outline" text={t("authenticMeds")} />
-            <FeatureRow icon="document-text-outline"  text={t("prescriptionSupport")} />
+            <FeatureRow icon="document-text-outline"   text={t("prescriptionSupport")} />
           </View>
 
-          {/* Main CTA — Login */}
+          {/* Login */}
           <TouchableOpacity style={styles.loginBtn} onPress={() => router.push("/(auth)/login")}>
             <Text style={styles.loginBtnText}>{t("login")}</Text>
             <Ionicons name="arrow-back" size={20} color="#fff" />
           </TouchableOpacity>
 
-          {/* Register Customer */}
+          {/* Register */}
           <TouchableOpacity style={styles.registerBtn} onPress={() => router.push("/(auth)/register")}>
             <Text style={styles.registerBtnText}>{t("register")}</Text>
           </TouchableOpacity>
@@ -203,37 +164,100 @@ export default function WelcomeScreen() {
         </View>
       </ScrollView>
 
-      {/* ══ MORE LANGUAGES MODAL ══ */}
-      <Modal visible={showLangModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t("chooseLanguage")}</Text>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 360 }}>
-              {LANGUAGES.map(lang => (
-                <TouchableOpacity
-                  key={lang.code}
-                  style={[styles.langOption, language.code === lang.code && styles.langOptionActive]}
-                  onPress={() => { setLanguage(lang); setShowLangModal(false); }}
-                >
-                  {language.code === lang.code && (
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
-                  )}
-                  <View style={styles.langOptionInfo}>
-                    <Text style={styles.langOptionName}>{lang.nativeName}</Text>
-                    <Text style={styles.langOptionSub}>{lang.name}</Text>
-                  </View>
-                  <Text style={{ fontSize: 26 }}>{lang.flag}</Text>
+      {/* ── LANGUAGE MODAL ── */}
+      <Modal visible={showLangModal} transparent animationType="slide" onRequestClose={() => setShowLangModal(false)}>
+        <View style={styles.langOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowLangModal(false)} />
+          <View style={styles.langSheet}>
+            {/* Handle */}
+            <View style={styles.sheetHandle} />
+
+            {/* Header */}
+            <View style={styles.sheetHeader}>
+              <TouchableOpacity onPress={() => setShowLangModal(false)} style={styles.sheetClose}>
+                <Ionicons name="close" size={20} color={Colors.textMuted} />
+              </TouchableOpacity>
+              <View style={styles.sheetTitleWrap}>
+                <Ionicons name="globe-outline" size={20} color={Colors.primary} />
+                <Text style={styles.sheetTitle}>{t("chooseLanguage")}</Text>
+              </View>
+            </View>
+
+            {/* Search */}
+            <View style={styles.searchWrap}>
+              <Ionicons name="search" size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={t("search")}
+                placeholderTextColor={Colors.textMuted}
+                value={langSearch}
+                onChangeText={setLangSearch}
+                autoCorrect={false}
+              />
+              {langSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setLangSearch("")}>
+                  <Ionicons name="close-circle" size={17} color={Colors.textMuted} />
                 </TouchableOpacity>
-              ))}
+              )}
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+              {/* Supported languages */}
+              {filteredSupported.length > 0 && (
+                <>
+                  {!langSearch && (
+                    <View style={styles.sectionLabel}>
+                      <View style={styles.sectionDot} />
+                      <Text style={styles.sectionLabelText}>مترجمة بالكامل</Text>
+                    </View>
+                  )}
+                  {filteredSupported.map(lang => (
+                    <LangRow
+                      key={lang.code}
+                      lang={lang}
+                      active={rawCode === lang.code}
+                      supported
+                      onPress={() => { setLanguage(lang); setShowLangModal(false); }}
+                    />
+                  ))}
+                </>
+              )}
+
+              {/* Other languages */}
+              {filteredOthers.length > 0 && (
+                <>
+                  {!langSearch && (
+                    <View style={[styles.sectionLabel, { marginTop: 8 }]}>
+                      <View style={[styles.sectionDot, { backgroundColor: Colors.textMuted }]} />
+                      <Text style={styles.sectionLabelText}>لغات أخرى</Text>
+                    </View>
+                  )}
+                  {filteredOthers.map(lang => (
+                    <LangRow
+                      key={lang.code}
+                      lang={lang}
+                      active={rawCode === lang.code}
+                      supported={false}
+                      onPress={() => { setLanguage(lang); setShowLangModal(false); }}
+                    />
+                  ))}
+                </>
+              )}
+
+              {filteredSupported.length === 0 && filteredOthers.length === 0 && (
+                <View style={styles.noResults}>
+                  <Ionicons name="search-outline" size={32} color={Colors.textMuted} />
+                  <Text style={styles.noResultsText}>{t("noResults")}</Text>
+                </View>
+              )}
+
+              <View style={{ height: 24 }} />
             </ScrollView>
-            <TouchableOpacity style={styles.modalClose} onPress={() => setShowLangModal(false)}>
-              <Text style={styles.modalCloseText}>{t("cancel")}</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* ══ HIDDEN ADMIN MODAL ══ */}
+      {/* ── HIDDEN ADMIN MODAL ── */}
       <Modal visible={showAdminModal} transparent animationType="fade" onRequestClose={() => setShowAdminModal(false)}>
         <View style={styles.adminOverlay}>
           <View style={styles.adminBox}>
@@ -278,6 +302,32 @@ export default function WelcomeScreen() {
   );
 }
 
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function LangRow({ lang, active, supported, onPress }: {
+  lang: typeof LANGUAGES[0]; active: boolean; supported: boolean; onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.langRow, active && styles.langRowActive]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      {active
+        ? <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
+        : <View style={styles.langRowCircle} />
+      }
+      <View style={styles.langRowInfo}>
+        <Text style={[styles.langRowNative, active && { color: Colors.primary }]}>
+          {lang.nativeName}
+        </Text>
+        <Text style={styles.langRowEn}>{lang.name}</Text>
+      </View>
+      <Text style={styles.langRowFlag}>{lang.flag}</Text>
+    </TouchableOpacity>
+  );
+}
+
 function StatItem({ number, label }: { number: string; label: string }) {
   return (
     <View style={styles.statItem}>
@@ -309,33 +359,25 @@ function LinkCard({ icon, color, label, onPress }: { icon: any; color: string; l
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.primary },
 
-  /* Language bar */
-  langBar: {
+  /* Top bar with language button */
+  topBar: {
     position: "absolute", top: 0, left: 0, right: 0, zIndex: 10,
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, paddingHorizontal: 20, paddingBottom: 10,
+    flexDirection: "row", justifyContent: "flex-end",
+    paddingHorizontal: 20, paddingBottom: 10,
   },
-  langPill: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 22,
-    paddingHorizontal: 11, paddingVertical: 6,
-    borderWidth: 1.5, borderColor: "transparent",
-  },
-  langPillActive: {
-    backgroundColor: "#fff", borderColor: "#fff",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15, shadowRadius: 6, elevation: 4,
-  },
-  langPillText: { fontSize: 12, fontWeight: "600", color: "rgba(255,255,255,0.9)" },
-  langPillTextActive: { color: Colors.primary, fontWeight: "800" },
-  langMoreBtn: {
-    width: 32, height: 32, borderRadius: 16,
+  langBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
     backgroundColor: "rgba(255,255,255,0.18)",
-    alignItems: "center", justifyContent: "center",
+    borderRadius: 22, paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.25)",
   },
+  langBtnFlag: { fontSize: 18 },
+  langBtnText: { fontSize: 13, fontWeight: "600", color: "#fff", maxWidth: 80 },
 
   /* Scroll + hero */
   scroll: { flexGrow: 1 },
@@ -404,26 +446,64 @@ const styles = StyleSheet.create({
   linkCardIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   linkCardText: { fontSize: 11, fontWeight: "700", textAlign: "center" },
 
-  /* Modal */
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalContent: {
-    backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, gap: 8,
+  /* Language sheet */
+  langOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  langSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    maxHeight: "85%",
+    paddingBottom: 0,
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: Colors.textPrimary, textAlign: "center", marginBottom: 8 },
-  langOption: {
-    flexDirection: "row", alignItems: "center", gap: 12, padding: 12,
-    borderRadius: 12, backgroundColor: Colors.surfaceAlt, marginBottom: 6,
+  sheetHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: "#E0E0E0", alignSelf: "center", marginTop: 10, marginBottom: 4,
   },
-  langOptionActive: { backgroundColor: Colors.primaryLight, borderWidth: 1.5, borderColor: Colors.primary },
-  langOptionInfo: { flex: 1 },
-  langOptionName: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
-  langOptionSub: { fontSize: 11, color: Colors.textMuted, textAlign: "right" },
-  modalClose: {
-    backgroundColor: Colors.surfaceAlt, borderRadius: 12, paddingVertical: 13,
-    alignItems: "center", marginTop: 6,
+  sheetHeader: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: "#F0F0F0",
   },
-  modalCloseText: { fontSize: 15, fontWeight: "700", color: Colors.textMuted },
+  sheetClose: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: "#F5F5F5",
+    alignItems: "center", justifyContent: "center",
+  },
+  sheetTitleWrap: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  sheetTitle: { fontSize: 17, fontWeight: "800", color: Colors.textPrimary },
+
+  searchWrap: {
+    flexDirection: "row", alignItems: "center",
+    marginHorizontal: 16, marginVertical: 12,
+    backgroundColor: "#F5F5F7", borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: Platform.OS === "ios" ? 12 : 8,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary },
+
+  sectionLabel: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 20, paddingVertical: 6,
+  },
+  sectionDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.primary },
+  sectionLabelText: { fontSize: 11, fontWeight: "700", color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 },
+
+  langRow: {
+    flexDirection: "row", alignItems: "center", gap: 14,
+    marginHorizontal: 12, marginVertical: 3,
+    paddingHorizontal: 14, paddingVertical: 13,
+    borderRadius: 14,
+  },
+  langRowActive: { backgroundColor: Colors.primaryLight },
+  langRowCircle: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 2, borderColor: "#DDD",
+  },
+  langRowInfo: { flex: 1 },
+  langRowNative: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
+  langRowEn: { fontSize: 11, color: Colors.textMuted, textAlign: "right" },
+  langRowFlag: { fontSize: 26 },
+
+  noResults: { alignItems: "center", paddingVertical: 40, gap: 10 },
+  noResultsText: { fontSize: 14, color: Colors.textMuted },
 
   /* Admin */
   adminOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", alignItems: "center", justifyContent: "center", padding: 24 },
