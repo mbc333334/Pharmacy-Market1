@@ -11,6 +11,8 @@ pnpm workspace monorepo using TypeScript. داواپلاس is a pharmacy & medic
 - **User Types**: Customer, Pharmacy, Warehouse, Admin (مدير التطبيق)
 - **Pharmacy Database Integration**: CSV/Excel import, REST API, MySQL/PostgreSQL — full import screen for pharmacies at `(pharmacy)/import.tsx` with barcode scan, database connect, and auto-sync log
 - **Delivery Company Rating**: Both pharmacies and warehouses can rate delivery companies (1-5 stars + comment), ratings shown on cards and in detail modal with review history
+- **Shared Delivery Screen**: `components/SharedDeliveryScreen.tsx` — single component used by both `(pharmacy)/delivery.tsx` and `(warehouse)/delivery.tsx`; parameterized by accentColor, reviewerType, banner text, WhatsApp message, and default values for new company
+- **Shared DashboardStatCard**: `components/DashboardStatCard.tsx` — used in pharmacy/index and warehouse/index; badge support, accent color border
 - **Inventory Auto-Sync (InventoryContext)**: `contexts/InventoryContext.tsx` — when a customer order is completed → pharmacy stock decrements automatically; when warehouse ships to pharmacy → pharmacy stock increments; full sync event log with settings
 - **Warehouse Accounts**: Linked only to participating pharmacies, full dashboard with inventory/orders/pharmacies management
 - **Default Region**: Iraq (العراق, +964)
