@@ -53,7 +53,7 @@ export default function CartScreen() {
   const { user } = useAuth();
   const { items, totalPrice, updateQuantity, removeItem, clearCart } = useCart();
   const { placeCustomerOrder } = useOrders();
-  const { enabledMethods, isEnabled } = usePaymentMethods();
+  const { enabledMethods, isEnabled, getMethod } = usePaymentMethods();
   const [promoCode, setPromoCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [promoApplied, setPromoApplied] = useState(false);
