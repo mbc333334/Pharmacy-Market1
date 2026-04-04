@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
   Platform, ScrollView,
@@ -27,26 +27,33 @@ export default function WarehouseRegisterScreen() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [otpStep, setOtpStep] = useState<"none"|"otp">("none");
+  const [otpCode, setOtpCode] = useState(""); const [otpInput, setOtpInput] = useState(""); const [otpErr, setOtpErr] = useState("");
+  const [otpTimer, setOtpTimer] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(()=>{ if(otpTimer<=0){ if(timerRef.current) clearInterval(timerRef.current); return; } timerRef.current=setInterval(()=>setOtpTimer(v=>v-1),1000); return()=>{ if(timerRef.current) clearInterval(timerRef.current); }; },[otpTimer]);
+  function genOTP(){ return String(Math.floor(100000+Math.random()*900000)); }
 
-  const handleRegister = async () => {
+  const startOtp = () => {
     if (!ownerName || !phone || !warehouseName || !licenseNumber || !city || !address || !password || !confirmPass) {
-      setError(t("enterAllFields"));
-      return;
+      setError(t("enterAllFields")); return;
     }
-    if (password !== confirmPass) {
-      setError(t("passwordMismatch"));
-      return;
-    }
+    if (password !== confirmPass) { setError(t("passwordMismatch")); return; }
     setError("");
+    const code = genOTP(); setOtpCode(code); setOtpInput(""); setOtpErr(""); setOtpStep("otp"); setOtpTimer(60);
+  };
+  const verifyAndRegister = async () => {
+    if (otpInput !== otpCode) { setOtpErr("رمز التحقق غير صحيح، حاول مجدداً"); return; }
     setLoading(true);
     try {
       await registerWarehouse({ ownerName, phone, warehouseName, licenseNumber, city, address, password });
     } catch {
-      setError("حدث خطأ، يرجى المحاولة مرة أخرى");
+      setOtpErr("حدث خطأ، يرجى المحاولة مرة أخرى");
     } finally {
       setLoading(false);
     }
   };
+  const resendOtp = () => { const code=genOTP(); setOtpCode(code); setOtpInput(""); setOtpErr(""); setOtpTimer(60); };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -141,16 +148,42 @@ export default function WarehouseRegisterScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleRegister} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Text style={styles.submitBtnText}>{t("registerWarehouse")}</Text>
-              <Ionicons name="arrow-back" size={20} color="#fff" />
-            </>
-          )}
-        </TouchableOpacity>
+        {otpStep === "otp" ? (
+          <View style={{ marginTop:12 }}>
+            <View style={{ backgroundColor:"#FFFBEB", borderWidth:1.5, borderColor:"#F6AD55", borderRadius:14, padding:14, alignItems:"center", marginBottom:12 }}>
+              <Text style={{ fontSize:11, fontWeight:"700", color:"#744210", marginBottom:4 }}>📱 رمز التحقق التجريبي</Text>
+              <Text style={{ fontSize:28, fontWeight:"900", letterSpacing:8, color:"#744210" }}>{otpCode}</Text>
+              <Text style={{ fontSize:10, color:"#92400E", marginTop:4 }}>سيُرسَل عبر SMS في التطبيق الفعلي</Text>
+            </View>
+            <View style={styles.inputWrap}>
+              <TextInput style={[styles.input, { textAlign:"center", fontSize:22, letterSpacing:10, fontWeight:"800", borderColor: otpErr?"#E53E3E":"#0D7A54" }]}
+                placeholder="• • • • • •" value={otpInput} maxLength={6} keyboardType="numeric"
+                onChangeText={t=>{ setOtpErr(""); setOtpInput(t.replace(/\D/g,"").slice(0,6)); }}
+                placeholderTextColor="#aaa" />
+            </View>
+            {otpErr ? <Text style={{ color:"#E53E3E", textAlign:"right", marginTop:4, fontSize:12 }}>⚠️ {otpErr}</Text> : null}
+            <View style={{ alignItems:"flex-end", marginVertical:8 }}>
+              {otpTimer>0 ? <Text style={{ fontSize:12, color:"#888" }}>⏱ إعادة الإرسال بعد {otpTimer}ث</Text>
+                : <TouchableOpacity onPress={resendOtp}><Text style={{ fontSize:13, fontWeight:"700", color:"#0D7A54", textDecorationLine:"underline" }}>إعادة إرسال الرمز</Text></TouchableOpacity>}
+            </View>
+            <TouchableOpacity style={[styles.submitBtn, { opacity: otpInput.length<6||loading ? 0.5 : 1 }]}
+              onPress={verifyAndRegister} disabled={otpInput.length<6||loading}>
+              {loading ? <ActivityIndicator color="#fff" /> : <>
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <Text style={styles.submitBtnText}>تحقق وتسجيل المذخر</Text>
+              </>}
+            </TouchableOpacity>
+            <TouchableOpacity style={{ flexDirection:"row", justifyContent:"center", gap:6, marginTop:10 }} onPress={()=>setOtpStep("none")}>
+              <Ionicons name="chevron-forward" size={16} color="#888" />
+              <Text style={{ fontSize:13, color:"#888" }}>العودة للنموذج</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.submitBtn} onPress={startOtp} disabled={loading}>
+            <Text style={styles.submitBtnText}>📲 إرسال رمز التحقق (OTP)</Text>
+            <Ionicons name="arrow-back" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </View>
   );

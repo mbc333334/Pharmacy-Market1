@@ -192,23 +192,57 @@ function WhDash({ wh, products, orders, pharmacies }:any) {
   );
 }
 
+function genOTP(){ return String(Math.floor(100000+Math.random()*900000)); }
 function PassCard({ storageKey, color }:{ storageKey:string; color:string }) {
   const [pf,setPf]=useState({ newPass:"", confirmPass:"" });
   const [showNew,setShowNew]=useState(false);
-  const [pErr,setPErr]=useState(""); const [pSaved,setPSaved]=useState(false);
-  const submit=()=>{
+  const [pErr,setPErr]=useState("");
+  const [pStep,setPStep]=useState<"form"|"otp"|"done">("form");
+  const [otpCode,setOtpCode]=useState(""); const [otpInput,setOtpInput]=useState(""); const [otpErr,setOtpErr]=useState("");
+  const [timer,setTimer]=useState(0);
+  React.useEffect(()=>{ if(timer<=0)return; const t=setTimeout(()=>setTimer(v=>v-1),1000); return ()=>clearTimeout(t); },[timer]);
+  const sendOtp=()=>{
     setPErr("");
     if (!pf.newPass.trim()) { setPErr("أدخل كلمة المرور الجديدة"); return; }
     if (pf.newPass.length<4) { setPErr("يجب أن تكون 4 أحرف على الأقل"); return; }
     if (pf.newPass!==pf.confirmPass) { setPErr("كلمتا المرور غير متطابقتين"); return; }
-    localStorage.setItem(storageKey, pf.newPass.trim());
-    setPSaved(true); setTimeout(()=>{ setPSaved(false); setPf({ newPass:"", confirmPass:"" }); },2000);
+    const code=genOTP(); setOtpCode(code); setOtpInput(""); setOtpErr(""); setPStep("otp"); setTimer(60);
   };
+  const verifyOtp=()=>{
+    if (otpInput!==otpCode) { setOtpErr("رمز التحقق غير صحيح، حاول مجدداً"); return; }
+    localStorage.setItem(storageKey, pf.newPass.trim());
+    setPStep("done"); setTimeout(()=>{ setPStep("form"); setPf({ newPass:"", confirmPass:"" }); setOtpInput(""); },2500);
+  };
+  const resendOtp=()=>{ const code=genOTP(); setOtpCode(code); setOtpInput(""); setOtpErr(""); setTimer(60); };
   return (
     <Card style={{ maxWidth:560, marginTop:14, border:`1.5px solid ${color}30` }}>
       <SH icon="🔑" title="تغيير كلمة المرور" />
-      {pSaved ? (
+      {pStep==="done" ? (
         <div style={{ textAlign:"center", color:C.green, fontWeight:800, padding:"10px 0", fontSize:14 }}>✅ تم تغيير كلمة المرور بنجاح!</div>
+      ) : pStep==="otp" ? (
+        <div>
+          <div style={{ background:"#FFFBEB", border:"1px solid #F6AD55", borderRadius:10, padding:"12px 14px", marginBottom:14, textAlign:"center" }}>
+            <div style={{ fontSize:11, color:"#744210", marginBottom:6 }}>📱 رمز التحقق التجريبي — سيُرسَل عبر SMS في التطبيق الفعلي</div>
+            <div style={{ fontSize:26, fontWeight:900, letterSpacing:8, color:"#744210" }}>{otpCode}</div>
+          </div>
+          <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:6, textAlign:"right" }}>أدخل رمز التحقق المكوّن من 6 أرقام</label>
+          <input type="text" maxLength={6} value={otpInput}
+            onChange={e=>{ setOtpErr(""); setOtpInput(e.target.value.replace(/\D/g,"").slice(0,6)); }}
+            onKeyDown={(e:any)=>e.key==="Enter"&&otpInput.length===6&&verifyOtp()}
+            placeholder="• • • • • •"
+            style={{ width:"100%", border:`2px solid ${otpErr?C.red:color}`, borderRadius:10, padding:"12px", fontSize:22, textAlign:"center", letterSpacing:8, boxSizing:"border-box", fontWeight:800 }} />
+          {otpErr&&<div style={{ fontSize:11, color:C.red, marginTop:4, marginBottom:4, textAlign:"right" }}>⚠️ {otpErr}</div>}
+          <div style={{ fontSize:11, color:C.muted, textAlign:"right", margin:"8px 0 12px" }}>
+            {timer>0 ? `⏱ إعادة الإرسال بعد ${timer}ث` : <button onClick={resendOtp} style={{ background:"none", border:"none", color, cursor:"pointer", fontWeight:700, fontSize:12, textDecoration:"underline" }}>إعادة إرسال الرمز</button>}
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={()=>{ setPStep("form"); setOtpInput(""); setOtpErr(""); }} style={{ flex:1, background:C.bg, color:C.muted, border:`1px solid ${C.border}`, borderRadius:9, padding:10, fontWeight:700, cursor:"pointer", fontSize:13 }}>← رجوع</button>
+            <button onClick={verifyOtp} disabled={otpInput.length<6}
+              style={{ flex:2, background:otpInput.length===6?`linear-gradient(135deg,${color},${C.green})`:"#ccc", color:"#fff", border:"none", borderRadius:9, padding:10, fontWeight:800, cursor:otpInput.length===6?"pointer":"not-allowed", fontSize:13 }}>
+              ✓ تحقق وتغيير كلمة المرور
+            </button>
+          </div>
+        </div>
       ) : (
         <div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
@@ -223,15 +257,15 @@ function PassCard({ storageKey, color }:{ storageKey:string; color:string }) {
             <div>
               <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:3 }}>تأكيد كلمة المرور</label>
               <input type="password" value={pf.confirmPass} onChange={e=>setPf(p=>({...p,confirmPass:e.target.value}))}
-                onKeyDown={(e:any)=>e.key==="Enter"&&submit()} placeholder="••••••"
+                onKeyDown={(e:any)=>e.key==="Enter"&&sendOtp()} placeholder="••••••"
                 style={{ width:"100%", border:`1.5px solid ${pf.confirmPass&&pf.confirmPass!==pf.newPass?C.red:C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box" }} />
             </div>
           </div>
           {pf.confirmPass&&pf.confirmPass!==pf.newPass&&<div style={{ fontSize:11, color:C.red, marginBottom:6 }}>⚠️ كلمتا المرور غير متطابقتين</div>}
           {pErr&&<div style={{ background:"#FFF5F5", border:"1px solid #FED7D7", borderRadius:7, padding:"7px 12px", fontSize:12, color:C.red, marginBottom:8 }}>{pErr}</div>}
-          <button onClick={submit} disabled={!pf.newPass||pf.newPass!==pf.confirmPass}
+          <button onClick={sendOtp} disabled={!pf.newPass||pf.newPass!==pf.confirmPass}
             style={{ width:"100%", background:pf.newPass&&pf.newPass===pf.confirmPass?`linear-gradient(135deg,${color},${C.green})`:"#ccc", color:"#fff", border:"none", borderRadius:9, padding:10, fontWeight:800, cursor:pf.newPass&&pf.newPass===pf.confirmPass?"pointer":"not-allowed", fontSize:13 }}>
-            🔐 تغيير كلمة المرور
+            📲 إرسال رمز التحقق (OTP)
           </button>
         </div>
       )}

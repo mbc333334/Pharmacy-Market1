@@ -38,17 +38,29 @@ export default function ProfileScreen() {
   const [pErr, setPErr] = useState("");
   const [pSaved, setPSaved] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
+  const [passModalStep, setPassModalStep] = useState<"form"|"otp"|"done">("form");
+  const [passOtpCode, setPassOtpCode] = useState(""); const [passOtpInput, setPassOtpInput] = useState(""); const [passOtpErr, setPassOtpErr] = useState("");
+  const [passOtpTimer, setPassOtpTimer] = useState(0);
+  const passTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  React.useEffect(()=>{ if(passOtpTimer<=0){ if(passTimerRef.current) clearInterval(passTimerRef.current); return; } passTimerRef.current=setInterval(()=>setPassOtpTimer(v=>v-1),1000); return()=>{ if(passTimerRef.current) clearInterval(passTimerRef.current); }; },[passOtpTimer]);
+  function genPassOTP(){ return String(Math.floor(100000+Math.random()*900000)); }
 
-  const openPassModal = () => { setPf({ newPass: "", confirmPass: "" }); setPErr(""); setPSaved(false); setShowPassModal(true); };
+  const openPassModal = () => { setPf({ newPass: "", confirmPass: "" }); setPErr(""); setPSaved(false); setPassModalStep("form"); setPassOtpInput(""); setPassOtpErr(""); setShowPassModal(true); };
   const closePassModal = () => setShowPassModal(false);
-  const submitPass = () => {
+  const sendPassOtp = () => {
     if (!pf.newPass.trim()) { setPErr("أدخل كلمة المرور الجديدة"); return; }
     if (pf.newPass.length < 4) { setPErr("يجب أن تكون 4 أحرف على الأقل"); return; }
     if (pf.newPass !== pf.confirmPass) { setPErr("كلمتا المرور غير متطابقتين"); return; }
-    if (user?.id) savePassword(user.id, pf.newPass.trim());
-    setPSaved(true);
-    setTimeout(() => { setPSaved(false); closePassModal(); }, 1800);
+    const code = genPassOTP(); setPassOtpCode(code); setPassOtpInput(""); setPassOtpErr(""); setPassModalStep("otp"); setPassOtpTimer(60);
   };
+  const verifyPassOtp = () => {
+    if (passOtpInput !== passOtpCode) { setPassOtpErr("رمز التحقق غير صحيح، حاول مجدداً"); return; }
+    if (user?.id) savePassword(user.id, pf.newPass.trim());
+    setPassModalStep("done");
+    setTimeout(() => { closePassModal(); setPassModalStep("form"); }, 1800);
+  };
+  const resendPassOtp = () => { const code=genPassOTP(); setPassOtpCode(code); setPassOtpInput(""); setPassOtpErr(""); setPassOtpTimer(60); };
+  const submitPass = sendPassOtp;
 
   const initials = user?.name?.split(" ").slice(0, 2).map(n => n[0]).join("") ?? "م";
 
@@ -306,11 +318,52 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
 
-              {pSaved ? (
+              {passModalStep === "done" ? (
                 <View style={styles.savedBox}>
                   <Ionicons name="checkmark-circle" size={40} color={Colors.success} />
                   <Text style={styles.savedText}>تم تغيير كلمة المرور بنجاح!</Text>
                 </View>
+              ) : passModalStep === "otp" ? (
+                <>
+                  <View style={styles.otpNoticeBox}>
+                    <Text style={styles.otpNoticeLbl}>📱 رمز التحقق التجريبي</Text>
+                    <Text style={styles.otpCodeDisplay}>{passOtpCode}</Text>
+                    <Text style={styles.otpNoticeHnt}>سيُرسَل عبر SMS في التطبيق الفعلي</Text>
+                  </View>
+                  <Text style={styles.inputLabel}>أدخل رمز التحقق المكوّن من 6 أرقام</Text>
+                  <TextInput
+                    value={passOtpInput}
+                    onChangeText={t => { setPassOtpErr(""); setPassOtpInput(t.replace(/\D/g, "").slice(0, 6)); }}
+                    placeholder="• • • • • •"
+                    placeholderTextColor={Colors.textMuted}
+                    style={[styles.input, { textAlign: "center", fontSize: 22, letterSpacing: 10, fontWeight: "800", marginTop: 8, borderColor: passOtpErr ? Colors.error : Colors.primary }]}
+                    keyboardType="numeric"
+                    maxLength={6}
+                  />
+                  {passOtpErr !== "" && <Text style={styles.errText}>⚠️ {passOtpErr}</Text>}
+                  <View style={{ alignItems: "flex-end", marginVertical: 10 }}>
+                    {passOtpTimer > 0 ? (
+                      <Text style={styles.timerTxt}>⏱ إعادة الإرسال بعد {passOtpTimer}ث</Text>
+                    ) : (
+                      <TouchableOpacity onPress={resendPassOtp}>
+                        <Text style={styles.resendLnk}>إعادة إرسال الرمز</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.submitBtn, passOtpInput.length < 6 && { opacity: 0.4 }]}
+                    onPress={verifyPassOtp}
+                    disabled={passOtpInput.length < 6}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                    <Text style={styles.submitBtnText}>تحقق وتغيير كلمة المرور</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ alignItems:"center", marginTop:12, flexDirection:"row", justifyContent:"center", gap:6 }} onPress={()=>setPassModalStep("form")}>
+                    <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+                    <Text style={{ fontSize:13, color:Colors.textMuted }}>العودة لتعديل كلمة المرور</Text>
+                  </TouchableOpacity>
+                </>
               ) : (
                 <>
                   <View style={styles.inputGroup}>
@@ -352,8 +405,8 @@ export default function ProfileScreen() {
                     disabled={!pf.newPass || pf.newPass !== pf.confirmPass}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="lock-closed-outline" size={18} color="#fff" />
-                    <Text style={styles.submitBtnText}>تغيير كلمة المرور</Text>
+                    <Ionicons name="send-outline" size={18} color="#fff" />
+                    <Text style={styles.submitBtnText}>📲 إرسال رمز التحقق (OTP)</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -529,4 +582,10 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
   },
   submitBtnText: { fontSize: 16, fontWeight: "800", color: "#fff" },
+  otpNoticeBox: { backgroundColor:"#FFFBEB", borderWidth:1.5, borderColor:"#F6AD55", borderRadius:14, padding:16, alignItems:"center", marginBottom:14 },
+  otpNoticeLbl: { fontSize:12, fontWeight:"700", color:"#744210", marginBottom:6 },
+  otpCodeDisplay: { fontSize:30, fontWeight:"900", letterSpacing:8, color:"#744210", marginBottom:4 },
+  otpNoticeHnt: { fontSize:11, color:"#92400E", textAlign:"center" },
+  timerTxt: { fontSize:12, color:Colors.textMuted },
+  resendLnk: { fontSize:13, fontWeight:"700", color:Colors.primary, textDecorationLine:"underline" },
 });

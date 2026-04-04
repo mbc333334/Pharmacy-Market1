@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Platform, ScrollView,
@@ -27,6 +27,12 @@ export default function DeliveryRegisterScreen() {
   const [city, setCity] = useState("");
   const [fleetSize, setFleetSize] = useState("");
   const [cityOpen, setCityOpen] = useState(false);
+  const [otpStep, setOtpStep] = useState<"none"|"otp">("none");
+  const [otpCode, setOtpCode] = useState(""); const [otpInput, setOtpInput] = useState(""); const [otpErr, setOtpErr] = useState("");
+  const [otpTimer, setOtpTimer] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(()=>{ if(otpTimer<=0){ if(timerRef.current) clearInterval(timerRef.current); return; } timerRef.current=setInterval(()=>setOtpTimer(v=>v-1),1000); return()=>{ if(timerRef.current) clearInterval(timerRef.current); }; },[otpTimer]);
+  function genOTP(){ return String(Math.floor(100000+Math.random()*900000)); }
 
   const nextStep = () => {
     if (step === 0) {
@@ -38,12 +44,17 @@ export default function DeliveryRegisterScreen() {
     setStep(s => Math.min(s + 1, 2));
   };
 
-  const handleSubmit = async () => {
+  const startOtp = () => {
+    const code = genOTP(); setOtpCode(code); setOtpInput(""); setOtpErr(""); setOtpStep("otp"); setOtpTimer(60);
+  };
+  const verifyAndSubmit = async () => {
+    if (otpInput !== otpCode) { setOtpErr("رمز التحقق غير صحيح، حاول مجدداً"); return; }
     setLoading(true);
     await new Promise(r => setTimeout(r, 1200));
     setLoading(false);
     setSubmitted(true);
   };
+  const resendOtp = () => { const code=genOTP(); setOtpCode(code); setOtpInput(""); setOtpErr(""); setOtpTimer(60); };
 
   if (submitted) {
     return (
@@ -147,18 +158,50 @@ export default function DeliveryRegisterScreen() {
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <TouchableOpacity
-          style={[styles.nextBtn, { backgroundColor: "#D69E2E" }]}
-          onPress={step < 2 ? nextStep : handleSubmit}
-          disabled={loading}
-        >
-          {loading ? <ActivityIndicator color="#fff" /> : (
-            <>
-              <Ionicons name={step < 2 ? "arrow-back" : "checkmark-circle"} size={20} color="#fff" />
-              <Text style={styles.nextBtnText}>{step < 2 ? "التالي" : "إرسال الطلب"}</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {otpStep === "otp" ? (
+          <View style={{ marginTop:12 }}>
+            <View style={{ backgroundColor:"#FFFBEB", borderWidth:1.5, borderColor:"#F6AD55", borderRadius:14, padding:14, alignItems:"center", marginBottom:12 }}>
+              <Text style={{ fontSize:11, fontWeight:"700", color:"#744210", marginBottom:4 }}>📱 رمز التحقق التجريبي</Text>
+              <Text style={{ fontSize:28, fontWeight:"900", letterSpacing:8, color:"#744210" }}>{otpCode}</Text>
+              <Text style={{ fontSize:10, color:"#92400E", marginTop:4 }}>سيُرسَل عبر SMS في التطبيق الفعلي</Text>
+            </View>
+            <View style={[styles.inputWrap, { borderColor: otpErr ? "#E53E3E" : "#D69E2E" }]}>
+              <TextInput style={[styles.input, { textAlign:"center", fontSize:22, letterSpacing:10, fontWeight:"800" }]}
+                placeholder="• • • • • •" value={otpInput} maxLength={6} keyboardType="numeric"
+                onChangeText={t=>{ setOtpErr(""); setOtpInput(t.replace(/\D/g,"").slice(0,6)); }}
+                placeholderTextColor="#aaa" />
+            </View>
+            {otpErr ? <Text style={{ color:"#E53E3E", textAlign:"right", marginTop:4, fontSize:12 }}>⚠️ {otpErr}</Text> : null}
+            <View style={{ alignItems:"flex-end", marginVertical:8 }}>
+              {otpTimer>0 ? <Text style={{ fontSize:12, color:"#888" }}>⏱ إعادة الإرسال بعد {otpTimer}ث</Text>
+                : <TouchableOpacity onPress={resendOtp}><Text style={{ fontSize:13, fontWeight:"700", color:"#D69E2E", textDecorationLine:"underline" }}>إعادة إرسال الرمز</Text></TouchableOpacity>}
+            </View>
+            <TouchableOpacity style={[styles.nextBtn, { backgroundColor:"#D69E2E", opacity: otpInput.length<6||loading ? 0.5 : 1 }]}
+              onPress={verifyAndSubmit} disabled={otpInput.length<6||loading}>
+              {loading ? <ActivityIndicator color="#fff" /> : <>
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <Text style={styles.nextBtnText}>تحقق وإرسال الطلب</Text>
+              </>}
+            </TouchableOpacity>
+            <TouchableOpacity style={{ flexDirection:"row", justifyContent:"center", gap:6, marginTop:10 }} onPress={()=>setOtpStep("none")}>
+              <Ionicons name="chevron-forward" size={16} color="#888" />
+              <Text style={{ fontSize:13, color:"#888" }}>العودة للمراجعة</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.nextBtn, { backgroundColor: "#D69E2E" }]}
+            onPress={step < 2 ? nextStep : startOtp}
+            disabled={loading}
+          >
+            {loading ? <ActivityIndicator color="#fff" /> : (
+              <>
+                <Ionicons name={step < 2 ? "arrow-back" : "send"} size={20} color="#fff" />
+                <Text style={styles.nextBtnText}>{step < 2 ? "التالي" : "📲 إرسال رمز التحقق"}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={styles.loginLink} onPress={() => router.replace("/(auth)/login")}>
           <Text style={styles.loginLinkText}>لديك حساب؟ تسجيل الدخول</Text>
@@ -245,6 +288,8 @@ const styles = StyleSheet.create({
     gap: 8, borderRadius: 14, paddingVertical: 15, marginBottom: 12, marginTop: 8,
   },
   nextBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  inputWrap: { backgroundColor: Colors.surfaceAlt, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.border, paddingHorizontal: 14 },
+  input: { paddingVertical: 14, fontSize: 15, color: Colors.textPrimary },
   loginLink: { alignItems: "center", paddingBottom: 32 },
   loginLinkText: { fontSize: 13, color: Colors.primary, fontWeight: "600" },
   successBox: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 16 },

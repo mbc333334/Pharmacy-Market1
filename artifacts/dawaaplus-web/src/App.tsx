@@ -192,14 +192,23 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastS
   const [showPNew, setShowPNew] = useState(false);
   const [pErr, setPErr] = useState("");
   const [pSaved, setPSaved] = useState(false);
+  const [pStep, setPStep] = useState<"form"|"otp"|"done">("form");
+  const [pOtpCode, setPOtpCode] = useState(""); const [pOtpInput, setPOtpInput] = useState(""); const [pOtpErr, setPOtpErr] = useState("");
+  const [pTimer, setPTimer] = useState(0);
+  React.useEffect(()=>{ if(pTimer<=0)return; const t=setTimeout(()=>setPTimer(v=>v-1),1000); return()=>clearTimeout(t); },[pTimer]);
 
-  const openPModal = () => { setPForm({ newPass:"", confirmPass:"" }); setPErr(""); setPSaved(false); setShowPassModal(true); };
+  const openPModal = () => { setPForm({ newPass:"", confirmPass:"" }); setPErr(""); setPSaved(false); setPStep("form"); setPOtpInput(""); setPOtpErr(""); setShowPassModal(true); };
   const closePModal = () => setShowPassModal(false);
-  const submitPChange = () => {
+  const genAdminOTP = () => String(Math.floor(100000+Math.random()*900000));
+  const sendAdminOtp = () => {
     setPErr("");
     if (!pForm.newPass.trim()) { setPErr("أدخل كلمة المرور الجديدة"); return; }
     if (pForm.newPass.length < 4) { setPErr("يجب أن تكون 4 أحرف على الأقل"); return; }
     if (pForm.newPass !== pForm.confirmPass) { setPErr("كلمتا المرور غير متطابقتين"); return; }
+    const code = genAdminOTP(); setPOtpCode(code); setPOtpInput(""); setPOtpErr(""); setPStep("otp"); setPTimer(60);
+  };
+  const verifyAdminOtp = () => {
+    if (pOtpInput !== pOtpCode) { setPOtpErr("رمز التحقق غير صحيح، حاول مجدداً"); return; }
     if (isSuperAdmin) {
       wrLS("admin_super_password", pForm.newPass.trim());
     } else {
@@ -207,9 +216,10 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastS
       const updated = accs.map((a:any) => (a.phone===(user as any).phone ? { ...a, password: pForm.newPass.trim() } : a));
       wrLS("admin_accounts", updated);
     }
-    setPSaved(true);
-    setTimeout(() => { setPSaved(false); closePModal(); }, 1800);
+    setPStep("done");
+    setTimeout(() => { setPSaved(false); closePModal(); setPStep("form"); }, 1800);
   };
+  const resendAdminOtp = () => { const code=genAdminOTP(); setPOtpCode(code); setPOtpInput(""); setPOtpErr(""); setPTimer(60); };
 
   return (
     <div style={{ display:"flex", height:"100vh", overflow:"hidden" }}>
@@ -225,8 +235,32 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastS
               </div>
               <button onClick={closePModal} style={{ marginRight:"auto", background:"none", border:"none", fontSize:22, cursor:"pointer", color:C.muted }}>×</button>
             </div>
-            {pSaved ? (
+            {pStep==="done" ? (
               <div style={{ textAlign:"center", padding:"20px 0", color:C.green, fontWeight:800, fontSize:15 }}>✅ تم تغيير كلمة المرور بنجاح!</div>
+            ) : pStep==="otp" ? (
+              <>
+                <div style={{ background:"#FFFBEB", border:"1px solid #F6AD55", borderRadius:10, padding:"12px 14px", marginBottom:14, textAlign:"center" }}>
+                  <div style={{ fontSize:11, color:"#744210", marginBottom:6 }}>📱 رمز التحقق التجريبي — سيُرسَل عبر SMS في التطبيق الفعلي</div>
+                  <div style={{ fontSize:28, fontWeight:900, letterSpacing:8, color:"#744210" }}>{pOtpCode}</div>
+                </div>
+                <label style={{ fontSize:12, fontWeight:700, color:C.muted, display:"block", marginBottom:6 }}>أدخل رمز التحقق المكوّن من 6 أرقام</label>
+                <input type="text" maxLength={6} value={pOtpInput}
+                  onChange={e=>{ setPOtpErr(""); setPOtpInput(e.target.value.replace(/\D/g,"").slice(0,6)); }}
+                  onKeyDown={(e:any)=>e.key==="Enter"&&pOtpInput.length===6&&verifyAdminOtp()}
+                  placeholder="• • • • • •"
+                  style={{ width:"100%", border:`2px solid ${pOtpErr?C.red:C.admin}`, borderRadius:10, padding:"12px", fontSize:22, textAlign:"center", letterSpacing:8, boxSizing:"border-box", fontWeight:800, marginBottom:6 }} />
+                {pOtpErr&&<div style={{ fontSize:11, color:C.red, marginBottom:6 }}>⚠️ {pOtpErr}</div>}
+                <div style={{ fontSize:11, color:C.muted, textAlign:"right", marginBottom:14 }}>
+                  {pTimer>0 ? `⏱ إعادة الإرسال بعد ${pTimer}ث` : <button onClick={resendAdminOtp} style={{ background:"none", border:"none", color:C.admin, cursor:"pointer", fontWeight:700, fontSize:12, textDecoration:"underline" }}>إعادة إرسال الرمز</button>}
+                </div>
+                <div style={{ display:"flex", gap:10 }}>
+                  <button onClick={()=>{ setPStep("form"); setPOtpInput(""); setPOtpErr(""); }} style={{ flex:1, background:"#F7FAFC", color:C.muted, border:`1px solid ${C.border}`, borderRadius:10, padding:11, fontWeight:700, cursor:"pointer", fontSize:13 }}>← رجوع</button>
+                  <button onClick={verifyAdminOtp} disabled={pOtpInput.length<6}
+                    style={{ flex:2, background:pOtpInput.length===6?`linear-gradient(135deg,${C.admin},#553C9A)`:"#ccc", color:"#fff", border:"none", borderRadius:10, padding:11, fontWeight:800, cursor:pOtpInput.length===6?"pointer":"not-allowed", fontSize:14 }}>
+                    ✓ تحقق وتغيير كلمة المرور
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <div style={{ marginBottom:12 }}>
@@ -240,16 +274,16 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastS
                 <div style={{ marginBottom:16 }}>
                   <label style={{ fontSize:12, fontWeight:700, color:C.muted, display:"block", marginBottom:6 }}>تأكيد كلمة المرور</label>
                   <input type="password" value={pForm.confirmPass} onChange={e=>setPForm(p=>({...p,confirmPass:e.target.value}))}
-                    onKeyDown={(e:any)=>e.key==="Enter"&&submitPChange()} placeholder="••••••••"
+                    onKeyDown={(e:any)=>e.key==="Enter"&&sendAdminOtp()} placeholder="••••••••"
                     style={{ width:"100%", border:`1.5px solid ${pForm.confirmPass&&pForm.confirmPass!==pForm.newPass?C.red:C.border}`, borderRadius:10, padding:"10px 14px", fontSize:14, boxSizing:"border-box" }} />
                   {pForm.confirmPass && pForm.confirmPass!==pForm.newPass && <div style={{ fontSize:11, color:C.red, marginTop:4 }}>⚠️ كلمتا المرور غير متطابقتين</div>}
                 </div>
                 {pErr && <div style={{ background:"#FFF5F5", border:"1px solid #FED7D7", borderRadius:8, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:12 }}>{pErr}</div>}
                 <div style={{ display:"flex", gap:10 }}>
                   <button onClick={closePModal} style={{ flex:1, background:"#F7FAFC", color:C.muted, border:`1px solid ${C.border}`, borderRadius:10, padding:11, fontWeight:700, cursor:"pointer", fontSize:13 }}>إلغاء</button>
-                  <button onClick={submitPChange} disabled={!pForm.newPass||pForm.newPass!==pForm.confirmPass}
+                  <button onClick={sendAdminOtp} disabled={!pForm.newPass||pForm.newPass!==pForm.confirmPass}
                     style={{ flex:2, background:pForm.newPass&&pForm.newPass===pForm.confirmPass?`linear-gradient(135deg,${C.admin},#553C9A)`:"#ccc", color:"#fff", border:"none", borderRadius:10, padding:11, fontWeight:800, cursor:pForm.newPass&&pForm.newPass===pForm.confirmPass?"pointer":"not-allowed", fontSize:14 }}>
-                    💾 حفظ كلمة المرور
+                    📲 إرسال رمز التحقق (OTP)
                   </button>
                 </div>
               </>

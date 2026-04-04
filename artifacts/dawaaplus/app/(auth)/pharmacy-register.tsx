@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Platform, ScrollView,
@@ -28,6 +28,12 @@ export default function PharmacyRegisterScreen() {
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
   const [cityOpen, setCityOpen] = useState(false);
+  const [otpStep, setOtpStep] = useState<"none"|"otp">("none");
+  const [otpCode, setOtpCode] = useState(""); const [otpInput, setOtpInput] = useState(""); const [otpErr, setOtpErr] = useState("");
+  const [otpTimer, setOtpTimer] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(()=>{ if(otpTimer<=0){ if(timerRef.current) clearInterval(timerRef.current); return; } timerRef.current=setInterval(()=>setOtpTimer(v=>v-1),1000); return()=>{ if(timerRef.current) clearInterval(timerRef.current); }; },[otpTimer]);
+  function genOTP(){ return String(Math.floor(100000+Math.random()*900000)); }
 
   const nextStep = () => {
     if (step === 0) {
@@ -39,16 +45,65 @@ export default function PharmacyRegisterScreen() {
     setStep(s => Math.min(s + 1, 2));
   };
 
-  const handleSubmit = async () => {
+  const startOtp = () => {
+    const code = genOTP(); setOtpCode(code); setOtpInput(""); setOtpErr(""); setOtpStep("otp"); setOtpTimer(60);
+  };
+  const verifyAndSubmit = async () => {
+    if (otpInput !== otpCode) { setOtpErr("رمز التحقق غير صحيح، حاول مجدداً"); return; }
     setLoading(true);
     try {
       await registerPharmacy({ ownerName, phone, password, pharmacyName, licenseNumber, city, address });
     } catch {
-      setError("حدث خطأ، يرجى المحاولة مجدداً");
+      setOtpErr("حدث خطأ، يرجى المحاولة مجدداً");
     } finally {
       setLoading(false);
     }
   };
+  const resendOtp = () => { const code=genOTP(); setOtpCode(code); setOtpInput(""); setOtpErr(""); setOtpTimer(60); };
+
+  if (otpStep === "otp") {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0), justifyContent:"center" }]}>
+        <ScrollView contentContainerStyle={{ padding: 28 }}>
+          <View style={{ alignItems:"center", marginBottom: 20 }}>
+            <View style={{ width:60, height:60, borderRadius:18, backgroundColor:"#1A9E6E", alignItems:"center", justifyContent:"center", marginBottom:10 }}>
+              <Ionicons name="shield-checkmark-outline" size={30} color="#fff" />
+            </View>
+            <Text style={{ fontSize:20, fontWeight:"900", color:"#0D7A54" }}>التحقق عبر SMS</Text>
+            <Text style={{ fontSize:13, color:"#666", textAlign:"center", marginTop:4 }}>رمز التحقق سيُرسَل إلى {phone}</Text>
+          </View>
+          <View style={styles.otpNotice}>
+            <Text style={styles.otpNoticeLabel}>📱 رمز التحقق التجريبي</Text>
+            <Text style={styles.otpCodeText}>{otpCode}</Text>
+            <Text style={styles.otpNoticeHint}>سيُرسَل عبر SMS في التطبيق الفعلي</Text>
+          </View>
+          <Text style={[styles.label, { marginBottom:6 }]}>أدخل رمز التحقق</Text>
+          <View style={[styles.inputWrap, { borderColor: otpErr ? "#E53E3E" : "#1A9E6E" }]}>
+            <TextInput style={[styles.input, { textAlign:"center", fontSize:22, letterSpacing:10, fontWeight:"800" }]}
+              placeholder="• • • • • •" value={otpInput} maxLength={6} keyboardType="numeric"
+              onChangeText={t=>{ setOtpErr(""); setOtpInput(t.replace(/\D/g,"").slice(0,6)); }}
+              placeholderTextColor="#aaa" />
+          </View>
+          {otpErr ? <Text style={{ color:"#E53E3E", textAlign:"right", marginTop:4, fontSize:12 }}>⚠️ {otpErr}</Text> : null}
+          <View style={{ alignItems:"flex-end", marginVertical:10 }}>
+            {otpTimer>0 ? <Text style={{ fontSize:12, color:"#888" }}>⏱ إعادة الإرسال بعد {otpTimer}ث</Text>
+              : <TouchableOpacity onPress={resendOtp}><Text style={{ fontSize:13, fontWeight:"700", color:"#1A9E6E", textDecorationLine:"underline" }}>إعادة إرسال الرمز</Text></TouchableOpacity>}
+          </View>
+          <TouchableOpacity style={[styles.nextBtn, { opacity: otpInput.length<6||loading ? 0.5 : 1 }]}
+            onPress={verifyAndSubmit} disabled={otpInput.length<6||loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <>
+              <Text style={styles.nextBtnText}>تحقق وإرسال الطلب</Text>
+              <Ionicons name="checkmark-circle" size={20} color="#fff" />
+            </>}
+          </TouchableOpacity>
+          <TouchableOpacity style={{ alignItems:"center", marginTop:14, flexDirection:"row", justifyContent:"center", gap:6 }} onPress={()=>setOtpStep("none")}>
+            <Ionicons name="chevron-forward" size={16} color="#888" />
+            <Text style={{ fontSize:13, color:"#888" }}>العودة للمراجعة</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -159,13 +214,9 @@ export default function PharmacyRegisterScreen() {
             <Ionicons name="arrow-back" size={20} color="#fff" />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.nextBtn} onPress={handleSubmit} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : (
-              <>
-                <Text style={styles.nextBtnText}>إرسال الطلب</Text>
-                <Ionicons name="arrow-back" size={20} color="#fff" />
-              </>
-            )}
+          <TouchableOpacity style={styles.nextBtn} onPress={startOtp}>
+            <Text style={styles.nextBtnText}>📲 إرسال رمز التحقق (OTP)</Text>
+            <Ionicons name="arrow-back" size={20} color="#fff" />
           </TouchableOpacity>
         )}
       </View>
@@ -296,4 +347,11 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
   },
   nextBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  otpNotice: { backgroundColor:"#FFFBEB", borderWidth:1.5, borderColor:"#F6AD55", borderRadius:14, padding:16, alignItems:"center", marginBottom:16 },
+  otpNoticeLabel: { fontSize:12, fontWeight:"700", color:"#744210", marginBottom:6 },
+  otpCodeText: { fontSize:30, fontWeight:"900", letterSpacing:8, color:"#744210", marginBottom:4 },
+  otpNoticeHint: { fontSize:11, color:"#92400E", textAlign:"center" },
+  inputWrap: { backgroundColor:Colors.surfaceAlt, borderRadius:12, borderWidth:1.5, borderColor:Colors.border, paddingHorizontal:14 },
+  input: { paddingVertical:14, fontSize:15, color:Colors.textPrimary },
+  label: { fontSize:14, fontWeight:"600", color:Colors.textPrimary, textAlign:"right" },
 });
