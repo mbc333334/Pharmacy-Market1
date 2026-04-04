@@ -1,323 +1,408 @@
-import { useState } from "react";
+import { useState, createContext, useContext } from "react";
 
-// ─── Brand ───────────────────────────────────────────────────────────────────
+// ─── Colors ───────────────────────────────────────────────────────────────────
 const C = {
-  admin:    "#7C3AED",
-  pharmacy: "#1A9E6E",
-  warehouse:"#0D7A54",
-  delivery: "#D69E2E",
-  text:     "#1a202c",
-  muted:    "#718096",
-  border:   "#e2e8f0",
-  bg:       "#f7fafc",
-  surface:  "#ffffff",
-  red:      "#E53E3E",
-  green:    "#38A169",
-  blue:     "#3182CE",
+  admin:"#7C3AED", pharmacy:"#1A9E6E", warehouse:"#0D7A54", delivery:"#D69E2E",
+  text:"#1a202c", muted:"#718096", border:"#e2e8f0", bg:"#f7fafc", surface:"#fff",
+  red:"#E53E3E", green:"#38A169", blue:"#3182CE", orange:"#DD6B20",
 };
 
-type Portal = "home" | "admin" | "pharmacy" | "warehouse" | "delivery";
-type AdminSection = "dashboard" | "pharmacies" | "warehouses" | "delivery_cos" | "subscriptions" | "finance" | "announcements";
-type PartnerSection = "dashboard" | "account" | "inventory" | "orders" | "subscription" | "finance" | "support";
+// ─── Types ────────────────────────────────────────────────────────────────────
+type Role = "admin"|"pharmacy"|"warehouse"|"delivery";
+interface User { id:string; role:Role; name:string; phone:string; password:string; }
+interface PharmacyData { id:string; userId:string; name:string; city:string; phone:string;
+  license:string; plan:string; active:boolean; products:Product[]; orders:Order[];
+  revenue:number; joined:string; address:string; email:string; }
+interface WarehouseData { id:string; userId:string; name:string; city:string; phone:string;
+  plan:string; active:boolean; products:Product[]; orders:Order[]; linkedPharmacies:number;
+  revenue:number; joined:string; address:string; email:string; }
+interface DeliveryData { id:string; userId:string; name:string; city:string; phone:string;
+  plan:string; active:boolean; drivers:number; trips:Trip[]; rating:number;
+  revenue:number; joined:string; address:string; email:string; }
+interface Product { id:string; name:string; qty:number; price:number; expiry:string; unit:string; }
+interface Order  { id:string; product:string; amount:number; status:string; date:string; customer:string; }
+interface Trip   { id:string; from:string; to:string; status:string; amount:number; date:string; driver:string; }
+interface DB { pharmacies:PharmacyData[]; warehouses:WarehouseData[]; deliveries:DeliveryData[]; }
 
-// ─── Shared mock data (mirrors mobile app data) ───────────────────────────
-const SHARED_DATA = {
-  pharmacies: [
-    { id:"ph1", name:"صيدلية الشفاء",  city:"أربيل",     phone:"07501234567", plan:"premium",  active:true,  revenue:4200000, orders:18, products:247, joined:"2024-01-15" },
-    { id:"ph2", name:"صيدلية النور",    city:"السليمانية",phone:"07701234568", plan:"standard", active:true,  revenue:2800000, orders:11, products:189, joined:"2024-02-20" },
-    { id:"ph3", name:"صيدلية الأمل",    city:"دهوك",      phone:"07601234569", plan:"free",     active:true,  revenue:900000,  orders:5,  products:94,  joined:"2024-03-10" },
-    { id:"ph4", name:"صيدلية الحياة",   city:"كركوك",     phone:"07501234570", plan:"premium",  active:false, revenue:0,       orders:0,  products:0,   joined:"2024-04-01" },
+// ─── Initial DB ───────────────────────────────────────────────────────────────
+const INITIAL_DB: DB = {
+  pharmacies:[
+    { id:"ph1", userId:"u_ph1", name:"صيدلية الشفاء",  city:"أربيل",      phone:"07501234567", license:"PH-20240115",
+      plan:"premium", active:true, revenue:4200000, joined:"2024-01-15", address:"شارع 100، أربيل", email:"shifa@email.com",
+      products:[
+        { id:"p1", name:"باراسيتامول 500mg",  qty:12,  price:3500,  expiry:"2025-08-01", unit:"علبة" },
+        { id:"p2", name:"أموكسيسيلين 500mg",  qty:8,   price:4200,  expiry:"2025-06-15", unit:"علبة" },
+        { id:"p3", name:"فيتامين C 1000mg",   qty:34,  price:2800,  expiry:"2026-01-01", unit:"علبة" },
+        { id:"p4", name:"أنسولين نوفوميكس",   qty:20,  price:15000, expiry:"2025-05-20", unit:"قارورة" },
+      ],
+      orders:[
+        { id:"#1041", product:"باراسيتامول × 3", amount:10500, status:"processing", date:"2025-04-04", customer:"أحمد علي" },
+        { id:"#1040", product:"فيتامين C × 5",   amount:14000, status:"completed",  date:"2025-04-03", customer:"سارة محمد" },
+        { id:"#1039", product:"أنسولين",          amount:15000, status:"new",        date:"2025-04-03", customer:"كريم حسن" },
+        { id:"#1038", product:"أموكسيسيلين × 2",  amount:8400,  status:"cancelled",  date:"2025-04-02", customer:"نور خالد" },
+      ]},
+    { id:"ph2", userId:"u_ph2", name:"صيدلية النور",   city:"السليمانية", phone:"07701234568", license:"PH-20240220",
+      plan:"standard", active:true, revenue:2800000, joined:"2024-02-20", address:"شارع زانكو، السليمانية", email:"noor@email.com",
+      products:[
+        { id:"p5", name:"ميتفورمين 850mg", qty:5,  price:5800, expiry:"2025-09-30", unit:"علبة" },
+        { id:"p6", name:"أسبرين 100mg",   qty:28, price:1800, expiry:"2026-03-01", unit:"علبة" },
+      ],
+      orders:[
+        { id:"#2041", product:"ميتفورمين × 2", amount:11600, status:"new",       date:"2025-04-04", customer:"ليلى أحمد" },
+        { id:"#2040", product:"أسبرين × 10",   amount:18000, status:"completed", date:"2025-04-02", customer:"عمر يوسف" },
+      ]},
+    { id:"ph3", userId:"u_ph3", name:"صيدلية الأمل",   city:"دهوك",       phone:"07601234569", license:"PH-20240310",
+      plan:"free", active:true, revenue:900000, joined:"2024-03-10", address:"شارع بيروت، دهوك", email:"amal@email.com",
+      products:[
+        { id:"p7", name:"سيتريزين 10mg", qty:45, price:2200, expiry:"2026-06-01", unit:"علبة" },
+      ],
+      orders:[
+        { id:"#3041", product:"سيتريزين × 3", amount:6600, status:"completed", date:"2025-04-03", customer:"هديل فاروق" },
+      ]},
   ],
-  warehouses: [
-    { id:"wh1", name:"مذخر الشمال",  city:"أربيل",     phone:"07501234571", plan:"premium",  active:true,  revenue:18700000, orders:34, products:1845, linked:89, joined:"2023-11-01" },
-    { id:"wh2", name:"مذخر الوسط",   city:"السليمانية",phone:"07701234572", plan:"standard", active:true,  revenue:9200000,  orders:21, products:1120, linked:45, joined:"2024-01-10" },
-    { id:"wh3", name:"مذخر الجنوب",  city:"بغداد",     phone:"07801234573", plan:"free",     active:true,  revenue:3400000,  orders:9,  products:560,  linked:22, joined:"2024-02-28" },
+  warehouses:[
+    { id:"wh1", userId:"u_wh1", name:"مذخر الشمال", city:"أربيل",      phone:"07501234571",
+      plan:"premium", active:true, revenue:18700000, joined:"2023-11-01", linkedPharmacies:89,
+      address:"المنطقة الصناعية، أربيل", email:"north@email.com",
+      products:[
+        { id:"wp1", name:"باراسيتامول 500mg (كرتون)", qty:340, price:280000, expiry:"2025-12-01", unit:"كرتون" },
+        { id:"wp2", name:"أموكسيسيلين 500mg (كرتون)", qty:180, price:320000, expiry:"2025-10-15", unit:"كرتون" },
+        { id:"wp3", name:"أنسولين نوفوميكس",          qty:200, price:120000, expiry:"2025-08-01", unit:"صندوق" },
+      ],
+      orders:[
+        { id:"#W1041", product:"باراسيتامول × 50 كرتون", amount:14000000, status:"processing", date:"2025-04-04", customer:"صيدلية الشفاء" },
+        { id:"#W1040", product:"أموكسيسيلين × 30 كرتون", amount:9600000,  status:"completed",  date:"2025-04-03", customer:"صيدلية النور" },
+      ]},
+    { id:"wh2", userId:"u_wh2", name:"مذخر الوسط",  city:"السليمانية", phone:"07701234572",
+      plan:"standard", active:true, revenue:9200000, joined:"2024-01-10", linkedPharmacies:45,
+      address:"شارع التجار، السليمانية", email:"middle@email.com",
+      products:[
+        { id:"wp4", name:"ميتفورمين 850mg (كرتون)", qty:90, price:420000, expiry:"2026-01-01", unit:"كرتون" },
+      ],
+      orders:[
+        { id:"#W2041", product:"ميتفورمين × 20 كرتون", amount:8400000, status:"new", date:"2025-04-04", customer:"صيدلية الأمل" },
+      ]},
   ],
-  deliveries: [
-    { id:"dl1", name:"نجم إكسبرس",    city:"أربيل",     phone:"07501234574", plan:"premium",  active:true,  revenue:2100000, trips:47,  drivers:23, rating:4.7, joined:"2023-12-01" },
-    { id:"dl2", name:"سريع للتوصيل",   city:"السليمانية",phone:"07701234575", plan:"standard", active:true,  revenue:1400000, trips:31,  drivers:14, rating:4.4, joined:"2024-01-20" },
-    { id:"dl3", name:"ألفا ديليفري",   city:"دهوك",      phone:"07601234576", plan:"free",     active:false, revenue:0,       trips:0,   drivers:5,  rating:4.1, joined:"2024-03-05" },
-  ],
-  finance: {
-    totalRevenue: 94200000,
-    monthRevenue: 14800000,
-    subscriptionIncome: 6200000,
-    pendingPayments: 1800000,
-    methods: [
-      { name:"زين كاش",   account:"07701000001", collected:3200000 },
-      { name:"فاست باي",  account:"07601000002", collected:1800000 },
-      { name:"FIB",       account:"IQ12...",     collected:950000  },
-    ],
-  },
-  announcements: [
-    { id:1, title:"تحديث نظام الاشتراكات",  body:"سيتم تحديث نظام الاشتراكات في 15 أبريل 2025.", target:"all",      date:"2025-04-01", status:"published" },
-    { id:2, title:"عروض الصيف",              body:"خصومات حصرية للصيدليات خلال شهر يونيو.",        target:"pharmacy", date:"2025-04-02", status:"draft"     },
-    { id:3, title:"رسوم التوصيل الجديدة",    body:"تحديث جدول رسوم التوصيل بدءاً من مايو.",        target:"delivery", date:"2025-04-03", status:"published" },
-  ],
-  orders: [
-    { id:"#1041", product:"باراسيتامول × 3",        status:"processing", amount:45000,   date:"2025-04-04" },
-    { id:"#1040", product:"أموكسيسيلين × 2",         status:"completed",  amount:38000,   date:"2025-04-03" },
-    { id:"#1039", product:"فيتامين C × 5",           status:"new",        amount:62000,   date:"2025-04-03" },
-    { id:"#1038", product:"أنسولين",                  status:"cancelled",  amount:120000,  date:"2025-04-02" },
+  deliveries:[
+    { id:"dl1", userId:"u_dl1", name:"نجم إكسبرس",   city:"أربيل",      phone:"07501234574",
+      plan:"premium", active:true, revenue:2100000, joined:"2023-12-01", drivers:23, rating:4.7,
+      address:"مجمع ستار، أربيل", email:"najm@email.com",
+      trips:[
+        { id:"#D881", from:"أربيل مركز", to:"شارع 100، أربيل",    status:"active",    amount:5000,  date:"2025-04-04", driver:"محمد أمين" },
+        { id:"#D880", from:"زانكو",      to:"عينكاوا، أربيل",      status:"completed", amount:7000,  date:"2025-04-04", driver:"كاروان علي" },
+        { id:"#D879", from:"صلاح الدين", to:"دهوك المركز",         status:"pending",   amount:12000, date:"2025-04-03", driver:"سردار محمد" },
+      ]},
+    { id:"dl2", userId:"u_dl2", name:"سريع للتوصيل", city:"السليمانية", phone:"07701234575",
+      plan:"standard", active:true, revenue:1400000, joined:"2024-01-20", drivers:14, rating:4.4,
+      address:"شارع بيكار، السليمانية", email:"sari3@email.com",
+      trips:[
+        { id:"#D201", from:"السليمانية", to:"شارع زانكو",   status:"completed", amount:4500, date:"2025-04-04", driver:"هاوكار أحمد" },
+        { id:"#D200", from:"كويسنجق",    to:"السليمانية",   status:"active",    amount:8000, date:"2025-04-03", driver:"شيرزاد علي" },
+      ]},
   ],
 };
 
-const planLabel: Record<string, { label:string; color:string; bg:string }> = {
-  premium:  { label:"بريميوم ✨",  color:"#7C3AED", bg:"#F3F0FF" },
-  standard: { label:"ستاندرد 🔵", color:"#3182CE", bg:"#EBF8FF" },
-  free:     { label:"مجاني",       color:"#718096", bg:"#EDF2F7" },
-};
-const statusMap: Record<string, { label:string; color:string; bg:string }> = {
-  new:        { label:"جديد",         color:"#D97706", bg:"#FFF3E0" },
-  processing: { label:"قيد التجهيز", color:"#3182CE", bg:"#EBF8FF" },
-  completed:  { label:"مكتمل",        color:"#38A169", bg:"#F0FFF4" },
-  cancelled:  { label:"ملغي",         color:"#E53E3E", bg:"#FFF5F5" },
-};
+const USERS: User[] = [
+  { id:"u_admin", role:"admin",    name:"مدير المنصة",    phone:"admin",       password:"admin" },
+  { id:"u_ph1",   role:"pharmacy", name:"صيدلية الشفاء",  phone:"07501234567", password:"ph1" },
+  { id:"u_ph2",   role:"pharmacy", name:"صيدلية النور",   phone:"07701234568", password:"ph2" },
+  { id:"u_ph3",   role:"pharmacy", name:"صيدلية الأمل",   phone:"07601234569", password:"ph3" },
+  { id:"u_wh1",   role:"warehouse",name:"مذخر الشمال",    phone:"07501234571", password:"wh1" },
+  { id:"u_wh2",   role:"warehouse",name:"مذخر الوسط",     phone:"07701234572", password:"wh2" },
+  { id:"u_dl1",   role:"delivery", name:"نجم إكسبرس",    phone:"07501234574", password:"dl1" },
+  { id:"u_dl2",   role:"delivery", name:"سريع للتوصيل",  phone:"07701234575", password:"dl2" },
+];
+
+// ─── Context ──────────────────────────────────────────────────────────────────
+const DBCtx = createContext<{ db:DB; setDB:React.Dispatch<React.SetStateAction<DB>> }>({} as any);
+const useDB = () => useContext(DBCtx);
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ROOT APP
+// ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [portal, setPortal] = useState<Portal>("home");
-  if (portal === "home")     return <Home onSelect={setPortal} />;
-  if (portal === "admin")    return <AdminPortal    onBack={() => setPortal("home")} />;
-  if (portal === "pharmacy") return <PharmacyPortal onBack={() => setPortal("home")} />;
-  if (portal === "warehouse")return <WarehousePortal onBack={() => setPortal("home")} />;
-  if (portal === "delivery") return <DeliveryPortal  onBack={() => setPortal("home")} />;
-  return null;
+  const [db, setDB] = useState<DB>(INITIAL_DB);
+  const [user, setUser]   = useState<User|null>(null);
+  const logout = () => setUser(null);
+  return (
+    <DBCtx.Provider value={{ db, setDB }}>
+      <div dir="rtl" style={{ fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif", minHeight:"100vh", background:C.bg }}>
+        {!user
+          ? <LoginScreen onLogin={setUser} />
+          : user.role==="admin"
+          ? <AdminPortal    user={user} onLogout={logout} />
+          : user.role==="pharmacy"
+          ? <PharmacyPortal user={user} onLogout={logout} />
+          : user.role==="warehouse"
+          ? <WarehousePortal user={user} onLogout={logout} />
+          : <DeliveryPortal  user={user} onLogout={logout} />
+        }
+      </div>
+    </DBCtx.Provider>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HOME — PORTAL SELECTOR
+// LOGIN
 // ═══════════════════════════════════════════════════════════════════════════════
-function Home({ onSelect }: { onSelect: (p: Portal) => void }) {
-  const portals = [
-    { id:"admin"    as Portal, icon:"🛡️", label:"مدير المنصة",      sub:"الإشراف الكامل، المالية، الاشتراكات",    color:C.admin    },
-    { id:"pharmacy" as Portal, icon:"💊", label:"بوابة الصيدليات",  sub:"إدارة حساب الصيدلية وربطه بالتطبيق",    color:C.pharmacy },
-    { id:"warehouse"as Portal, icon:"🏭", label:"بوابة المذاخر",    sub:"إدارة حساب المذخر وربطه بالتطبيق",      color:C.warehouse},
-    { id:"delivery" as Portal, icon:"🚛", label:"بوابة شركات التوصيل", sub:"إدارة شركة التوصيل وربطها بالتطبيق", color:C.delivery },
-  ];
+function LoginScreen({ onLogin }: { onLogin:(u:User)=>void }) {
+  const [phone, setPhone]   = useState("");
+  const [pass,  setPass]    = useState("");
+  const [error, setError]   = useState("");
+  const [showPass, setShowPass] = useState(false);
+
+  const roleColor:Record<Role,string> = { admin:C.admin, pharmacy:C.pharmacy, warehouse:C.warehouse, delivery:C.delivery };
+  const roleIcon:Record<Role,string>  = { admin:"🛡️", pharmacy:"💊", warehouse:"🏭", delivery:"🚛" };
+
+  const handleLogin = () => {
+    const u = USERS.find(u => u.phone===phone.trim() && u.password===pass.trim());
+    if (u) { setError(""); onLogin(u); }
+    else setError("رقم الهاتف أو كلمة المرور غير صحيحة");
+  };
+
+  const quickLogin = (u:User) => onLogin(u);
+
   return (
-    <div dir="rtl" style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
+    <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:C.bg }}>
       {/* Hero */}
-      <div style={{ background:`linear-gradient(135deg,${C.admin} 0%,#553C9A 100%)`, padding:"50px 24px 70px", textAlign:"center" }}>
-        <div style={{ fontSize:54, marginBottom:8 }}>💊</div>
-        <h1 style={{ color:"#fff", fontSize:36, fontWeight:900, margin:0 }}>دواء +</h1>
-        <p style={{ color:"rgba(255,255,255,0.85)", fontSize:16, margin:"8px 0 0" }}>منظومة الإدارة المتكاملة — إقليم كردستان والعراق</p>
-        <div style={{ display:"flex", justifyContent:"center", gap:32, marginTop:32, flexWrap:"wrap" }}>
-          {[{v:"+2,400",l:"صيدلية"},{v:"+300",l:"مذخر"},{v:"+50",l:"شركة توصيل"}].map(s=>(
-            <div key={s.l} style={{ color:"#fff", textAlign:"center" }}>
-              <div style={{ fontSize:24, fontWeight:900 }}>{s.v}</div>
-              <div style={{ fontSize:12, opacity:0.8 }}>{s.l}</div>
-            </div>
-          ))}
-        </div>
+      <div style={{ background:`linear-gradient(135deg,${C.admin} 0%,#553C9A 100%)`, padding:"40px 24px 60px", textAlign:"center" }}>
+        <div style={{ fontSize:52 }}>💊</div>
+        <h1 style={{ color:"#fff", fontSize:34, fontWeight:900, margin:"8px 0 4px" }}>دواء +</h1>
+        <p style={{ color:"rgba(255,255,255,0.8)", fontSize:14, margin:0 }}>منظومة الإدارة المتكاملة — كردستان والعراق</p>
       </div>
 
-      {/* Portal Cards */}
-      <div style={{ maxWidth:860, margin:"-36px auto 0", padding:"0 20px 60px" }}>
-        <div style={{ background:C.surface, borderRadius:20, padding:"28px 24px", boxShadow:"0 8px 40px rgba(0,0,0,0.10)" }}>
-          <h2 style={{ textAlign:"center", color:C.text, fontSize:17, fontWeight:800, margin:"0 0 20px" }}>اختر البوابة المناسبة</h2>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:14 }}>
-            {portals.map(p => (
-              <PortalCard key={p.id} {...p} onClick={() => onSelect(p.id)} />
+      <div style={{ maxWidth:440, margin:"-30px auto 0", padding:"0 20px 40px", width:"100%" }}>
+        {/* Login Card */}
+        <div style={{ background:C.surface, borderRadius:20, padding:"28px 24px", boxShadow:"0 8px 40px rgba(0,0,0,0.12)", marginBottom:20 }}>
+          <h2 style={{ textAlign:"center", fontSize:18, fontWeight:800, margin:"0 0 20px", color:C.text }}>تسجيل الدخول</h2>
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            <div>
+              <label style={{ fontSize:12, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>رقم الهاتف / معرّف الحساب</label>
+              <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="07xxxxxxxxx"
+                style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:10, padding:"11px 14px",
+                  fontSize:14, boxSizing:"border-box", outline:"none" }} />
+            </div>
+            <div style={{ position:"relative" }}>
+              <label style={{ fontSize:12, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>كلمة المرور</label>
+              <input type={showPass?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="••••••••"
+                style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:10, padding:"11px 14px",
+                  paddingLeft:40, fontSize:14, boxSizing:"border-box", outline:"none" }} />
+              <button onClick={()=>setShowPass(v=>!v)} style={{ position:"absolute", left:12, top:32, background:"none",
+                border:"none", cursor:"pointer", color:C.muted, fontSize:16 }}>{showPass?"🙈":"👁️"}</button>
+            </div>
+            {error && <div style={{ background:"#FFF5F5", border:"1px solid #FED7D7", borderRadius:8, padding:"8px 12px",
+              fontSize:13, color:C.red }}>{error}</div>}
+            <button onClick={handleLogin} style={{ background:`linear-gradient(135deg,${C.admin},#553C9A)`,
+              color:"#fff", border:"none", borderRadius:12, padding:"13px", fontWeight:800, cursor:"pointer", fontSize:15 }}>
+              دخول →
+            </button>
+          </div>
+        </div>
+
+        {/* Demo accounts */}
+        <div style={{ background:C.surface, borderRadius:16, padding:"18px 20px", boxShadow:"0 4px 16px rgba(0,0,0,0.06)" }}>
+          <div style={{ fontSize:12, fontWeight:800, color:C.muted, marginBottom:12, textAlign:"center" }}>
+            🔑 حسابات تجريبية — اضغط للدخول الفوري
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            {USERS.map(u=>(
+              <button key={u.id} onClick={()=>quickLogin(u)}
+                style={{ background:`${roleColor[u.role]}10`, border:`1.5px solid ${roleColor[u.role]}30`,
+                  borderRadius:10, padding:"8px 10px", cursor:"pointer", textAlign:"right", display:"flex", alignItems:"center", gap:6 }}>
+                <span style={{ fontSize:16 }}>{roleIcon[u.role]}</span>
+                <div>
+                  <div style={{ fontSize:11, fontWeight:800, color:roleColor[u.role] }}>{u.name}</div>
+                  <div style={{ fontSize:10, color:C.muted }}>{u.phone}</div>
+                </div>
+              </button>
             ))}
           </div>
         </div>
-        <SyncBanner />
-      </div>
-    </div>
-  );
-}
-
-function PortalCard({ icon, label, sub, color, onClick }: any) {
-  const [hov, setHov] = useState(false);
-  return (
-    <button onClick={onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
-      style={{ background:hov?`${color}18`:`${color}0C`, border:`2px solid ${hov?color:color+"30"}`,
-        borderRadius:16, padding:"22px 14px", cursor:"pointer", textAlign:"center",
-        display:"flex", flexDirection:"column", alignItems:"center", gap:8,
-        transform:hov?"translateY(-3px)":"none", transition:"all 0.18s" }}>
-      <span style={{ fontSize:34 }}>{icon}</span>
-      <span style={{ fontSize:15, fontWeight:800, color }}>{label}</span>
-      <span style={{ fontSize:11, color:C.muted, lineHeight:1.4 }}>{sub}</span>
-    </button>
-  );
-}
-
-function SyncBanner() {
-  return (
-    <div style={{ background:"#EBF8FF", border:"1px solid #90CDF4", borderRadius:14, padding:"14px 18px",
-      display:"flex", alignItems:"center", gap:12, marginTop:18 }}>
-      <span style={{ fontSize:24 }}>🔄</span>
-      <div>
-        <div style={{ fontWeight:800, color:C.blue, fontSize:14 }}>تزامن حي مع تطبيق دواء+</div>
-        <div style={{ fontSize:12, color:"#2C5282" }}>كل تغيير في البوابة ينعكس فوراً في التطبيق، والعكس صحيح — بيانات موحدة في الاتجاهين</div>
       </div>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SHARED LAYOUT
+// LAYOUT
 // ═══════════════════════════════════════════════════════════════════════════════
-function PortalLayout({ color, icon, title, subtitle, onBack, menu, activeSection, onSection, children }: {
-  color:string; icon:string; title:string; subtitle:string; onBack:()=>void;
-  menu:{id:string; label:string; icon:string}[]; activeSection:string;
-  onSection:(s:string)=>void; children:React.ReactNode;
+function Layout({ color, icon, title, userName, menu, active, onNav, onLogout, children }:{
+  color:string; icon:string; title:string; userName:string;
+  menu:{id:string;label:string;icon:string}[]; active:string;
+  onNav:(s:string)=>void; onLogout:()=>void; children:React.ReactNode;
 }) {
-  const [sideOpen, setSideOpen] = useState(true);
+  const [open, setOpen] = useState(true);
   return (
-    <div dir="rtl" style={{ display:"flex", height:"100vh", fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif", overflow:"hidden" }}>
+    <div style={{ display:"flex", height:"100vh", overflow:"hidden" }}>
       {/* Sidebar */}
-      <div style={{ width: sideOpen ? 220 : 60, background:"#1a202c", display:"flex", flexDirection:"column",
-        transition:"width 0.25s", flexShrink:0, overflow:"hidden" }}>
-        <div style={{ padding:"16px 12px", borderBottom:"1px solid #2d3748", display:"flex", alignItems:"center", gap:10 }}>
-          <span style={{ fontSize:24, flexShrink:0 }}>{icon}</span>
-          {sideOpen && <div>
-            <div style={{ color:"#fff", fontSize:13, fontWeight:800, whiteSpace:"nowrap" }}>{title}</div>
-            <div style={{ color:"#A0AEC0", fontSize:10 }}>دواء+</div>
+      <div style={{ width:open?220:60, background:"#1a202c", display:"flex", flexDirection:"column",
+        transition:"width 0.2s", flexShrink:0, overflow:"hidden" }}>
+        <div style={{ padding:"14px 12px", borderBottom:"1px solid #2d3748", display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:22, flexShrink:0 }}>{icon}</span>
+          {open && <div style={{ flex:1 }}>
+            <div style={{ color:"#fff", fontSize:12, fontWeight:800, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{title}</div>
+            <div style={{ color:"#A0AEC0", fontSize:10, whiteSpace:"nowrap" }}>{userName}</div>
           </div>}
-          <button onClick={()=>setSideOpen(v=>!v)} style={{ marginRight:"auto", background:"none", border:"none",
-            color:"#A0AEC0", cursor:"pointer", fontSize:18, flexShrink:0 }}>☰</button>
+          <button onClick={()=>setOpen(v=>!v)} style={{ background:"none", border:"none",
+            color:"#A0AEC0", cursor:"pointer", fontSize:16, flexShrink:0, marginRight:open?"0":"auto" }}>☰</button>
         </div>
-        <div style={{ flex:1, overflowY:"auto", padding:"8px 0" }}>
-          {menu.map(m => (
-            <button key={m.id} onClick={()=>onSection(m.id)}
-              style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"10px 14px",
-                background: activeSection===m.id ? `${color}30` : "none",
-                border:"none", cursor:"pointer", textAlign:"right",
-                borderRight: activeSection===m.id ? `3px solid ${color}` : "3px solid transparent",
-                transition:"all 0.15s" }}>
-              <span style={{ fontSize:18, flexShrink:0 }}>{m.icon}</span>
-              {sideOpen && <span style={{ color: activeSection===m.id ? "#fff" : "#A0AEC0", fontSize:13, fontWeight:activeSection===m.id?700:400, whiteSpace:"nowrap" }}>{m.label}</span>}
+        <div style={{ flex:1, overflowY:"auto", padding:"6px 0" }}>
+          {menu.map(m=>(
+            <button key={m.id} onClick={()=>onNav(m.id)} style={{
+              width:"100%", display:"flex", alignItems:"center", gap:10, padding:"10px 14px",
+              background:active===m.id?`${color}25`:"none", border:"none", cursor:"pointer", textAlign:"right",
+              borderRight:active===m.id?`3px solid ${color}`:"3px solid transparent" }}>
+              <span style={{ fontSize:17, flexShrink:0 }}>{m.icon}</span>
+              {open && <span style={{ color:active===m.id?"#fff":"#A0AEC0", fontSize:13,
+                fontWeight:active===m.id?700:400, whiteSpace:"nowrap" }}>{m.label}</span>}
             </button>
           ))}
         </div>
-        <button onClick={onBack} style={{ padding:"14px", background:"none", border:"none", borderTop:"1px solid #2d3748",
-          color:"#A0AEC0", cursor:"pointer", display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
-          <span>🚪</span>{sideOpen && <span>العودة للرئيسية</span>}
+        <button onClick={onLogout} style={{ padding:14, background:"none", border:"none",
+          borderTop:"1px solid #2d3748", color:"#A0AEC0", cursor:"pointer",
+          display:"flex", alignItems:"center", gap:8, fontSize:13 }}>
+          <span>🚪</span>{open && <span>تسجيل الخروج</span>}
         </button>
       </div>
-
-      {/* Main */}
+      {/* Content */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        {/* Top bar */}
-        <div style={{ background:C.surface, borderBottom:`1px solid ${C.border}`, padding:"0 24px",
-          display:"flex", alignItems:"center", gap:16, height:60, flexShrink:0 }}>
+        <div style={{ background:C.surface, borderBottom:`1px solid ${C.border}`, padding:"0 20px",
+          height:56, display:"flex", alignItems:"center", gap:12, flexShrink:0 }}>
           <div style={{ flex:1 }}>
-            <div style={{ fontWeight:800, fontSize:16, color:C.text }}>{menu.find(m=>m.id===activeSection)?.label}</div>
-            <div style={{ fontSize:11, color:C.muted }}>{subtitle}</div>
+            <span style={{ fontWeight:800, fontSize:15, color:C.text }}>
+              {menu.find(m=>m.id===active)?.label}
+            </span>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:8, background:`${color}12`, borderRadius:20,
-            padding:"6px 14px", border:`1px solid ${color}30` }}>
-            <span style={{ width:8, height:8, borderRadius:"50%", background:"#38A169", display:"block", animation:"pulse 2s infinite" }} />
-            <span style={{ fontSize:12, color, fontWeight:700 }}>متزامن مع التطبيق</span>
+          <div style={{ display:"flex", alignItems:"center", gap:6, background:`${color}12`,
+            borderRadius:20, padding:"5px 12px", border:`1px solid ${color}30` }}>
+            <span style={{ width:7, height:7, borderRadius:"50%", background:C.green, display:"block" }} />
+            <span style={{ fontSize:11, color, fontWeight:700 }}>🔄 متزامن مع التطبيق</span>
           </div>
         </div>
-        {/* Content */}
-        <div style={{ flex:1, overflowY:"auto", padding:24 }}>{children}</div>
+        <div style={{ flex:1, overflowY:"auto", padding:20 }}>{children}</div>
       </div>
     </div>
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function StatBox({ icon, label, value, change, color }: any) {
+// ─── UI Atoms ─────────────────────────────────────────────────────────────────
+function Stat({ icon, label, value, change, color }:any) {
   return (
-    <div style={{ background:C.surface, borderRadius:14, padding:"18px 20px",
-      borderTop:`3px solid ${color}`, boxShadow:"0 2px 8px rgba(0,0,0,0.06)" }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
-        <span style={{ fontSize:24 }}>{icon}</span>
-        {change && <span style={{ fontSize:11, color:C.green, fontWeight:700, background:"#F0FFF4",
-          borderRadius:8, padding:"2px 8px" }}>{change}</span>}
+    <div style={{ background:C.surface, borderRadius:14, padding:"16px 18px",
+      borderTop:`3px solid ${color}`, boxShadow:"0 2px 8px rgba(0,0,0,0.05)" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+        <span style={{ fontSize:22 }}>{icon}</span>
+        {change && <span style={{ fontSize:10, color:C.green, fontWeight:700, background:"#F0FFF4", borderRadius:6, padding:"2px 7px" }}>{change}</span>}
       </div>
-      <div style={{ fontSize:22, fontWeight:900, color:C.text }}>{value}</div>
-      <div style={{ fontSize:12, color:C.muted, marginTop:4 }}>{label}</div>
+      <div style={{ fontSize:20, fontWeight:900, color:C.text }}>{value}</div>
+      <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>{label}</div>
     </div>
   );
 }
-function Badge({ label, color, bg }: any) {
-  return <span style={{ background:bg, color, borderRadius:8, padding:"2px 10px", fontSize:11, fontWeight:700 }}>{label}</span>;
+function Badge({ label, color, bg }:any) {
+  return <span style={{ background:bg, color, borderRadius:7, padding:"2px 9px", fontSize:11, fontWeight:700 }}>{label}</span>;
 }
-function SectionTitle({ title, icon }: any) {
-  return <h3 style={{ fontSize:16, fontWeight:800, color:C.text, margin:"0 0 16px", display:"flex", alignItems:"center", gap:8 }}><span>{icon}</span>{title}</h3>;
+function Card({ children, style }:any) {
+  return <div style={{ background:C.surface, borderRadius:14, padding:18, boxShadow:"0 2px 8px rgba(0,0,0,0.05)", ...style }}>{children}</div>;
 }
-function Card({ children, style }: any) {
-  return <div style={{ background:C.surface, borderRadius:16, padding:20, boxShadow:"0 2px 8px rgba(0,0,0,0.06)", ...style }}>{children}</div>;
-}
-function AppSyncNote({ entity }: { entity: string }) {
+function SyncNote({ text }:{ text:string }) {
   return (
-    <div style={{ background:"#EBF8FF", border:"1px solid #90CDF4", borderRadius:10, padding:"10px 14px",
-      display:"flex", alignItems:"center", gap:8, marginBottom:16 }}>
-      <span style={{ fontSize:16 }}>📱</span>
-      <span style={{ fontSize:12, color:"#2C5282" }}>بيانات {entity} متزامنة مع تطبيق دواء+ — أي تعديل هنا يظهر فوراً في التطبيق</span>
+    <div style={{ background:"#EBF8FF", border:"1px solid #90CDF4", borderRadius:10, padding:"9px 14px",
+      display:"flex", gap:8, alignItems:"center", marginBottom:14 }}>
+      <span>📱</span>
+      <span style={{ fontSize:12, color:"#2C5282" }}>{text}</span>
     </div>
   );
 }
+function H({ icon, title }:any) {
+  return <h3 style={{ fontSize:15, fontWeight:800, color:C.text, margin:"0 0 14px",
+    display:"flex", alignItems:"center", gap:7 }}><span>{icon}</span>{title}</h3>;
+}
+const planBadge = (p:string) => p==="premium"
+  ? { label:"بريميوم ✨", color:"#7C3AED", bg:"#F3F0FF" }
+  : p==="standard"
+  ? { label:"ستاندرد", color:C.blue, bg:"#EBF8FF" }
+  : { label:"مجاني", color:C.muted, bg:"#EDF2F7" };
+const orderBadge = (s:string) => s==="new"?{label:"جديد",color:"#D97706",bg:"#FFF3E0"}:
+  s==="processing"?{label:"قيد التجهيز",color:C.blue,bg:"#EBF8FF"}:
+  s==="completed"?{label:"مكتمل",color:C.green,bg:"#F0FFF4"}:{label:"ملغي",color:C.red,bg:"#FFF5F5"};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADMIN PORTAL
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_MENU = [
-  { id:"dashboard",    label:"لوحة التحكم",      icon:"📊" },
-  { id:"pharmacies",   label:"الصيدليات",         icon:"💊" },
-  { id:"warehouses",   label:"المذاخر",            icon:"🏭" },
-  { id:"delivery_cos", label:"شركات التوصيل",     icon:"🚛" },
-  { id:"subscriptions",label:"الاشتراكات",         icon:"💎" },
-  { id:"finance",      label:"الإدارة المالية",   icon:"💰" },
-  { id:"announcements",label:"الإعلانات",          icon:"📢" },
+  {id:"dash",   label:"لوحة التحكم",   icon:"📊"},
+  {id:"pharms", label:"الصيدليات",      icon:"💊"},
+  {id:"wares",  label:"المذاخر",        icon:"🏭"},
+  {id:"deliv",  label:"شركات التوصيل", icon:"🚛"},
+  {id:"subs",   label:"الاشتراكات",    icon:"💎"},
+  {id:"finance",label:"الإدارة المالية",icon:"💰"},
+  {id:"announce",label:"الإعلانات",    icon:"📢"},
 ];
 
-function AdminPortal({ onBack }: { onBack: ()=>void }) {
-  const [sec, setSec] = useState<AdminSection>("dashboard");
+function AdminPortal({ user, onLogout }:{ user:User; onLogout:()=>void }) {
+  const [sec, setSec] = useState("dash");
+  const { db } = useDB();
   return (
-    <PortalLayout color={C.admin} icon="🛡️" title="مدير المنصة" subtitle="لوحة الإدارة الكاملة لمنصة دواء+"
-      onBack={onBack} menu={ADMIN_MENU} activeSection={sec} onSection={s => setSec(s as AdminSection)}>
-      {sec === "dashboard"     && <AdminDashboard />}
-      {sec === "pharmacies"    && <AdminPharmacies />}
-      {sec === "warehouses"    && <AdminWarehouses />}
-      {sec === "delivery_cos"  && <AdminDeliveries />}
-      {sec === "subscriptions" && <AdminSubscriptions />}
-      {sec === "finance"       && <AdminFinance />}
-      {sec === "announcements" && <AdminAnnouncements />}
-    </PortalLayout>
+    <Layout color={C.admin} icon="🛡️" title="مدير المنصة" userName={user.name}
+      menu={ADMIN_MENU} active={sec} onNav={setSec} onLogout={onLogout}>
+      {sec==="dash"    && <AdminDash    db={db} />}
+      {sec==="pharms"  && <AdminPharms  db={db} />}
+      {sec==="wares"   && <AdminWares   db={db} />}
+      {sec==="deliv"   && <AdminDeliv   db={db} />}
+      {sec==="subs"    && <AdminSubs    db={db} />}
+      {sec==="finance" && <AdminFin     db={db} />}
+      {sec==="announce"&& <AdminAnn />}
+    </Layout>
   );
 }
 
-function AdminDashboard() {
-  const { pharmacies, warehouses, deliveries, finance } = SHARED_DATA;
+function AdminDash({ db }:{ db:DB }) {
+  const totalRev = [...db.pharmacies,...db.warehouses,...db.deliveries].reduce((s,a)=>s+a.revenue,0);
   return (
     <div>
-      <AppSyncNote entity="جميع المشتركين" />
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:14, marginBottom:24 }}>
-        <StatBox icon="💊" label="صيدلية مسجّلة"       value={pharmacies.length.toLocaleString()} change="+43 هذا الشهر" color={C.pharmacy}  />
-        <StatBox icon="🏭" label="مذخر مسجّل"           value={warehouses.length.toLocaleString()} change="+12 هذا الشهر" color={C.warehouse} />
-        <StatBox icon="🚛" label="شركة توصيل"           value={deliveries.length.toLocaleString()} change="+5 هذا الشهر"  color={C.delivery}  />
-        <StatBox icon="💰" label="إيرادات المنصة الكلية" value={`${(finance.totalRevenue/1000000).toFixed(1)}M د.ع`} change="+18% سنوياً" color={C.admin} />
+      <SyncNote text="البيانات تتحدث فور تعديل أي مشترك لحسابه في بوابته الخاصة أو في التطبيق" />
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:12, marginBottom:20 }}>
+        <Stat icon="💊" label="صيدلية نشطة"    value={db.pharmacies.filter(p=>p.active).length}    change="+3 جديدة" color={C.pharmacy}  />
+        <Stat icon="🏭" label="مذخر نشط"        value={db.warehouses.filter(w=>w.active).length}    change="+1 جديد"  color={C.warehouse} />
+        <Stat icon="🚛" label="شركة توصيل"      value={db.deliveries.filter(d=>d.active).length}    color={C.delivery} />
+        <Stat icon="💰" label="إجمالي الإيرادات" value={`${(totalRev/1000000).toFixed(1)}M د.ع`}   change="+18%" color={C.admin} />
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14 }}>
         <Card>
-          <SectionTitle title="آخر الصيدليات المنضمة" icon="💊" />
-          {pharmacies.slice(0,3).map(p=>(
-            <div key={p.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0", borderBottom:`1px solid ${C.border}` }}>
+          <H icon="💊" title="آخر الصيدليات" />
+          {db.pharmacies.map(p=>(
+            <div key={p.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${C.border}`, alignItems:"center" }}>
               <div>
-                <div style={{ fontWeight:700, fontSize:13 }}>{p.name}</div>
-                <div style={{ fontSize:11, color:C.muted }}>{p.city} · {p.joined}</div>
+                <div style={{ fontWeight:700, fontSize:12 }}>{p.name}</div>
+                <div style={{ fontSize:10, color:C.muted }}>{p.city}</div>
               </div>
-              <Badge {...planLabel[p.plan]} />
+              <Badge {...planBadge(p.plan)} />
             </div>
           ))}
         </Card>
         <Card>
-          <SectionTitle title="آخر المذاخر المنضمة" icon="🏭" />
-          {warehouses.slice(0,3).map(w=>(
-            <div key={w.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0", borderBottom:`1px solid ${C.border}` }}>
+          <H icon="🏭" title="آخر المذاخر" />
+          {db.warehouses.map(w=>(
+            <div key={w.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${C.border}`, alignItems:"center" }}>
               <div>
-                <div style={{ fontWeight:700, fontSize:13 }}>{w.name}</div>
-                <div style={{ fontSize:11, color:C.muted }}>{w.city} · {w.joined}</div>
+                <div style={{ fontWeight:700, fontSize:12 }}>{w.name}</div>
+                <div style={{ fontSize:10, color:C.muted }}>{w.city}</div>
               </div>
-              <Badge {...planLabel[w.plan]} />
+              <Badge {...planBadge(w.plan)} />
+            </div>
+          ))}
+        </Card>
+        <Card>
+          <H icon="🚛" title="شركات التوصيل" />
+          {db.deliveries.map(d=>(
+            <div key={d.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${C.border}`, alignItems:"center" }}>
+              <div>
+                <div style={{ fontWeight:700, fontSize:12 }}>{d.name}</div>
+                <div style={{ fontSize:10, color:C.muted }}>{d.rating} ★ · {d.drivers} سائق</div>
+              </div>
+              <Badge {...planBadge(d.plan)} />
             </div>
           ))}
         </Card>
@@ -326,132 +411,112 @@ function AdminDashboard() {
   );
 }
 
-function SubscriberTable({ data, fields, color }: { data:any[]; fields:{key:string;label:string}[]; color:string }) {
-  const [search, setSearch] = useState("");
-  const filtered = data.filter(d => Object.values(d).join(" ").includes(search));
+function AdminTable({ rows, cols, color }:{ rows:any[]; cols:{k:string;l:string}[]; color:string }) {
   return (
-    <div>
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
-        <input placeholder="🔍 بحث..." value={search} onChange={e=>setSearch(e.target.value)}
-          style={{ flex:1, border:`1px solid ${C.border}`, borderRadius:10, padding:"8px 14px", fontSize:13 }} />
-        <button style={{ background:color, color:"#fff", border:"none", borderRadius:10, padding:"8px 18px", fontWeight:700, cursor:"pointer", fontSize:13 }}>
-          + إضافة حساب
-        </button>
-      </div>
-      <div style={{ overflowX:"auto" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-          <thead>
-            <tr style={{ background:C.bg }}>
-              {fields.map(f=><th key={f.key} style={{ padding:"10px 12px", textAlign:"right", color:C.muted, fontWeight:600, borderBottom:`2px solid ${C.border}` }}>{f.label}</th>)}
-              <th style={{ padding:"10px 12px", borderBottom:`2px solid ${C.border}` }}>الإجراء</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row,i)=>(
-              <tr key={i} style={{ borderBottom:`1px solid ${C.border}`, background: i%2===0?C.surface:C.bg }}>
-                {fields.map(f=>(
-                  <td key={f.key} style={{ padding:"10px 12px" }}>
-                    {f.key==="plan" ? <Badge {...planLabel[row[f.key]]} /> :
-                     f.key==="active" ? <Badge label={row[f.key]?"نشط":"معطّل"} color={row[f.key]?C.green:C.red} bg={row[f.key]?"#F0FFF4":"#FFF5F5"} /> :
-                     String(row[f.key]||"—")}
-                  </td>
-                ))}
-                <td style={{ padding:"10px 12px" }}>
-                  <div style={{ display:"flex", gap:6 }}>
-                    <button style={{ background:`${color}15`, color, border:"none", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontSize:12, fontWeight:700 }}>تعديل</button>
-                    <button style={{ background:"#FFF5F5", color:C.red, border:"none", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontSize:12 }}>إيقاف</button>
-                  </div>
+    <div style={{ overflowX:"auto" }}>
+      <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+        <thead>
+          <tr style={{ background:C.bg }}>
+            {cols.map(c=><th key={c.k} style={{ padding:"9px 12px", textAlign:"right", color:C.muted, borderBottom:`2px solid ${C.border}`, fontWeight:600 }}>{c.l}</th>)}
+            <th style={{ padding:"9px 12px", borderBottom:`2px solid ${C.border}` }}>إجراء</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r,i)=>(
+            <tr key={i} style={{ borderBottom:`1px solid ${C.border}`, background:i%2?C.bg:C.surface }}>
+              {cols.map(c=>(
+                <td key={c.k} style={{ padding:"9px 12px" }}>
+                  {c.k==="plan" ? <Badge {...planBadge(r[c.k])} /> :
+                   c.k==="active" ? <Badge label={r[c.k]?"نشط":"معطّل"} color={r[c.k]?C.green:C.red} bg={r[c.k]?"#F0FFF4":"#FFF5F5"} /> :
+                   c.k==="revenue" ? `${Number(r[c.k]).toLocaleString()} د.ع` : String(r[c.k]||"—")}
                 </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              ))}
+              <td style={{ padding:"9px 12px" }}>
+                <span style={{ background:`${color}15`, color, borderRadius:7, padding:"3px 9px", fontSize:11, fontWeight:700, cursor:"pointer" }}>تعديل</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-function AdminPharmacies() {
-  return <div><AppSyncNote entity="حسابات الصيدليات" /><SectionTitle title="إدارة حسابات الصيدليات" icon="💊" />
-    <SubscriberTable color={C.pharmacy} data={SHARED_DATA.pharmacies}
-      fields={[{key:"name",label:"الصيدلية"},{key:"city",label:"المدينة"},{key:"phone",label:"الهاتف"},{key:"plan",label:"الاشتراك"},{key:"active",label:"الحالة"},{key:"revenue",label:"الإيرادات"},{key:"joined",label:"تاريخ الانضمام"}]} /></div>;
+function AdminPharms({ db }:{ db:DB }) {
+  return <Card><SyncNote text="البيانات مُغذَّاة مباشرة من بوابات الصيدليات والتطبيق" /><H icon="💊" title="جميع حسابات الصيدليات" />
+    <AdminTable color={C.pharmacy} rows={db.pharmacies}
+      cols={[{k:"name",l:"الصيدلية"},{k:"city",l:"المدينة"},{k:"phone",l:"الهاتف"},{k:"plan",l:"الاشتراك"},{k:"active",l:"الحالة"},{k:"revenue",l:"الإيراد"},{k:"joined",l:"الانضمام"}]} /></Card>;
 }
-function AdminWarehouses() {
-  return <div><AppSyncNote entity="حسابات المذاخر" /><SectionTitle title="إدارة حسابات المذاخر" icon="🏭" />
-    <SubscriberTable color={C.warehouse} data={SHARED_DATA.warehouses}
-      fields={[{key:"name",label:"المذخر"},{key:"city",label:"المدينة"},{key:"phone",label:"الهاتف"},{key:"plan",label:"الاشتراك"},{key:"active",label:"الحالة"},{key:"revenue",label:"الإيرادات"},{key:"joined",label:"تاريخ الانضمام"}]} /></div>;
+function AdminWares({ db }:{ db:DB }) {
+  return <Card><SyncNote text="البيانات مُغذَّاة مباشرة من بوابات المذاخر والتطبيق" /><H icon="🏭" title="جميع حسابات المذاخر" />
+    <AdminTable color={C.warehouse} rows={db.warehouses}
+      cols={[{k:"name",l:"المذخر"},{k:"city",l:"المدينة"},{k:"phone",l:"الهاتف"},{k:"plan",l:"الاشتراك"},{k:"active",l:"الحالة"},{k:"linkedPharmacies",l:"صيدليات مرتبطة"},{k:"revenue",l:"الإيراد"}]} /></Card>;
 }
-function AdminDeliveries() {
-  return <div><AppSyncNote entity="حسابات شركات التوصيل" /><SectionTitle title="إدارة شركات التوصيل" icon="🚛" />
-    <SubscriberTable color={C.delivery} data={SHARED_DATA.deliveries}
-      fields={[{key:"name",label:"الشركة"},{key:"city",label:"المدينة"},{key:"phone",label:"الهاتف"},{key:"plan",label:"الاشتراك"},{key:"active",label:"الحالة"},{key:"trips",label:"الرحلات"},{key:"rating",label:"التقييم"}]} /></div>;
+function AdminDeliv({ db }:{ db:DB }) {
+  return <Card><SyncNote text="البيانات مُغذَّاة مباشرة من بوابات شركات التوصيل والتطبيق" /><H icon="🚛" title="شركات التوصيل" />
+    <AdminTable color={C.delivery} rows={db.deliveries}
+      cols={[{k:"name",l:"الشركة"},{k:"city",l:"المدينة"},{k:"phone",l:"الهاتف"},{k:"plan",l:"الاشتراك"},{k:"active",l:"الحالة"},{k:"drivers",l:"السائقون"},{k:"rating",l:"التقييم"}]} /></Card>;
 }
 
-function AdminSubscriptions() {
+function AdminSubs({ db }:{ db:DB }) {
   const all = [
-    ...SHARED_DATA.pharmacies.map(p=>({...p, type:"صيدلية", typeIcon:"💊", typeColor:C.pharmacy})),
-    ...SHARED_DATA.warehouses.map(w=>({...w, type:"مذخر", typeIcon:"🏭", typeColor:C.warehouse})),
-    ...SHARED_DATA.deliveries.map(d=>({...d, type:"شركة توصيل", typeIcon:"🚛", typeColor:C.delivery})),
+    ...db.pharmacies.map(p=>({...p,type:"صيدلية",tc:C.pharmacy,ti:"💊"})),
+    ...db.warehouses.map(w=>({...w,type:"مذخر",tc:C.warehouse,ti:"🏭"})),
+    ...db.deliveries.map(d=>({...d,type:"شركة توصيل",tc:C.delivery,ti:"🚛"})),
   ];
   return (
     <div>
-      <AppSyncNote entity="الاشتراكات" />
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12, marginBottom:24 }}>
-        {[{l:"بريميوم",c:C.admin,v:all.filter(a=>a.plan==="premium").length},{l:"ستاندرد",c:C.blue,v:all.filter(a=>a.plan==="standard").length},{l:"مجاني",c:C.muted,v:all.filter(a=>a.plan==="free").length}].map(s=>(
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:16 }}>
+        {[{l:"بريميوم",v:all.filter(a=>a.plan==="premium").length,c:C.admin},
+          {l:"ستاندرد",v:all.filter(a=>a.plan==="standard").length,c:C.blue},
+          {l:"مجاني",v:all.filter(a=>a.plan==="free").length,c:C.muted},
+          {l:"الكل",v:all.length,c:C.text}].map(s=>(
           <Card key={s.l} style={{ textAlign:"center", borderTop:`3px solid ${s.c}` }}>
-            <div style={{ fontSize:28, fontWeight:900, color:s.c }}>{s.v}</div>
+            <div style={{ fontSize:26, fontWeight:900, color:s.c }}>{s.v}</div>
             <div style={{ fontSize:12, color:C.muted }}>{s.l}</div>
           </Card>
         ))}
       </div>
       <Card>
-        <SectionTitle title="جميع الاشتراكات" icon="💎" />
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+        <H icon="💎" title="جميع الاشتراكات" />
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
           <thead><tr style={{ background:C.bg }}>
-            {["النوع","الاسم","المدينة","الاشتراك","الحالة","الإجراء"].map(h=><th key={h} style={{ padding:"10px 12px", textAlign:"right", color:C.muted, borderBottom:`2px solid ${C.border}` }}>{h}</th>)}
-          </tr></thead>
-          <tbody>
-            {all.map((a,i)=>(
-              <tr key={i} style={{ borderBottom:`1px solid ${C.border}` }}>
-                <td style={{ padding:"10px 12px" }}><span style={{ background:`${a.typeColor}15`, color:a.typeColor, borderRadius:8, padding:"2px 10px", fontWeight:700, fontSize:11 }}>{a.typeIcon} {a.type}</span></td>
-                <td style={{ padding:"10px 12px", fontWeight:700 }}>{a.name}</td>
-                <td style={{ padding:"10px 12px", color:C.muted }}>{a.city}</td>
-                <td style={{ padding:"10px 12px" }}><Badge {...planLabel[a.plan]} /></td>
-                <td style={{ padding:"10px 12px" }}><Badge label={a.active?"نشط":"معطّل"} color={a.active?C.green:C.red} bg={a.active?"#F0FFF4":"#FFF5F5"} /></td>
-                <td style={{ padding:"10px 12px" }}>
-                  <button style={{ background:`${C.admin}15`, color:C.admin, border:"none", borderRadius:8, padding:"4px 10px", cursor:"pointer", fontWeight:700, fontSize:12 }}>ترقية</button>
-                </td>
-              </tr>
+            {["النوع","الاسم","المدينة","الاشتراك","الحالة","ترقية"].map(h=>(
+              <th key={h} style={{ padding:"9px 12px", textAlign:"right", color:C.muted, borderBottom:`2px solid ${C.border}` }}>{h}</th>
             ))}
-          </tbody>
+          </tr></thead>
+          <tbody>{all.map((a,i)=>(
+            <tr key={i} style={{ borderBottom:`1px solid ${C.border}` }}>
+              <td style={{ padding:"9px 12px" }}><Badge label={`${a.ti} ${a.type}`} color={a.tc} bg={`${a.tc}15`} /></td>
+              <td style={{ padding:"9px 12px", fontWeight:700 }}>{a.name}</td>
+              <td style={{ padding:"9px 12px", color:C.muted }}>{a.city}</td>
+              <td style={{ padding:"9px 12px" }}><Badge {...planBadge(a.plan)} /></td>
+              <td style={{ padding:"9px 12px" }}><Badge label={a.active?"نشط":"معطّل"} color={a.active?C.green:C.red} bg={a.active?"#F0FFF4":"#FFF5F5"} /></td>
+              <td style={{ padding:"9px 12px" }}><span style={{ background:`${C.admin}15`, color:C.admin, borderRadius:7, padding:"3px 9px", fontSize:11, fontWeight:700, cursor:"pointer" }}>ترقية</span></td>
+            </tr>
+          ))}</tbody>
         </table>
       </Card>
     </div>
   );
 }
 
-function AdminFinance() {
-  const f = SHARED_DATA.finance;
+function AdminFin({ db }:{ db:DB }) {
+  const total = [...db.pharmacies,...db.warehouses,...db.deliveries].reduce((s,a)=>s+a.revenue,0);
   return (
     <div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:14, marginBottom:24 }}>
-        <StatBox icon="💰" label="الإيرادات الكلية"       value={`${(f.totalRevenue/1000000).toFixed(1)}M`}  change="+18%" color={C.admin} />
-        <StatBox icon="📅" label="إيرادات هذا الشهر"     value={`${(f.monthRevenue/1000000).toFixed(1)}M`}  change="+12%" color={C.pharmacy} />
-        <StatBox icon="💎" label="دخل الاشتراكات"         value={`${(f.subscriptionIncome/1000000).toFixed(1)}M`} color={C.warehouse} />
-        <StatBox icon="⏳" label="مدفوعات معلّقة"         value={`${(f.pendingPayments/1000000).toFixed(1)}M`} color={C.delivery} />
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12, marginBottom:16 }}>
+        <Stat icon="💰" label="إجمالي الإيرادات" value={`${(total/1000000).toFixed(1)}M`}  change="+18%" color={C.admin} />
+        <Stat icon="💊" label="إيرادات الصيدليات" value={`${(db.pharmacies.reduce((s,p)=>s+p.revenue,0)/1000000).toFixed(1)}M`} color={C.pharmacy} />
+        <Stat icon="🏭" label="إيرادات المذاخر"   value={`${(db.warehouses.reduce((s,w)=>s+w.revenue,0)/1000000).toFixed(1)}M`} color={C.warehouse} />
+        <Stat icon="🚛" label="إيرادات التوصيل"   value={`${(db.deliveries.reduce((s,d)=>s+d.revenue,0)/1000000).toFixed(1)}M`} color={C.delivery} />
       </div>
-      <Card style={{ marginBottom:16 }}>
-        <SectionTitle title="حسابات وسائل الدفع" icon="🏦" />
-        {f.methods.map(m=>(
-          <div key={m.name} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 0", borderBottom:`1px solid ${C.border}` }}>
-            <div>
-              <div style={{ fontWeight:700, fontSize:14 }}>{m.name}</div>
-              <div style={{ fontSize:12, color:C.muted, fontFamily:"monospace" }}>رقم الحساب: {m.account}</div>
-            </div>
-            <div style={{ textAlign:"left" }}>
-              <div style={{ fontWeight:700, color:C.green, fontSize:15 }}>{m.collected.toLocaleString()} د.ع</div>
-              <div style={{ fontSize:11, color:C.muted }}>محصّل</div>
-            </div>
+      <Card>
+        <H icon="🏦" title="ملخص الإيرادات لكل حساب" />
+        {[...db.pharmacies,...db.warehouses,...db.deliveries].map((a:any,i)=>(
+          <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"9px 0", borderBottom:`1px solid ${C.border}`, alignItems:"center" }}>
+            <span style={{ fontWeight:700, fontSize:13 }}>{a.name}</span>
+            <span style={{ fontWeight:800, color:C.green, fontSize:14 }}>{a.revenue.toLocaleString()} د.ع</span>
           </div>
         ))}
       </Card>
@@ -459,39 +524,42 @@ function AdminFinance() {
   );
 }
 
-function AdminAnnouncements() {
+function AdminAnn() {
   const [form, setForm] = useState({ title:"", body:"", target:"all" });
+  const anns = [
+    { title:"تحديث نظام الاشتراكات",body:"سيتم التحديث في 15 أبريل 2025",target:"all",date:"2025-04-01",pub:true },
+    { title:"رسوم التوصيل الجديدة",body:"تحديث جدول الرسوم بدءاً من مايو",target:"delivery",date:"2025-04-03",pub:true },
+  ];
   return (
     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
       <Card>
-        <SectionTitle title="إنشاء إعلان جديد" icon="✍️" />
+        <H icon="✍️" title="إنشاء إعلان جديد" />
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="عنوان الإعلان"
-            style={{ border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 14px", fontSize:13 }} />
-          <textarea value={form.body} onChange={e=>setForm({...form,body:e.target.value})} placeholder="نص الإعلان..." rows={4}
-            style={{ border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 14px", fontSize:13, resize:"vertical" }} />
+            style={{ border:`1px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13 }} />
+          <textarea value={form.body} onChange={e=>setForm({...form,body:e.target.value})} placeholder="نص الإعلان..." rows={3}
+            style={{ border:`1px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, resize:"vertical" }} />
           <select value={form.target} onChange={e=>setForm({...form,target:e.target.value})}
-            style={{ border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 14px", fontSize:13 }}>
+            style={{ border:`1px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13 }}>
             <option value="all">للجميع</option>
             <option value="pharmacy">الصيدليات فقط</option>
             <option value="warehouse">المذاخر فقط</option>
             <option value="delivery">شركات التوصيل فقط</option>
           </select>
-          <button style={{ background:C.admin, color:"#fff", border:"none", borderRadius:10, padding:"12px", fontWeight:700, cursor:"pointer", fontSize:14 }}>
-            📢 نشر الإعلان
+          <button style={{ background:C.admin, color:"#fff", border:"none", borderRadius:9, padding:11, fontWeight:700, cursor:"pointer" }}>
+            📢 نشر
           </button>
         </div>
       </Card>
       <Card>
-        <SectionTitle title="الإعلانات السابقة" icon="📋" />
-        {SHARED_DATA.announcements.map(a=>(
-          <div key={a.id} style={{ padding:"12px 0", borderBottom:`1px solid ${C.border}` }}>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 }}>
+        <H icon="📋" title="الإعلانات" />
+        {anns.map((a,i)=>(
+          <div key={i} style={{ padding:"10px 0", borderBottom:`1px solid ${C.border}` }}>
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
               <span style={{ fontWeight:700, fontSize:13 }}>{a.title}</span>
-              <Badge label={a.status==="published"?"منشور":"مسودة"} color={a.status==="published"?C.green:C.muted} bg={a.status==="published"?"#F0FFF4":"#EDF2F7"} />
+              <Badge label={a.pub?"منشور":"مسودة"} color={a.pub?C.green:C.muted} bg={a.pub?"#F0FFF4":"#EDF2F7"} />
             </div>
             <div style={{ fontSize:12, color:C.muted }}>{a.body}</div>
-            <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>{a.date} · {a.target==="all"?"للجميع":a.target}</div>
           </div>
         ))}
       </Card>
@@ -502,100 +570,123 @@ function AdminAnnouncements() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // PHARMACY PORTAL
 // ═══════════════════════════════════════════════════════════════════════════════
-const PARTNER_MENU = (type: string) => [
-  { id:"dashboard",    label:"لوحة التحكم",    icon:"📊" },
-  { id:"account",      label:"حسابي",          icon:"👤" },
-  { id:"inventory",    label:type==="pharmacy"?"المخزون":"المنتجات", icon:"📦" },
-  { id:"orders",       label:"الطلبات",         icon:"🛒" },
-  { id:"subscription", label:"الاشتراك",        icon:"💎" },
-  { id:"finance",      label:"المالية",         icon:"💰" },
-  { id:"support",      label:"الدعم والتواصل", icon:"💬" },
+const PH_MENU = [
+  {id:"dash",  label:"لوحة التحكم",   icon:"📊"},
+  {id:"acc",   label:"حسابي",          icon:"👤"},
+  {id:"inv",   label:"المخزون",        icon:"📦"},
+  {id:"orders",label:"الطلبات",        icon:"🛒"},
+  {id:"sub",   label:"الاشتراك",      icon:"💎"},
+  {id:"fin",   label:"المالية",        icon:"💰"},
+  {id:"sup",   label:"الدعم",         icon:"💬"},
 ];
 
-function PharmacyPortal({ onBack }: { onBack:()=>void }) {
-  const ph = SHARED_DATA.pharmacies[0];
-  const [sec, setSec] = useState<PartnerSection>("dashboard");
+function PharmacyPortal({ user, onLogout }:{ user:User; onLogout:()=>void }) {
+  const { db, setDB } = useDB();
+  const [sec, setSec] = useState("dash");
+  const ph = db.pharmacies.find(p=>p.userId===user.id)!;
+  const updatePh = (updated:PharmacyData) =>
+    setDB(prev=>({ ...prev, pharmacies:prev.pharmacies.map(p=>p.id===ph.id?updated:p) }));
   return (
-    <PortalLayout color={C.pharmacy} icon="💊" title="بوابة الصيدلية" subtitle={ph.name}
-      onBack={onBack} menu={PARTNER_MENU("pharmacy")} activeSection={sec} onSection={s=>setSec(s as PartnerSection)}>
-      {sec==="dashboard"    && <PartnerDashboard color={C.pharmacy} entity={ph} type="pharmacy" />}
-      {sec==="account"      && <AccountSection color={C.pharmacy} entity={ph} type="pharmacy" />}
-      {sec==="inventory"    && <InventorySection color={C.pharmacy} />}
-      {sec==="orders"       && <OrdersSection color={C.pharmacy} />}
-      {sec==="subscription" && <SubscriptionSection color={C.pharmacy} plan={ph.plan} />}
-      {sec==="finance"      && <FinanceSection color={C.pharmacy} revenue={ph.revenue} />}
-      {sec==="support"      && <SupportSection color={C.pharmacy} name={ph.name} type="صيدلية" />}
-    </PortalLayout>
+    <Layout color={C.pharmacy} icon="💊" title="بوابة الصيدلية" userName={ph.name}
+      menu={PH_MENU} active={sec} onNav={setSec} onLogout={onLogout}>
+      {sec==="dash"   && <PartnerDash color={C.pharmacy} name={ph.name} city={ph.city}
+        stats={[{icon:"📦",l:"منتج",v:ph.products.length},{icon:"🛒",l:"طلب",v:ph.orders.length},
+          {icon:"💰",l:"إيراد",v:`${(ph.revenue/1000000).toFixed(1)}M د.ع`},{icon:"💎",l:"الاشتراك",v:planBadge(ph.plan).label}]} orders={ph.orders} />}
+      {sec==="acc"    && <AccountSec color={C.pharmacy} data={ph} onSave={updatePh}
+        fields={[{k:"name",l:"الاسم التجاري"},{k:"city",l:"المدينة"},{k:"phone",l:"الهاتف"},{k:"address",l:"العنوان"},{k:"email",l:"البريد الإلكتروني"},{k:"license",l:"رقم الرخصة"}]} />}
+      {sec==="inv"    && <InvSec color={C.pharmacy} products={ph.products} onUpdate={prods=>updatePh({...ph,products:prods})} />}
+      {sec==="orders" && <OrdersSec color={C.pharmacy} orders={ph.orders} onUpdate={ords=>updatePh({...ph,orders:ords})} />}
+      {sec==="sub"    && <SubSec color={C.pharmacy} plan={ph.plan} onUpgrade={p=>updatePh({...ph,plan:p})} />}
+      {sec==="fin"    && <FinSec color={C.pharmacy} revenue={ph.revenue} />}
+      {sec==="sup"    && <SupportSec color={C.pharmacy} name={ph.name} />}
+    </Layout>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // WAREHOUSE PORTAL
 // ═══════════════════════════════════════════════════════════════════════════════
-function WarehousePortal({ onBack }: { onBack:()=>void }) {
-  const wh = SHARED_DATA.warehouses[0];
-  const [sec, setSec] = useState<PartnerSection>("dashboard");
+function WarehousePortal({ user, onLogout }:{ user:User; onLogout:()=>void }) {
+  const { db, setDB } = useDB();
+  const [sec, setSec] = useState("dash");
+  const wh = db.warehouses.find(w=>w.userId===user.id)!;
+  const updateWh = (updated:WarehouseData) =>
+    setDB(prev=>({ ...prev, warehouses:prev.warehouses.map(w=>w.id===wh.id?updated:w) }));
   return (
-    <PortalLayout color={C.warehouse} icon="🏭" title="بوابة المذخر" subtitle={wh.name}
-      onBack={onBack} menu={PARTNER_MENU("warehouse")} activeSection={sec} onSection={s=>setSec(s as PartnerSection)}>
-      {sec==="dashboard"    && <PartnerDashboard color={C.warehouse} entity={wh} type="warehouse" />}
-      {sec==="account"      && <AccountSection color={C.warehouse} entity={wh} type="warehouse" />}
-      {sec==="inventory"    && <InventorySection color={C.warehouse} />}
-      {sec==="orders"       && <OrdersSection color={C.warehouse} />}
-      {sec==="subscription" && <SubscriptionSection color={C.warehouse} plan={wh.plan} />}
-      {sec==="finance"      && <FinanceSection color={C.warehouse} revenue={wh.revenue} />}
-      {sec==="support"      && <SupportSection color={C.warehouse} name={wh.name} type="مذخر" />}
-    </PortalLayout>
+    <Layout color={C.warehouse} icon="🏭" title="بوابة المذخر" userName={wh.name}
+      menu={PH_MENU} active={sec} onNav={setSec} onLogout={onLogout}>
+      {sec==="dash"   && <PartnerDash color={C.warehouse} name={wh.name} city={wh.city}
+        stats={[{icon:"📦",l:"منتج",v:wh.products.length},{icon:"💼",l:"طلب",v:wh.orders.length},
+          {icon:"💰",l:"إيراد",v:`${(wh.revenue/1000000).toFixed(1)}M`},{icon:"🤝",l:"صيدليات مرتبطة",v:wh.linkedPharmacies}]} orders={wh.orders} />}
+      {sec==="acc"    && <AccountSec color={C.warehouse} data={wh} onSave={updateWh}
+        fields={[{k:"name",l:"اسم المذخر"},{k:"city",l:"المدينة"},{k:"phone",l:"الهاتف"},{k:"address",l:"العنوان"},{k:"email",l:"البريد الإلكتروني"}]} />}
+      {sec==="inv"    && <InvSec color={C.warehouse} products={wh.products} onUpdate={prods=>updateWh({...wh,products:prods})} />}
+      {sec==="orders" && <OrdersSec color={C.warehouse} orders={wh.orders} onUpdate={ords=>updateWh({...wh,orders:ords})} />}
+      {sec==="sub"    && <SubSec color={C.warehouse} plan={wh.plan} onUpgrade={p=>updateWh({...wh,plan:p})} />}
+      {sec==="fin"    && <FinSec color={C.warehouse} revenue={wh.revenue} />}
+      {sec==="sup"    && <SupportSec color={C.warehouse} name={wh.name} />}
+    </Layout>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DELIVERY PORTAL
 // ═══════════════════════════════════════════════════════════════════════════════
-function DeliveryPortal({ onBack }: { onBack:()=>void }) {
-  const dl = SHARED_DATA.deliveries[0];
-  const [sec, setSec] = useState<PartnerSection>("dashboard");
+const DL_MENU = [
+  {id:"dash",  label:"لوحة التحكم",   icon:"📊"},
+  {id:"acc",   label:"حسابي",          icon:"👤"},
+  {id:"inv",   label:"الرحلات",        icon:"🗺️"},
+  {id:"orders",label:"السائقون",       icon:"👥"},
+  {id:"sub",   label:"الاشتراك",      icon:"💎"},
+  {id:"fin",   label:"المالية",        icon:"💰"},
+  {id:"sup",   label:"الدعم",         icon:"💬"},
+];
+
+function DeliveryPortal({ user, onLogout }:{ user:User; onLogout:()=>void }) {
+  const { db, setDB } = useDB();
+  const [sec, setSec] = useState("dash");
+  const dl = db.deliveries.find(d=>d.userId===user.id)!;
+  const updateDl = (updated:DeliveryData) =>
+    setDB(prev=>({ ...prev, deliveries:prev.deliveries.map(d=>d.id===dl.id?updated:d) }));
   return (
-    <PortalLayout color={C.delivery} icon="🚛" title="بوابة شركة التوصيل" subtitle={dl.name}
-      onBack={onBack} menu={PARTNER_MENU("delivery")} activeSection={sec} onSection={s=>setSec(s as PartnerSection)}>
-      {sec==="dashboard"    && <PartnerDashboard color={C.delivery} entity={dl} type="delivery" />}
-      {sec==="account"      && <AccountSection color={C.delivery} entity={dl} type="delivery" />}
-      {sec==="inventory"    && <InventorySection color={C.delivery} />}
-      {sec==="orders"       && <OrdersSection color={C.delivery} />}
-      {sec==="subscription" && <SubscriptionSection color={C.delivery} plan={dl.plan} />}
-      {sec==="finance"      && <FinanceSection color={C.delivery} revenue={dl.revenue} />}
-      {sec==="support"      && <SupportSection color={C.delivery} name={dl.name} type="شركة توصيل" />}
-    </PortalLayout>
+    <Layout color={C.delivery} icon="🚛" title="بوابة شركة التوصيل" userName={dl.name}
+      menu={DL_MENU} active={sec} onNav={setSec} onLogout={onLogout}>
+      {sec==="dash"   && <PartnerDash color={C.delivery} name={dl.name} city={dl.city}
+        stats={[{icon:"🚛",l:"رحلة",v:dl.trips.length},{icon:"👥",l:"سائق",v:dl.drivers},
+          {icon:"⭐",l:"تقييم",v:`${dl.rating} ★`},{icon:"💰",l:"إيراد",v:`${(dl.revenue/1000000).toFixed(1)}M`}]} orders={dl.trips.map(t=>({id:t.id,product:`${t.from} → ${t.to}`,amount:t.amount,status:t.status,date:t.date,customer:t.driver}))} />}
+      {sec==="acc"    && <AccountSec color={C.delivery} data={dl} onSave={updateDl}
+        fields={[{k:"name",l:"اسم الشركة"},{k:"city",l:"المدينة"},{k:"phone",l:"الهاتف"},{k:"address",l:"العنوان"},{k:"email",l:"البريد الإلكتروني"}]} />}
+      {sec==="inv"    && <TripsSec color={C.delivery} trips={dl.trips} />}
+      {sec==="orders" && <DriversTab drivers={dl.drivers} />}
+      {sec==="sub"    && <SubSec color={C.delivery} plan={dl.plan} onUpgrade={p=>updateDl({...dl,plan:p})} />}
+      {sec==="fin"    && <FinSec color={C.delivery} revenue={dl.revenue} />}
+      {sec==="sup"    && <SupportSec color={C.delivery} name={dl.name} />}
+    </Layout>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SHARED PARTNER SECTIONS
+// SHARED SECTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
-function PartnerDashboard({ color, entity, type }: { color:string; entity:any; type:string }) {
-  const isDelivery = type === "delivery";
+function PartnerDash({ color, name, city, stats, orders }:any) {
   return (
     <div>
-      <AppSyncNote entity={`حساب ${entity.name}`} />
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:14, marginBottom:24 }}>
-        {!isDelivery && <StatBox icon="📦" label="منتج في المخزون" value={entity.products?.toLocaleString?.()||entity.products} color={color} />}
-        {!isDelivery && <StatBox icon="🛒" label="طلبات اليوم"    value={entity.orders}                              change="+5 جديدة" color={color} />}
-        {isDelivery  && <StatBox icon="🚛" label="رحلة اليوم"     value={entity.trips}                               change="+8 مكتملة" color={color} />}
-        {isDelivery  && <StatBox icon="⭐" label="التقييم"         value={entity.rating+" ★"}                        color={color} />}
-        <StatBox icon="💰" label="إيرادات الشهر" value={entity.revenue?.toLocaleString?.()+" د.ع"||"—"} color={color} />
-        <StatBox icon="📅" label="تاريخ الانضمام" value={entity.joined} color={C.muted} />
+      <SyncNote text={`بيانات ${name} متزامنة مع تطبيق دواء+ — أي تعديل يظهر فوراً للمدير وفي التطبيق`} />
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:12, marginBottom:18 }}>
+        {stats.map((s:any)=><Stat key={s.l} icon={s.icon} label={s.l} value={s.v} color={color} />)}
       </div>
       <Card>
-        <SectionTitle title="آخر الطلبات من التطبيق" icon="📱" />
-        {SHARED_DATA.orders.map(o=>(
-          <div key={o.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0", borderBottom:`1px solid ${C.border}` }}>
+        <H icon="📱" title="آخر الطلبات من التطبيق" />
+        {orders.map((o:any)=>(
+          <div key={o.id} style={{ display:"flex", justifyContent:"space-between", padding:"9px 0", borderBottom:`1px solid ${C.border}`, alignItems:"center" }}>
             <div>
               <span style={{ fontWeight:700, color, fontSize:13 }}>{o.id}</span>
-              <span style={{ fontSize:13, color:C.text, marginRight:10 }}>{o.product}</span>
+              <span style={{ fontSize:13, marginRight:8 }}>{o.product}</span>
+              <span style={{ fontSize:11, color:C.muted }}>· {o.date}</span>
             </div>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <span style={{ fontSize:13, fontWeight:700 }}>{o.amount.toLocaleString()} د.ع</span>
-              <Badge {...statusMap[o.status]} />
+            <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+              <span style={{ fontWeight:700, fontSize:13 }}>{o.amount?.toLocaleString()} د.ع</span>
+              <Badge {...orderBadge(o.status)} />
             </div>
           </div>
         ))}
@@ -604,76 +695,101 @@ function PartnerDashboard({ color, entity, type }: { color:string; entity:any; t
   );
 }
 
-function AccountSection({ color, entity, type }: { color:string; entity:any; type:string }) {
+function AccountSec({ color, data, onSave, fields }:{ color:string; data:any; onSave:(d:any)=>void; fields:{k:string;l:string}[] }) {
+  const [form, setForm] = useState<any>({...data});
   const [saved, setSaved] = useState(false);
-  const fields = [
-    { label:"الاسم التجاري", val:entity.name },
-    { label:"المدينة",        val:entity.city },
-    { label:"رقم الهاتف",    val:entity.phone },
-    ...(type==="pharmacy"?[{ label:"رقم الرخصة", val:"PH-20240115" }]:[]),
-    ...(type==="warehouse"?[{ label:"صيدليات مرتبطة", val:entity.linked+" صيدلية" }]:[]),
-    ...(type==="delivery"?[{ label:"عدد السائقين", val:entity.drivers+" سائق" }]:[]),
-  ];
+  const save = () => { onSave(form); setSaved(true); setTimeout(()=>setSaved(false), 3000); };
   return (
     <div>
-      <AppSyncNote entity="بيانات الحساب" />
-      <Card style={{ maxWidth:600 }}>
-        <SectionTitle title="معلومات الحساب" icon="👤" />
-        <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:16 }}>
+      <SyncNote text="حفظ البيانات هنا يُحدّثها فوراً في بوابة المدير وفي التطبيق" />
+      <Card style={{ maxWidth:560 }}>
+        <H icon="👤" title="معلومات الحساب" />
+        <div style={{ display:"flex", flexDirection:"column", gap:11, marginBottom:14 }}>
           {fields.map(f=>(
-            <div key={f.label}>
-              <label style={{ fontSize:12, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>{f.label}</label>
-              <input defaultValue={f.val} style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 14px", fontSize:14, boxSizing:"border-box" }} />
+            <div key={f.k}>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:3 }}>{f.l}</label>
+              <input value={form[f.k]||""} onChange={e=>setForm({...form,[f.k]:e.target.value})}
+                style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box" }} />
             </div>
           ))}
         </div>
-        <button onClick={()=>{setSaved(true);setTimeout(()=>setSaved(false),3000)}}
-          style={{ background:color, color:"#fff", border:"none", borderRadius:10, padding:"12px 24px",
-            fontWeight:700, cursor:"pointer", fontSize:14, width:"100%" }}>
-          {saved ? "✅ تم الحفظ والمزامنة مع التطبيق" : "💾 حفظ ومزامنة مع التطبيق"}
+        <button onClick={save} style={{ background:color, color:"#fff", border:"none", borderRadius:9,
+          padding:"12px", width:"100%", fontWeight:800, cursor:"pointer", fontSize:14 }}>
+          {saved?"✅ تم الحفظ والمزامنة مع التطبيق وبوابة المدير!":"💾 حفظ ومزامنة"}
         </button>
         {saved && <div style={{ textAlign:"center", fontSize:12, color:C.green, marginTop:8 }}>
-          ✅ تم تحديث بياناتك في التطبيق أيضاً
+          ✅ يمكن للمدير رؤية التغييرات الآن
         </div>}
       </Card>
     </div>
   );
 }
 
-function InventorySection({ color }: { color:string }) {
-  const items = [
-    { name:"باراسيتامول 500mg",  qty:12,  unit:"علبة",  price:3500,  expiry:"2025-08-01" },
-    { name:"أموكسيسيلين 500mg",  qty:8,   unit:"علبة",  price:4200,  expiry:"2025-06-15" },
-    { name:"ميتفورمين 850mg",    qty:5,   unit:"علبة",  price:5800,  expiry:"2025-09-30" },
-    { name:"فيتامين C 1000mg",   qty:34,  unit:"علبة",  price:2800,  expiry:"2026-01-01" },
-    { name:"أنسولين نوفوميكس",   qty:20,  unit:"قارورة",price:15000, expiry:"2025-05-20" },
-  ];
+function InvSec({ color, products, onUpdate }:{ color:string; products:Product[]; onUpdate:(p:Product[])=>void }) {
+  const [items, setItems] = useState<Product[]>(products);
+  const [saved, setSaved] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newItem, setNewItem] = useState<Partial<Product>>({ name:"", qty:0, price:0, expiry:"", unit:"علبة" });
+
+  const updateQty = (id:string, qty:number) => setItems(prev=>prev.map(p=>p.id===id?{...p,qty}:p));
+  const save = () => { onUpdate(items); setSaved(true); setTimeout(()=>setSaved(false),2500); };
+  const addItem = () => {
+    const updated = [...items, { id:`p${Date.now()}`, name:newItem.name||"", qty:newItem.qty||0,
+      price:newItem.price||0, expiry:newItem.expiry||"", unit:newItem.unit||"علبة" }];
+    setItems(updated); onUpdate(updated); setShowAdd(false);
+    setNewItem({ name:"", qty:0, price:0, expiry:"", unit:"علبة" });
+  };
+
   return (
     <div>
-      <AppSyncNote entity="المخزون" />
-      <div style={{ display:"flex", gap:10, marginBottom:16 }}>
-        <input placeholder="🔍 بحث..." style={{ flex:1, border:`1px solid ${C.border}`, borderRadius:10, padding:"8px 14px", fontSize:13 }} />
-        <button style={{ background:color, color:"#fff", border:"none", borderRadius:10, padding:"8px 18px", fontWeight:700, cursor:"pointer" }}>+ إضافة</button>
+      <SyncNote text="تعديل المخزون هنا يُحدّثه في التطبيق وبوابة المدير فوراً" />
+      <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+        <button onClick={()=>setShowAdd(v=>!v)} style={{ background:color, color:"#fff", border:"none", borderRadius:9, padding:"8px 16px", fontWeight:700, cursor:"pointer" }}>+ إضافة منتج</button>
+        <button onClick={save} style={{ background:C.green, color:"#fff", border:"none", borderRadius:9, padding:"8px 16px", fontWeight:700, cursor:"pointer" }}>
+          {saved?"✅ تم الحفظ":"💾 حفظ التغييرات"}
+        </button>
       </div>
+      {showAdd && (
+        <Card style={{ marginBottom:12, border:`2px solid ${color}` }}>
+          <H icon="➕" title="إضافة منتج جديد" />
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:10 }}>
+            <input placeholder="اسم المنتج" value={newItem.name} onChange={e=>setNewItem({...newItem,name:e.target.value})}
+              style={{ border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 10px", fontSize:13 }} />
+            <input type="number" placeholder="الكمية" value={newItem.qty||""} onChange={e=>setNewItem({...newItem,qty:Number(e.target.value)})}
+              style={{ border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 10px", fontSize:13 }} />
+            <input type="number" placeholder="السعر" value={newItem.price||""} onChange={e=>setNewItem({...newItem,price:Number(e.target.value)})}
+              style={{ border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 10px", fontSize:13 }} />
+            <input placeholder="تاريخ الانتهاء" value={newItem.expiry} onChange={e=>setNewItem({...newItem,expiry:e.target.value})}
+              style={{ border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 10px", fontSize:13 }} />
+            <select value={newItem.unit} onChange={e=>setNewItem({...newItem,unit:e.target.value})}
+              style={{ border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 10px", fontSize:13 }}>
+              {["علبة","قارورة","كيس","كرتون","صندوق"].map(u=><option key={u}>{u}</option>)}
+            </select>
+            <button onClick={addItem} style={{ background:color, color:"#fff", border:"none", borderRadius:8, fontWeight:700, cursor:"pointer" }}>إضافة</button>
+          </div>
+        </Card>
+      )}
       <Card>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
           <thead><tr style={{ background:C.bg }}>
             {["المنتج","الكمية","الوحدة","السعر","انتهاء الصلاحية","الحالة"].map(h=>(
-              <th key={h} style={{ padding:"10px 12px", textAlign:"right", color:C.muted, borderBottom:`2px solid ${C.border}`, fontWeight:600 }}>{h}</th>
+              <th key={h} style={{ padding:"9px 12px", textAlign:"right", color:C.muted, borderBottom:`2px solid ${C.border}` }}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
             {items.map((it,i)=>(
-              <tr key={i} style={{ borderBottom:`1px solid ${C.border}`, background:i%2===0?C.surface:C.bg }}>
-                <td style={{ padding:"10px 12px", fontWeight:700 }}>{it.name}</td>
-                <td style={{ padding:"10px 12px", fontWeight:700, color:it.qty<10?C.red:C.text }}>{it.qty}</td>
-                <td style={{ padding:"10px 12px", color:C.muted }}>{it.unit}</td>
-                <td style={{ padding:"10px 12px" }}>{it.price.toLocaleString()} د.ع</td>
-                <td style={{ padding:"10px 12px", color:C.muted }}>{it.expiry}</td>
-                <td style={{ padding:"10px 12px" }}>
-                  {it.qty < 10
-                    ? <Badge label="ينفد" color={C.red} bg="#FFF5F5" />
-                    : <Badge label="متوفر" color={C.green} bg="#F0FFF4" />}
+              <tr key={it.id} style={{ borderBottom:`1px solid ${C.border}`, background:i%2?C.bg:C.surface }}>
+                <td style={{ padding:"9px 12px", fontWeight:700 }}>{it.name}</td>
+                <td style={{ padding:"9px 12px" }}>
+                  <input type="number" value={it.qty} onChange={e=>updateQty(it.id,Number(e.target.value))}
+                    style={{ width:60, border:`1px solid ${it.qty<10?C.red:C.border}`, borderRadius:7, padding:"3px 6px",
+                      fontSize:13, fontWeight:700, color:it.qty<10?C.red:C.text }} />
+                </td>
+                <td style={{ padding:"9px 12px", color:C.muted }}>{it.unit}</td>
+                <td style={{ padding:"9px 12px" }}>{it.price.toLocaleString()} د.ع</td>
+                <td style={{ padding:"9px 12px", color:C.muted }}>{it.expiry}</td>
+                <td style={{ padding:"9px 12px" }}>
+                  {it.qty<10 ? <Badge label="ينفد" color={C.red} bg="#FFF5F5" /> : <Badge label="متوفر" color={C.green} bg="#F0FFF4" />}
                 </td>
               </tr>
             ))}
@@ -684,22 +800,32 @@ function InventorySection({ color }: { color:string }) {
   );
 }
 
-function OrdersSection({ color }: { color:string }) {
+function OrdersSec({ color, orders, onUpdate }:{ color:string; orders:Order[]; onUpdate:(o:Order[])=>void }) {
+  const updateStatus = (id:string, status:string) => {
+    const updated = orders.map(o=>o.id===id?{...o,status}:o);
+    onUpdate(updated);
+  };
   return (
     <div>
-      <AppSyncNote entity="الطلبات" />
+      <SyncNote text="الطلبات تصل مباشرة من التطبيق — يمكنك تحديث حالتها هنا" />
       <Card>
-        <SectionTitle title="الطلبات المستقبَلة من التطبيق" icon="📱" />
-        {SHARED_DATA.orders.map(o=>(
-          <div key={o.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 0", borderBottom:`1px solid ${C.border}` }}>
+        <H icon="🛒" title="الطلبات" />
+        {orders.map(o=>(
+          <div key={o.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 0", borderBottom:`1px solid ${C.border}` }}>
             <div>
-              <div style={{ fontWeight:700, color, marginBottom:2 }}>{o.id}</div>
+              <div style={{ fontWeight:700, color, fontSize:13 }}>{o.id}</div>
               <div style={{ fontSize:13 }}>{o.product}</div>
-              <div style={{ fontSize:11, color:C.muted }}>{o.date}</div>
+              <div style={{ fontSize:11, color:C.muted }}>{o.customer} · {o.date}</div>
             </div>
-            <div style={{ textAlign:"left", display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
-              <div style={{ fontWeight:800 }}>{o.amount.toLocaleString()} د.ع</div>
-              <Badge {...statusMap[o.status]} />
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontWeight:700, fontSize:13 }}>{o.amount.toLocaleString()} د.ع</span>
+              <select value={o.status} onChange={e=>updateStatus(o.id,e.target.value)}
+                style={{ border:`1px solid ${C.border}`, borderRadius:8, padding:"4px 8px", fontSize:12, cursor:"pointer" }}>
+                <option value="new">جديد</option>
+                <option value="processing">قيد التجهيز</option>
+                <option value="completed">مكتمل</option>
+                <option value="cancelled">ملغي</option>
+              </select>
             </div>
           </div>
         ))}
@@ -708,28 +834,31 @@ function OrdersSection({ color }: { color:string }) {
   );
 }
 
-function SubscriptionSection({ color, plan }: { color:string; plan:string }) {
+function SubSec({ color, plan, onUpgrade }:{ color:string; plan:string; onUpgrade:(p:string)=>void }) {
   const plans = [
-    { id:"free",     name:"مجاني",    price:0,        features:["5 منتجات","دعم أساسي","بدون إعلانات"] },
-    { id:"standard", name:"ستاندرد",  price:25000,    features:["200 منتج","دعم أولوية","إعلان واحد","تقارير شهرية"] },
-    { id:"premium",  name:"بريميوم",  price:65000,    features:["منتجات غير محدودة","دعم 24/7","إعلانات متعددة","تقارير تفصيلية","مدير حساب خاص"] },
+    { id:"free",    name:"مجاني",   price:0,      features:["5 منتجات","دعم أساسي"] },
+    { id:"standard",name:"ستاندرد", price:25000,  features:["200 منتج","دعم أولوية","تقارير شهرية"] },
+    { id:"premium", name:"بريميوم", price:65000,  features:["غير محدود","دعم 24/7","مدير حساب خاص","إعلانات"] },
   ];
+  const [upgrading, setUpgrading] = useState<string|null>(null);
+  const doUpgrade = (pid:string) => { setUpgrading(pid); setTimeout(()=>{ onUpgrade(pid); setUpgrading(null); },1200); };
   return (
     <div>
-      <AppSyncNote entity="الاشتراك" />
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:16 }}>
+      <SyncNote text="الاشتراك يُحدَّث في بوابة المدير وفي التطبيق فوراً عند الترقية" />
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))", gap:14 }}>
         {plans.map(p=>(
           <Card key={p.id} style={{ border:`2px solid ${p.id===plan?color:C.border}`, position:"relative" }}>
-            {p.id===plan && <div style={{ position:"absolute", top:-10, right:16, background:color, color:"#fff", borderRadius:10, padding:"2px 12px", fontSize:11, fontWeight:700 }}>اشتراكك الحالي</div>}
-            <div style={{ fontWeight:800, fontSize:18, marginBottom:4 }}>{p.name}</div>
-            <div style={{ fontSize:22, fontWeight:900, color, marginBottom:16 }}>
-              {p.price===0 ? "مجاني" : `${p.price.toLocaleString()} د.ع/شهر`}
+            {p.id===plan && <div style={{ position:"absolute", top:-10, right:14, background:color, color:"#fff", borderRadius:9, padding:"2px 10px", fontSize:11, fontWeight:700 }}>اشتراكك الحالي</div>}
+            <div style={{ fontWeight:800, fontSize:17, marginBottom:4 }}>{p.name}</div>
+            <div style={{ fontSize:20, fontWeight:900, color, marginBottom:12 }}>
+              {p.price===0?"مجاني":`${p.price.toLocaleString()} د.ع/شهر`}
             </div>
-            {p.features.map(f=><div key={f} style={{ fontSize:13, color:C.text, marginBottom:6, display:"flex", gap:6 }}><span style={{ color:C.green }}>✓</span>{f}</div>)}
-            {p.id !== plan && (
-              <button style={{ marginTop:12, background:color, color:"#fff", border:"none", borderRadius:10,
-                padding:"10px", width:"100%", fontWeight:700, cursor:"pointer", fontSize:14 }}>
-                الترقية إلى {p.name}
+            {p.features.map(f=><div key={f} style={{ fontSize:12, marginBottom:5, display:"flex", gap:5 }}><span style={{ color:C.green }}>✓</span>{f}</div>)}
+            {p.id!==plan && (
+              <button onClick={()=>doUpgrade(p.id)} disabled={upgrading===p.id}
+                style={{ marginTop:10, background:color, color:"#fff", border:"none", borderRadius:9,
+                  padding:"9px", width:"100%", fontWeight:700, cursor:"pointer", fontSize:13 }}>
+                {upgrading===p.id?"⏳ جاري الترقية...":"ترقية"}
               </button>
             )}
           </Card>
@@ -739,25 +868,23 @@ function SubscriptionSection({ color, plan }: { color:string; plan:string }) {
   );
 }
 
-function FinanceSection({ color, revenue }: { color:string; revenue:number }) {
+function FinSec({ color, revenue }:{ color:string; revenue:number }) {
   const payments = [
-    { method:"زين كاش",  ref:"ZC-20250401", amount:850000,  date:"2025-04-01", status:"completed" },
-    { method:"فاست باي", ref:"FP-20250315", amount:650000,  date:"2025-03-15", status:"completed" },
-    { method:"FIB",       ref:"FI-20250301", amount:1200000, date:"2025-03-01", status:"completed" },
-    { method:"نقداً",    ref:"CA-20250215", amount:500000,  date:"2025-02-15", status:"completed" },
+    { method:"زين كاش", ref:"ZC-20250401", amount:Math.round(revenue*0.25), date:"2025-04-01" },
+    { method:"فاست باي",ref:"FP-20250315", amount:Math.round(revenue*0.15), date:"2025-03-15" },
+    { method:"FIB",     ref:"FI-20250301", amount:Math.round(revenue*0.30), date:"2025-03-01" },
   ];
   return (
     <div>
-      <AppSyncNote entity="المالية" />
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:14, marginBottom:24 }}>
-        <StatBox icon="💰" label="إجمالي الإيرادات" value={`${(revenue/1000000).toFixed(1)}M د.ع`} color={color} />
-        <StatBox icon="📅" label="هذا الشهر"        value={`${(revenue*0.3/1000000).toFixed(1)}M د.ع`} change="+8%" color={color} />
-        <StatBox icon="⏳" label="قيد المعالجة"     value="١٢٠,٠٠٠ د.ع" color={C.delivery} />
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:16 }}>
+        <Stat icon="💰" label="الإجمالي"     value={`${(revenue/1000000).toFixed(1)}M د.ع`}  change="+8%"  color={color} />
+        <Stat icon="📅" label="هذا الشهر"   value={`${(revenue*0.3/1000000).toFixed(2)}M`}  color={color} />
+        <Stat icon="⏳" label="معلّق"        value={`${(revenue*0.05/1000).toFixed(0)}K`}    color={C.orange} />
       </div>
       <Card>
-        <SectionTitle title="سجل المدفوعات" icon="📋" />
+        <H icon="📋" title="سجل المدفوعات" />
         {payments.map((p,i)=>(
-          <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 0", borderBottom:`1px solid ${C.border}` }}>
+          <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", borderBottom:`1px solid ${C.border}`, alignItems:"center" }}>
             <div>
               <div style={{ fontWeight:700, fontSize:13 }}>{p.method}</div>
               <div style={{ fontSize:11, color:C.muted }}>Ref: {p.ref} · {p.date}</div>
@@ -773,82 +900,112 @@ function FinanceSection({ color, revenue }: { color:string; revenue:number }) {
   );
 }
 
-function SupportSection({ color, name, type }: { color:string; name:string; type:string }) {
-  const [msg, setMsg] = useState("");
-  const [sent, setSent] = useState(false);
+function TripsSec({ color, trips }:{ color:string; trips:Trip[] }) {
+  const tripStatus = (s:string) => s==="active"?{label:"نشطة",color:C.blue,bg:"#EBF8FF"}:
+    s==="completed"?{label:"مكتملة",color:C.green,bg:"#F0FFF4"}:{label:"انتظار",color:C.orange,bg:"#FFFAF0"};
+  return (
+    <div>
+      <SyncNote text="الرحلات تتزامن مع التطبيق في الوقت الفعلي" />
+      <Card>
+        <H icon="🗺️" title="الرحلات" />
+        {trips.map(t=>(
+          <div key={t.id} style={{ padding:"12px 0", borderBottom:`1px solid ${C.border}` }}>
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+              <span style={{ fontWeight:700, color, fontSize:13 }}>{t.id}</span>
+              <Badge {...tripStatus(t.status)} />
+            </div>
+            <div style={{ fontSize:13 }}>{t.from} → {t.to}</div>
+            <div style={{ fontSize:11, color:C.muted }}>السائق: {t.driver} · {t.date} · {t.amount.toLocaleString()} د.ع</div>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
+function DriversTab({ drivers }:{ drivers:number }) {
+  const list = Array.from({ length:drivers },(_,i)=>({ name:`سائق ${i+1}`, status:i%3===0?"في الخدمة":i%3===1?"مشغول":"متوقف" }));
+  return (
+    <Card>
+      <H icon="👥" title={`السائقون (${drivers})`} />
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))", gap:8 }}>
+        {list.map((d,i)=>(
+          <div key={i} style={{ background:C.bg, borderRadius:10, padding:"10px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <span style={{ fontSize:13, fontWeight:600 }}>{d.name}</span>
+            <Badge label={d.status}
+              color={d.status==="في الخدمة"?C.green:d.status==="مشغول"?C.blue:C.muted}
+              bg={d.status==="في الخدمة"?"#F0FFF4":d.status==="مشغول"?"#EBF8FF":"#EDF2F7"} />
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function SupportSec({ color, name }:{ color:string; name:string }) {
   const [tab, setTab] = useState<"tickets"|"chat"|"contact">("tickets");
+  const [msg, setMsg] = useState(""); const [sent, setSent] = useState(false);
   const tickets = [
-    { id:"TK-001", title:"مشكلة في الطلبات", status:"open",     date:"2025-04-03", reply:"نحن ندرس مشكلتك..." },
-    { id:"TK-002", title:"سؤال عن الاشتراك", status:"resolved", date:"2025-04-01", reply:"تم الحل، راجع الاشتراكات." },
+    { id:"TK-001", title:"مشكلة في الطلبات",  status:"open",     date:"2025-04-03", reply:"نحن ندرس مشكلتك..." },
+    { id:"TK-002", title:"سؤال عن الاشتراك", status:"resolved", date:"2025-04-01", reply:"تم الحل، راجع قسم الاشتراك." },
   ];
   return (
     <div>
-      <AppSyncNote entity="الدعم" />
-      <div style={{ display:"flex", gap:8, marginBottom:20 }}>
+      <div style={{ display:"flex", gap:8, marginBottom:16 }}>
         {([["tickets","🎫 التذاكر"],["chat","💬 رسالة للمدير"],["contact","📞 التواصل"]] as const).map(([id,label])=>(
-          <button key={id} onClick={()=>setTab(id)}
-            style={{ background:tab===id?color:"#EDF2F7", color:tab===id?"#fff":C.text,
-              border:"none", borderRadius:10, padding:"8px 18px", fontWeight:700, cursor:"pointer", fontSize:13 }}>
+          <button key={id} onClick={()=>setTab(id)} style={{ background:tab===id?color:"#EDF2F7", color:tab===id?"#fff":C.text,
+            border:"none", borderRadius:9, padding:"8px 16px", fontWeight:700, cursor:"pointer", fontSize:13 }}>
             {label}
           </button>
         ))}
       </div>
-
       {tab==="tickets" && (
         <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
           {tickets.map(t=>(
             <Card key={t.id}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
-                <div>
-                  <span style={{ fontWeight:700, color }}>{t.id}</span>
-                  <span style={{ fontWeight:700, fontSize:14, marginRight:10 }}>{t.title}</span>
-                </div>
-                <Badge label={t.status==="open"?"مفتوحة":"محلولة"} color={t.status==="open"?C.delivery:C.green} bg={t.status==="open"?"#FFF3E0":"#F0FFF4"} />
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                <span style={{ fontWeight:700, color }}>{t.id} — {t.title}</span>
+                <Badge label={t.status==="open"?"مفتوحة":"محلولة"} color={t.status==="open"?C.orange:C.green} bg={t.status==="open"?"#FFF3E0":"#F0FFF4"} />
               </div>
-              <div style={{ fontSize:12, color:C.muted, marginBottom:6 }}>رد المدير: {t.reply}</div>
-              <div style={{ fontSize:11, color:C.muted }}>{t.date}</div>
+              <div style={{ fontSize:12, color:C.muted }}>رد المدير: {t.reply}</div>
+              <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>{t.date}</div>
             </Card>
           ))}
           <Card>
-            <SectionTitle title="فتح تذكرة جديدة" icon="✍️" />
-            <input placeholder="موضوع المشكلة" style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 14px", marginBottom:8, fontSize:13, boxSizing:"border-box" }} />
-            <textarea placeholder="وصف المشكلة بالتفصيل..." rows={3} style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 14px", fontSize:13, resize:"vertical", boxSizing:"border-box" }} />
-            <button style={{ background:color, color:"#fff", border:"none", borderRadius:10, padding:"10px 20px", fontWeight:700, cursor:"pointer", marginTop:8, fontSize:14 }}>إرسال التذكرة</button>
+            <H icon="✍️" title="فتح تذكرة جديدة" />
+            <input placeholder="موضوع المشكلة" style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:9, padding:"9px 12px", marginBottom:8, fontSize:13, boxSizing:"border-box" }} />
+            <textarea placeholder="وصف تفصيلي..." rows={3} style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, resize:"vertical", boxSizing:"border-box" }} />
+            <button style={{ background:color, color:"#fff", border:"none", borderRadius:9, padding:"9px 18px", fontWeight:700, cursor:"pointer", marginTop:8 }}>إرسال</button>
           </Card>
         </div>
       )}
-
       {tab==="chat" && (
         <Card>
-          <SectionTitle title="رسالة مباشرة لمدير المنصة" icon="💬" />
-          <div style={{ background:C.bg, borderRadius:12, padding:16, minHeight:120, marginBottom:12, fontSize:13, color:C.muted }}>
+          <H icon="💬" title="رسالة مباشرة لمدير المنصة" />
+          <div style={{ background:C.bg, borderRadius:10, padding:14, minHeight:100, marginBottom:10, fontSize:13, color:C.muted }}>
             مرحباً {name}! كيف يمكننا مساعدتك؟ 👋
           </div>
-          <textarea placeholder="اكتب رسالتك هنا..." value={msg} onChange={e=>setMsg(e.target.value)}
-            rows={3} style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 14px", fontSize:13, resize:"vertical", boxSizing:"border-box", marginBottom:8 }} />
-          <button onClick={()=>{setSent(true);setMsg("");setTimeout(()=>setSent(false),4000)}}
-            style={{ background:color, color:"#fff", border:"none", borderRadius:10, padding:"10px 20px", fontWeight:700, cursor:"pointer", fontSize:14 }}>
-            {sent ? "✅ تم الإرسال!" : "📨 إرسال إلى المدير"}
+          <textarea placeholder="اكتب رسالتك..." value={msg} onChange={e=>setMsg(e.target.value)} rows={3}
+            style={{ width:"100%", border:`1px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, resize:"vertical", boxSizing:"border-box", marginBottom:8 }} />
+          <button onClick={()=>{ setSent(true); setMsg(""); setTimeout(()=>setSent(false),3500); }}
+            style={{ background:color, color:"#fff", border:"none", borderRadius:9, padding:"9px 18px", fontWeight:700, cursor:"pointer" }}>
+            {sent?"✅ تم الإرسال!":"📨 إرسال"}
           </button>
-          {sent && <div style={{ color:C.green, fontSize:12, marginTop:8 }}>✅ تم إرسال رسالتك، سيرد عليك المدير قريباً</div>}
+          {sent && <div style={{ color:C.green, fontSize:12, marginTop:8 }}>✅ وصلت رسالتك — سيرد المدير قريباً</div>}
         </Card>
       )}
-
       {tab==="contact" && (
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:14 }}>
-          {[
-            { icon:"📞", label:"هاتف",    value:"+964 770 000 0001", action:"tel:+9647700000001" },
-            { icon:"💬", label:"واتساب",  value:"+964 770 000 0001", action:"https://wa.me/9647700000001" },
-            { icon:"📧", label:"البريد",  value:"admin@dawaplus.iq", action:"mailto:admin@dawaplus.iq" },
-            { icon:"🌐", label:"الموقع",  value:"dawaplus.iq",       action:"#" },
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:12 }}>
+          {[{icon:"📞",l:"هاتف",v:"+964 770 000 0001",a:"tel:+9647700000001"},
+            {icon:"💬",l:"واتساب",v:"+964 770 000 0001",a:"https://wa.me/9647700000001"},
+            {icon:"📧",l:"البريد",v:"admin@dawaplus.iq",a:"mailto:admin@dawaplus.iq"},
           ].map(c=>(
-            <Card key={c.label} style={{ textAlign:"center" }}>
-              <div style={{ fontSize:36, marginBottom:8 }}>{c.icon}</div>
-              <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>{c.label}</div>
-              <div style={{ fontSize:12, color:C.muted, marginBottom:12 }}>{c.value}</div>
-              <a href={c.action} target="_blank" rel="noreferrer"
-                style={{ background:color, color:"#fff", borderRadius:10, padding:"8px 16px",
-                  fontSize:13, fontWeight:700, textDecoration:"none", display:"inline-block" }}>تواصل الآن</a>
+            <Card key={c.l} style={{ textAlign:"center" }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>{c.icon}</div>
+              <div style={{ fontWeight:700, fontSize:13, marginBottom:3 }}>{c.l}</div>
+              <div style={{ fontSize:11, color:C.muted, marginBottom:10 }}>{c.v}</div>
+              <a href={c.a} target="_blank" rel="noreferrer"
+                style={{ background:color, color:"#fff", borderRadius:9, padding:"7px 14px", fontSize:12, fontWeight:700, textDecoration:"none" }}>تواصل</a>
             </Card>
           ))}
         </div>
