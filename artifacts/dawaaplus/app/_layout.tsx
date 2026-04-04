@@ -19,6 +19,7 @@ import { CartProvider } from "@/contexts/CartContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { IntegrationProvider } from "@/contexts/IntegrationContext";
 import { OrdersProvider } from "@/contexts/OrdersContext";
+import { InventoryProvider } from "@/contexts/InventoryContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -88,9 +89,11 @@ export default function RootLayout() {
                 <AuthProvider>
                   <IntegrationProvider>
                     <OrdersProvider>
-                      <CartProvider>
-                        <RootLayoutNav />
-                      </CartProvider>
+                      <InventoryProvider>
+                        <CartProvider>
+                          <RootLayoutNav />
+                        </CartProvider>
+                      </InventoryProvider>
                     </OrdersProvider>
                   </IntegrationProvider>
                 </AuthProvider>

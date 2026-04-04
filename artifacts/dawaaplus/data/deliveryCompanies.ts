@@ -1,3 +1,10 @@
+export interface DeliveryRating {
+  stars: number;
+  comment: string;
+  date: string;
+  reviewerType: "pharmacy" | "warehouse";
+}
+
 export interface DeliveryCompany {
   id: string;
   name: string;
@@ -15,6 +22,9 @@ export interface DeliveryCompany {
   isActive: boolean;
   isDefault: boolean;
   color: string;
+  rating: number;
+  ratingCount: number;
+  reviews: DeliveryRating[];
 }
 
 export const ALL_DELIVERY_COMPANIES: DeliveryCompany[] = [
@@ -35,6 +45,12 @@ export const ALL_DELIVERY_COMPANIES: DeliveryCompany[] = [
     isActive: true,
     isDefault: true,
     color: "#7C3AED",
+    rating: 4.7,
+    ratingCount: 128,
+    reviews: [
+      { stars: 5, comment: "خدمة ممتازة وسريعة جداً", date: "2026-03-20", reviewerType: "pharmacy" },
+      { stars: 4, comment: "التوصيل في الوقت المحدد دائماً", date: "2026-03-15", reviewerType: "warehouse" },
+    ],
   },
   {
     id: "dc2",
@@ -52,6 +68,12 @@ export const ALL_DELIVERY_COMPANIES: DeliveryCompany[] = [
     isActive: true,
     isDefault: false,
     color: "#F59E0B",
+    rating: 4.4,
+    ratingCount: 76,
+    reviews: [
+      { stars: 5, comment: "أسرع شركة توصيل في أربيل", date: "2026-03-18", reviewerType: "pharmacy" },
+      { stars: 4, comment: "جيدة لكن أحياناً يتأخرون", date: "2026-03-10", reviewerType: "pharmacy" },
+    ],
   },
   {
     id: "dc3",
@@ -70,6 +92,11 @@ export const ALL_DELIVERY_COMPANIES: DeliveryCompany[] = [
     isActive: false,
     isDefault: false,
     color: "#E53E3E",
+    rating: 4.2,
+    ratingCount: 43,
+    reviews: [
+      { stars: 4, comment: "موثوقة للشحنات الكبيرة", date: "2026-02-28", reviewerType: "warehouse" },
+    ],
   },
   {
     id: "dc4",
@@ -87,6 +114,11 @@ export const ALL_DELIVERY_COMPANIES: DeliveryCompany[] = [
     isActive: true,
     isDefault: false,
     color: "#0D7A54",
+    rating: 4.0,
+    ratingCount: 31,
+    reviews: [
+      { stars: 4, comment: "سعر مناسب وخدمة جيدة", date: "2026-03-05", reviewerType: "pharmacy" },
+    ],
   },
   {
     id: "dc5",
@@ -104,5 +136,10 @@ export const ALL_DELIVERY_COMPANIES: DeliveryCompany[] = [
     isActive: false,
     isDefault: false,
     color: "#2563EB",
+    rating: 3.8,
+    ratingCount: 19,
+    reviews: [
+      { stars: 3, comment: "متوسطة، تحتاج تحسين في التواصل", date: "2026-02-20", reviewerType: "warehouse" },
+    ],
   },
 ];

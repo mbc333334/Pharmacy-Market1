@@ -9,7 +9,9 @@ pnpm workspace monorepo using TypeScript. داواپلاس is a pharmacy & medic
 - **App Name**: صيدليتي + (Saydaliti+) — "صيدليتي" = My Pharmacy in Arabic/Kurdish
 - **3 Languages**: Arabic (العربية), Kurdish (کوردی), English — switchable from welcome screen
 - **User Types**: Customer, Pharmacy, Warehouse, Admin (مدير التطبيق)
-- **Pharmacy Database Integration**: CSV/Excel import, REST API, MySQL/PostgreSQL, WooCommerce, Odoo
+- **Pharmacy Database Integration**: CSV/Excel import, REST API, MySQL/PostgreSQL — full import screen for pharmacies at `(pharmacy)/import.tsx` with barcode scan, database connect, and auto-sync log
+- **Delivery Company Rating**: Both pharmacies and warehouses can rate delivery companies (1-5 stars + comment), ratings shown on cards and in detail modal with review history
+- **Inventory Auto-Sync (InventoryContext)**: `contexts/InventoryContext.tsx` — when a customer order is completed → pharmacy stock decrements automatically; when warehouse ships to pharmacy → pharmacy stock increments; full sync event log with settings
 - **Warehouse Accounts**: Linked only to participating pharmacies, full dashboard with inventory/orders/pharmacies management
 - **Default Region**: Iraq (العراق, +964)
 - **Subscription System**: 3 tiers (Free/Standard/Premium) for pharmacies and warehouses, pricing in د.ع

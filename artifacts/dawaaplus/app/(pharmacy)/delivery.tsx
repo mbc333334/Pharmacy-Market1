@@ -7,7 +7,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { ALL_DELIVERY_COMPANIES, DeliveryCompany } from "@/data/deliveryCompanies";
+import { ALL_DELIVERY_COMPANIES, DeliveryCompany, DeliveryRating } from "@/data/deliveryCompanies";
+
+const ACCENT = Colors.primary;
 
 export default function PharmacyDeliveryScreen() {
   const insets = useSafeAreaInsets();
@@ -16,6 +18,10 @@ export default function PharmacyDeliveryScreen() {
   const [selectedCompany, setSelectedCompany] = useState<DeliveryCompany | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingTarget, setRatingTarget] = useState<DeliveryCompany | null>(null);
+  const [ratingStars, setRatingStars] = useState(0);
+  const [ratingComment, setRatingComment] = useState("");
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newWhatsapp, setNewWhatsapp] = useState("");
@@ -27,23 +33,46 @@ export default function PharmacyDeliveryScreen() {
     activeFilter === "all" ? true : activeFilter === "active" ? c.isActive : !c.isActive
   );
 
-  const toggleActive = (id: string) => {
+  const toggleActive = (id: string) =>
     setCompanies(prev => prev.map(c => c.id === id ? { ...c, isActive: !c.isActive } : c));
-  };
 
-  const setDefault = (id: string) => {
+  const setDefault = (id: string) =>
     setCompanies(prev => prev.map(c => ({ ...c, isDefault: c.id === id })));
-  };
 
   const openDetail = (company: DeliveryCompany) => {
     setSelectedCompany(company);
     setShowModal(true);
   };
 
-  const callCompany = (phone: string) => {
-    Linking.openURL(`tel:${phone.replace(/\s/g, "")}`);
+  const openRating = (company: DeliveryCompany) => {
+    setRatingTarget(company);
+    setRatingStars(0);
+    setRatingComment("");
+    setShowRatingModal(true);
   };
 
+  const submitRating = () => {
+    if (ratingStars === 0) {
+      Alert.alert("تنبيه", "يرجى اختيار عدد النجوم");
+      return;
+    }
+    const newReview: DeliveryRating = {
+      stars: ratingStars,
+      comment: ratingComment.trim(),
+      date: new Date().toISOString().split("T")[0],
+      reviewerType: "pharmacy",
+    };
+    setCompanies(prev => prev.map(c => {
+      if (c.id !== ratingTarget?.id) return c;
+      const allReviews = [newReview, ...c.reviews];
+      const avg = allReviews.reduce((s, r) => s + r.stars, 0) / allReviews.length;
+      return { ...c, reviews: allReviews, rating: Math.round(avg * 10) / 10, ratingCount: c.ratingCount + 1 };
+    }));
+    setShowRatingModal(false);
+    Alert.alert("شكراً! ✅", "تم إرسال تقييمك بنجاح");
+  };
+
+  const callCompany = (phone: string) => Linking.openURL(`tel:${phone.replace(/\s/g, "")}`);
   const whatsappCompany = (wa: string, name: string) => {
     const msg = encodeURIComponent(`مرحباً ${name}، أنا من الصيدلية، أريد الاستفسار عن خدمات التوصيل.`);
     Linking.openURL(`https://wa.me/${wa}?text=${msg}`);
@@ -56,20 +85,12 @@ export default function PharmacyDeliveryScreen() {
     }
     const newCo: DeliveryCompany = {
       id: `custom-${Date.now()}`,
-      name: newName,
-      nameEn: newName,
-      logo: "🚚",
-      type: "local",
-      baseFee: parseInt(newFee) || 3000,
-      perKmFee: 150,
-      estimatedTime: newTime || "2-4 ساعات",
-      cities: [],
-      phone: newPhone,
-      whatsapp: newWhatsapp || newPhone.replace(/\D/g, ""),
-      features: ["توصيل محلي"],
-      isActive: true,
-      isDefault: false,
-      color: "#6B7280",
+      name: newName, nameEn: newName, logo: "🚚", type: "local",
+      baseFee: parseInt(newFee) || 3000, perKmFee: 150,
+      estimatedTime: newTime || "2-4 ساعات", cities: [],
+      phone: newPhone, whatsapp: newWhatsapp || newPhone.replace(/\D/g, ""),
+      features: ["توصيل محلي"], isActive: true, isDefault: false, color: "#6B7280",
+      rating: 0, ratingCount: 0, reviews: [],
     };
     setCompanies(prev => [...prev, newCo]);
     setNewName(""); setNewPhone(""); setNewWhatsapp(""); setNewFee(""); setNewTime("");
@@ -80,7 +101,6 @@ export default function PharmacyDeliveryScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddModal(true)}>
           <Ionicons name="add" size={20} color="#fff" />
@@ -92,29 +112,21 @@ export default function PharmacyDeliveryScreen() {
         </View>
       </View>
 
-      {/* Info Banner */}
       <View style={styles.infoBanner}>
         <Ionicons name="information-circle" size={18} color="#2563EB" />
         <Text style={styles.infoBannerText}>
-          فعّل الشركات التي تريد العمل معها، واضبط شركة التوصيل الافتراضية لطلباتك
+          فعّل الشركات التي تريد العمل معها، وقيّمها بعد كل تجربة توصيل لمساعدة باقي الصيادلة
         </Text>
       </View>
 
-      {/* Filters */}
       <View style={styles.filterRow}>
-        {[
-          { key: "all", label: "الكل" },
-          { key: "active", label: "مفعّلة" },
-          { key: "inactive", label: "معطّلة" },
-        ].map(f => (
+        {[{ key: "all", label: "الكل" }, { key: "active", label: "مفعّلة" }, { key: "inactive", label: "معطّلة" }].map(f => (
           <TouchableOpacity
             key={f.key}
             style={[styles.filterBtn, activeFilter === f.key && styles.filterBtnActive]}
             onPress={() => setActiveFilter(f.key as any)}
           >
-            <Text style={[styles.filterBtnText, activeFilter === f.key && styles.filterBtnTextActive]}>
-              {f.label}
-            </Text>
+            <Text style={[styles.filterBtnText, activeFilter === f.key && styles.filterBtnTextActive]}>{f.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -127,11 +139,13 @@ export default function PharmacyDeliveryScreen() {
         renderItem={({ item }) => (
           <DeliveryCard
             company={item}
+            accentColor={ACCENT}
             onToggle={() => toggleActive(item.id)}
             onSetDefault={() => setDefault(item.id)}
             onDetail={() => openDetail(item)}
             onCall={() => callCompany(item.phone)}
             onWhatsApp={() => whatsappCompany(item.whatsapp, item.name)}
+            onRate={() => openRating(item)}
           />
         )}
       />
@@ -144,11 +158,13 @@ export default function PharmacyDeliveryScreen() {
             {selectedCompany && (
               <CompanyDetail
                 company={selectedCompany}
+                accentColor={ACCENT}
                 onClose={() => setShowModal(false)}
                 onCall={() => callCompany(selectedCompany.phone)}
                 onWhatsApp={() => whatsappCompany(selectedCompany.whatsapp, selectedCompany.name)}
                 onSetDefault={() => { setDefault(selectedCompany.id); setShowModal(false); }}
                 onToggle={() => { toggleActive(selectedCompany.id); setShowModal(false); }}
+                onRate={() => { setShowModal(false); openRating(selectedCompany); }}
                 isDefault={selectedCompany.isDefault}
                 isActive={selectedCompany.isActive}
               />
@@ -169,50 +185,26 @@ export default function PharmacyDeliveryScreen() {
               <Text style={styles.addModalTitle}>إضافة شركة توصيل مخصصة</Text>
             </View>
             <ScrollView contentContainerStyle={styles.addForm}>
-              <Text style={styles.fieldLabel}>اسم الشركة *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newName}
-                onChangeText={setNewName}
-                placeholder="مثال: شركة النجم للتوصيل"
-                textAlign="right"
-              />
-              <Text style={styles.fieldLabel}>رقم الهاتف *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newPhone}
-                onChangeText={setNewPhone}
-                placeholder="+964 750 000 0000"
-                keyboardType="phone-pad"
-                textAlign="right"
-              />
-              <Text style={styles.fieldLabel}>واتساب (اختياري)</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newWhatsapp}
-                onChangeText={setNewWhatsapp}
-                placeholder="9647XXXXXXXXX"
-                keyboardType="phone-pad"
-                textAlign="right"
-              />
-              <Text style={styles.fieldLabel}>رسوم التوصيل الأساسية (د.ع)</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newFee}
-                onChangeText={setNewFee}
-                placeholder="3000"
-                keyboardType="numeric"
-                textAlign="right"
-              />
-              <Text style={styles.fieldLabel}>وقت التوصيل المتوقع</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newTime}
-                onChangeText={setNewTime}
-                placeholder="2-4 ساعات"
-                textAlign="right"
-              />
-              <TouchableOpacity style={styles.saveBtn} onPress={addCustomCompany}>
+              {[
+                { label: "اسم الشركة *", val: newName, set: setNewName, ph: "مثال: شركة النجم للتوصيل", kb: "default" },
+                { label: "رقم الهاتف *", val: newPhone, set: setNewPhone, ph: "+964 750 000 0000", kb: "phone-pad" },
+                { label: "واتساب (اختياري)", val: newWhatsapp, set: setNewWhatsapp, ph: "9647XXXXXXXXX", kb: "phone-pad" },
+                { label: "رسوم التوصيل الأساسية (د.ع)", val: newFee, set: setNewFee, ph: "3000", kb: "numeric" },
+                { label: "وقت التوصيل المتوقع", val: newTime, set: setNewTime, ph: "2-4 ساعات", kb: "default" },
+              ].map(f => (
+                <View key={f.label}>
+                  <Text style={styles.fieldLabel}>{f.label}</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={f.val}
+                    onChangeText={f.set}
+                    placeholder={f.ph}
+                    keyboardType={f.kb as any}
+                    textAlign="right"
+                  />
+                </View>
+              ))}
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: ACCENT }]} onPress={addCustomCompany}>
                 <Ionicons name="checkmark-circle" size={20} color="#fff" />
                 <Text style={styles.saveBtnText}>حفظ الشركة</Text>
               </TouchableOpacity>
@@ -220,27 +212,83 @@ export default function PharmacyDeliveryScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Rating Modal */}
+      <Modal visible={showRatingModal} animationType="slide" transparent onRequestClose={() => setShowRatingModal(false)}>
+        <View style={styles.overlay}>
+          <View style={styles.ratingModal}>
+            <View style={styles.modalHandle} />
+            <View style={styles.ratingHeader}>
+              <TouchableOpacity onPress={() => setShowRatingModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              </TouchableOpacity>
+              <Text style={styles.ratingTitle}>تقييم {ratingTarget?.name}</Text>
+            </View>
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map(s => (
+                <TouchableOpacity key={s} onPress={() => setRatingStars(s)}>
+                  <Ionicons
+                    name={s <= ratingStars ? "star" : "star-outline"}
+                    size={40}
+                    color={s <= ratingStars ? "#F59E0B" : Colors.border}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.ratingLabel}>
+              {ratingStars === 0 ? "اختر تقييمك" : ["", "ضعيف", "مقبول", "جيد", "جيد جداً", "ممتاز"][ratingStars]}
+            </Text>
+            <Text style={styles.fieldLabel}>تعليقك (اختياري)</Text>
+            <TextInput
+              style={[styles.textInput, { minHeight: 80, textAlignVertical: "top" }]}
+              value={ratingComment}
+              onChangeText={setRatingComment}
+              placeholder="شارك تجربتك مع هذه الشركة..."
+              textAlign="right"
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: ratingStars > 0 ? ACCENT : Colors.border }]}
+              onPress={submitRating}
+            >
+              <Ionicons name="send" size={18} color="#fff" />
+              <Text style={styles.saveBtnText}>إرسال التقييم</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-function DeliveryCard({
-  company, onToggle, onSetDefault, onDetail, onCall, onWhatsApp,
-}: {
-  company: DeliveryCompany;
-  onToggle: () => void;
-  onSetDefault: () => void;
-  onDetail: () => void;
-  onCall: () => void;
-  onWhatsApp: () => void;
-}) {
-  const typeLabel: Record<string, string> = {
-    express: "إكسبرس", national: "وطني", local: "محلي",
-  };
+function StarDisplay({ rating, count, size = 13 }: { rating: number; count: number; size?: number }) {
+  const full = Math.floor(rating);
+  const half = rating - full >= 0.5;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+      {[1, 2, 3, 4, 5].map(s => (
+        <Ionicons
+          key={s}
+          name={s <= full ? "star" : (s === full + 1 && half ? "star-half" : "star-outline")}
+          size={size}
+          color="#F59E0B"
+        />
+      ))}
+      <Text style={{ fontSize: size - 1, color: Colors.textMuted, marginRight: 2 }}>
+        {rating.toFixed(1)} ({count})
+      </Text>
+    </View>
+  );
+}
 
+function DeliveryCard({ company, accentColor, onToggle, onSetDefault, onDetail, onCall, onWhatsApp, onRate }: {
+  company: DeliveryCompany; accentColor: string;
+  onToggle: () => void; onSetDefault: () => void; onDetail: () => void;
+  onCall: () => void; onWhatsApp: () => void; onRate: () => void;
+}) {
+  const typeLabel: Record<string, string> = { express: "إكسبرس", national: "وطني", local: "محلي" };
   return (
     <View style={[styles.card, !company.isActive && styles.cardInactive]}>
-      {/* Top */}
       <TouchableOpacity style={styles.cardTop} onPress={onDetail} activeOpacity={0.8}>
         <View style={styles.cardTopRight}>
           <View style={[styles.logoBox, { backgroundColor: company.color + "20" }]}>
@@ -249,9 +297,7 @@ function DeliveryCard({
           <View style={styles.cardInfo}>
             <View style={styles.nameLine}>
               {company.isDefault && (
-                <View style={styles.defaultBadge}>
-                  <Text style={styles.defaultBadgeText}>افتراضي</Text>
-                </View>
+                <View style={styles.defaultBadge}><Text style={styles.defaultBadgeText}>افتراضي</Text></View>
               )}
               <Text style={styles.companyName}>{company.name}</Text>
             </View>
@@ -261,36 +307,36 @@ function DeliveryCard({
               </View>
               <Text style={styles.timeText}>{company.estimatedTime}</Text>
             </View>
+            {company.ratingCount > 0 && <StarDisplay rating={company.rating} count={company.ratingCount} />}
           </View>
         </View>
         <Switch
           value={company.isActive}
           onValueChange={onToggle}
-          thumbColor={company.isActive ? Colors.primary : "#ccc"}
-          trackColor={{ false: Colors.border, true: Colors.primaryLight }}
+          thumbColor={company.isActive ? accentColor : "#ccc"}
+          trackColor={{ false: Colors.border, true: accentColor + "50" }}
         />
       </TouchableOpacity>
 
-      {/* Fee */}
       <View style={styles.feeRow}>
-        <Text style={styles.feeValue}>{company.baseFee.toLocaleString()} د.ع</Text>
+        <Text style={[styles.feeValue, { color: accentColor }]}>{company.baseFee.toLocaleString()} د.ع</Text>
         <Text style={styles.feeLabel}>رسوم التوصيل الأساسية</Text>
       </View>
 
-      {/* Cities */}
       {company.cities.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.citiesRow}>
           {company.cities.map(city => (
-            <View key={city} style={styles.cityTag}>
-              <Text style={styles.cityTagText}>{city}</Text>
-            </View>
+            <View key={city} style={styles.cityTag}><Text style={styles.cityTagText}>{city}</Text></View>
           ))}
         </ScrollView>
       )}
 
-      {/* Actions */}
       {company.isActive && (
         <View style={styles.cardActions}>
+          <TouchableOpacity style={styles.rateBtn} onPress={onRate}>
+            <Ionicons name="star-outline" size={14} color="#F59E0B" />
+            <Text style={styles.rateBtnText}>تقييم</Text>
+          </TouchableOpacity>
           {!company.isDefault && (
             <TouchableOpacity style={styles.setDefaultBtn} onPress={onSetDefault}>
               <Ionicons name="star" size={14} color={Colors.warning} />
@@ -301,8 +347,8 @@ function DeliveryCard({
             <TouchableOpacity style={styles.waBtnSmall} onPress={onWhatsApp}>
               <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.callBtnSmall} onPress={onCall}>
-              <Ionicons name="call" size={16} color={Colors.primary} />
+            <TouchableOpacity style={[styles.callBtnSmall, { backgroundColor: accentColor + "15" }]} onPress={onCall}>
+              <Ionicons name="call" size={16} color={accentColor} />
             </TouchableOpacity>
           </View>
         </View>
@@ -311,17 +357,11 @@ function DeliveryCard({
   );
 }
 
-function CompanyDetail({
-  company, onClose, onCall, onWhatsApp, onSetDefault, onToggle, isDefault, isActive,
-}: {
-  company: DeliveryCompany;
-  onClose: () => void;
-  onCall: () => void;
-  onWhatsApp: () => void;
-  onSetDefault: () => void;
-  onToggle: () => void;
-  isDefault: boolean;
-  isActive: boolean;
+function CompanyDetail({ company, accentColor, onClose, onCall, onWhatsApp, onSetDefault, onToggle, onRate, isDefault, isActive }: {
+  company: DeliveryCompany; accentColor: string;
+  onClose: () => void; onCall: () => void; onWhatsApp: () => void;
+  onSetDefault: () => void; onToggle: () => void; onRate: () => void;
+  isDefault: boolean; isActive: boolean;
 }) {
   return (
     <ScrollView contentContainerStyle={styles.detailContent}>
@@ -332,7 +372,6 @@ function CompanyDetail({
         <Text style={styles.detailTitle}>{company.name}</Text>
       </View>
 
-      {/* Logo & Status */}
       <View style={styles.detailHero}>
         <View style={[styles.detailLogo, { backgroundColor: company.color + "20" }]}>
           <Text style={{ fontSize: 48 }}>{company.logo}</Text>
@@ -350,22 +389,21 @@ function CompanyDetail({
             </Text>
           </View>
         </View>
+        {company.ratingCount > 0 && <StarDisplay rating={company.rating} count={company.ratingCount} size={16} />}
       </View>
 
-      {/* Info Grid */}
       <View style={styles.infoGrid}>
-        <InfoCell icon="cash-outline" label="رسوم التوصيل" value={`${company.baseFee.toLocaleString()} د.ع`} />
-        <InfoCell icon="speedometer-outline" label="وقت التوصيل" value={company.estimatedTime} />
-        <InfoCell icon="navigate-outline" label="التغطية" value={`${company.cities.length} مدينة`} />
-        <InfoCell icon="call-outline" label="الهاتف" value={company.phone} />
+        <InfoCell icon="cash-outline" label="رسوم التوصيل" value={`${company.baseFee.toLocaleString()} د.ع`} accentColor={accentColor} />
+        <InfoCell icon="speedometer-outline" label="وقت التوصيل" value={company.estimatedTime} accentColor={accentColor} />
+        <InfoCell icon="navigate-outline" label="التغطية" value={`${company.cities.length} مدينة`} accentColor={accentColor} />
+        <InfoCell icon="call-outline" label="الهاتف" value={company.phone} accentColor={accentColor} />
       </View>
 
-      {/* Cities */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>المدن المغطاة</Text>
         <View style={styles.cityList}>
           {company.cities.map(city => (
-            <View key={city} style={styles.cityChip}>
+            <View key={city} style={[styles.cityChip, { borderColor: company.color }]}>
               <Ionicons name="location" size={12} color={company.color} />
               <Text style={[styles.cityChipText, { color: company.color }]}>{city}</Text>
             </View>
@@ -373,7 +411,6 @@ function CompanyDetail({
         </View>
       </View>
 
-      {/* Features */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>المميزات</Text>
         {company.features.map(f => (
@@ -384,24 +421,48 @@ function CompanyDetail({
         ))}
       </View>
 
-      {/* Tracking Link */}
+      {/* Reviews Section */}
+      {company.reviews.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>آراء المستخدمين ({company.reviews.length})</Text>
+          {company.reviews.slice(0, 3).map((r, i) => (
+            <View key={i} style={styles.reviewCard}>
+              <View style={styles.reviewTop}>
+                <Text style={styles.reviewDate}>{r.date}</Text>
+                <View style={{ flexDirection: "row", gap: 2 }}>
+                  {[1, 2, 3, 4, 5].map(s => (
+                    <Ionicons key={s} name={s <= r.stars ? "star" : "star-outline"} size={12} color="#F59E0B" />
+                  ))}
+                </View>
+                <View style={[styles.reviewerBadge, { backgroundColor: r.reviewerType === "pharmacy" ? Colors.primaryLight : "#E8F4F0" }]}>
+                  <Text style={[styles.reviewerBadgeText, { color: r.reviewerType === "pharmacy" ? Colors.primary : "#0D7A54" }]}>
+                    {r.reviewerType === "pharmacy" ? "صيدلية" : "مذخر"}
+                  </Text>
+                </View>
+              </View>
+              {r.comment ? <Text style={styles.reviewComment}>{r.comment}</Text> : null}
+            </View>
+          ))}
+        </View>
+      )}
+
       {company.trackingUrl && (
-        <TouchableOpacity
-          style={styles.trackingBtn}
-          onPress={() => Linking.openURL(company.trackingUrl!)}
-        >
-          <Ionicons name="open-outline" size={16} color={Colors.primary} />
-          <Text style={styles.trackingBtnText}>فتح لوحة تتبع الشركة</Text>
+        <TouchableOpacity style={[styles.trackingBtn, { borderColor: accentColor }]} onPress={() => Linking.openURL(company.trackingUrl!)}>
+          <Ionicons name="open-outline" size={16} color={accentColor} />
+          <Text style={[styles.trackingBtnText, { color: accentColor }]}>فتح لوحة تتبع الشركة</Text>
         </TouchableOpacity>
       )}
 
-      {/* Actions */}
       <View style={styles.detailActions}>
+        <TouchableOpacity style={[styles.rateActionBtn]} onPress={onRate}>
+          <Ionicons name="star" size={18} color="#F59E0B" />
+          <Text style={styles.rateActionBtnText}>تقييم الشركة</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.waBtn} onPress={onWhatsApp}>
           <Ionicons name="logo-whatsapp" size={20} color="#fff" />
           <Text style={styles.waBtnText}>واتساب</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.callBtn} onPress={onCall}>
+        <TouchableOpacity style={[styles.callBtn, { backgroundColor: accentColor }]} onPress={onCall}>
           <Ionicons name="call" size={20} color="#fff" />
           <Text style={styles.callBtnText}>اتصال</Text>
         </TouchableOpacity>
@@ -423,10 +484,10 @@ function CompanyDetail({
   );
 }
 
-function InfoCell({ icon, label, value }: { icon: string; label: string; value: string }) {
+function InfoCell({ icon, label, value, accentColor }: { icon: string; label: string; value: string; accentColor: string }) {
   return (
     <View style={styles.infoCell}>
-      <Ionicons name={icon as any} size={20} color={Colors.primary} />
+      <Ionicons name={icon as any} size={20} color={accentColor} />
       <Text style={styles.infoCellValue}>{value}</Text>
       <Text style={styles.infoCellLabel}>{label}</Text>
     </View>
@@ -438,8 +499,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     backgroundColor: Colors.surface, paddingHorizontal: 20,
-    paddingTop: 16, paddingBottom: 14,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
+    paddingTop: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   headerInfo: { alignItems: "flex-end" },
   headerTitle: { fontSize: 22, fontWeight: "800", color: Colors.textPrimary },
@@ -455,13 +515,8 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 12,
   },
   infoBannerText: { flex: 1, fontSize: 13, color: "#2563EB", textAlign: "right", lineHeight: 20 },
-  filterRow: {
-    flexDirection: "row", paddingHorizontal: 16, paddingVertical: 10, gap: 8,
-  },
-  filterBtn: {
-    paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20,
-    backgroundColor: Colors.border,
-  },
+  filterRow: { flexDirection: "row", paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  filterBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: Colors.border },
   filterBtnActive: { backgroundColor: Colors.primary },
   filterBtnText: { fontSize: 13, fontWeight: "600", color: Colors.textMuted },
   filterBtnTextActive: { color: "#fff" },
@@ -469,7 +524,6 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface, borderRadius: 18,
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
-    overflow: "hidden",
   },
   cardInactive: { opacity: 0.65 },
   cardTop: {
@@ -479,12 +533,12 @@ const styles = StyleSheet.create({
   cardTopRight: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   logoBox: { width: 48, height: 48, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   logoEmoji: { fontSize: 24 },
-  cardInfo: { flex: 1 },
+  cardInfo: { flex: 1, gap: 3 },
   nameLine: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   companyName: { fontSize: 16, fontWeight: "800", color: Colors.textPrimary },
   defaultBadge: { backgroundColor: "#FEF3C7", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
   defaultBadgeText: { fontSize: 10, fontWeight: "700", color: Colors.warning },
-  tagRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
+  tagRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   typeTag: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
   typeTagText: { fontSize: 11, fontWeight: "700" },
   timeText: { fontSize: 12, color: Colors.textMuted },
@@ -493,44 +547,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 10,
   },
   feeLabel: { fontSize: 13, color: Colors.textSecondary },
-  feeValue: { fontSize: 14, fontWeight: "700", color: Colors.primary },
+  feeValue: { fontSize: 14, fontWeight: "700" },
   citiesRow: { paddingHorizontal: 14, paddingBottom: 10, gap: 6 },
   cityTag: { backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   cityTagText: { fontSize: 11, color: Colors.textSecondary },
   cardActions: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     paddingHorizontal: 14, paddingVertical: 10,
-    borderTopWidth: 1, borderTopColor: Colors.border,
+    borderTopWidth: 1, borderTopColor: Colors.border, gap: 8,
   },
+  rateBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEF3C7", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  rateBtnText: { fontSize: 12, fontWeight: "700", color: "#D97706" },
   setDefaultBtn: { flexDirection: "row", alignItems: "center", gap: 6 },
   setDefaultBtnText: { fontSize: 13, fontWeight: "600", color: Colors.warning },
-  contactBtns: { flexDirection: "row", gap: 8 },
-  waBtnSmall: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: "#E8FFF2", alignItems: "center", justifyContent: "center",
-  },
-  callBtnSmall: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: Colors.primaryLight, alignItems: "center", justifyContent: "center",
-  },
+  contactBtns: { flexDirection: "row", gap: 8, marginRight: "auto" },
+  waBtnSmall: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#E8FFF2", alignItems: "center", justifyContent: "center" },
+  callBtnSmall: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  detailModal: {
-    backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    maxHeight: "90%",
-  },
-  addModal: {
-    backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    maxHeight: "85%",
-  },
+  detailModal: { backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "92%" },
+  addModal: { backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "85%" },
+  ratingModal: { backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, paddingBottom: 40 },
   modalHandle: { width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 2, alignSelf: "center", marginTop: 12 },
+  ratingHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24, marginTop: 8 },
+  ratingTitle: { fontSize: 18, fontWeight: "800", color: Colors.textPrimary },
+  starsRow: { flexDirection: "row", justifyContent: "center", gap: 12, marginBottom: 12 },
+  ratingLabel: { fontSize: 16, fontWeight: "700", color: Colors.textSecondary, textAlign: "center", marginBottom: 20 },
   detailContent: { padding: 20, paddingBottom: 40 },
-  detailHeader: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    marginBottom: 20,
-  },
+  detailHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
   detailTitle: { fontSize: 20, fontWeight: "800", color: Colors.textPrimary },
   closeBtn: { padding: 4 },
-  detailHero: { alignItems: "center", marginBottom: 20, gap: 12 },
+  detailHero: { alignItems: "center", marginBottom: 20, gap: 10 },
   detailLogo: { width: 80, height: 80, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   detailStatusRow: { flexDirection: "row", gap: 10, alignItems: "center" },
   defaultBadgeLarge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF3C7", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
@@ -538,59 +584,43 @@ const styles = StyleSheet.create({
   statusBadge: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
   statusBadgeText: { fontSize: 12, fontWeight: "700" },
   infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 },
-  infoCell: {
-    flex: 1, minWidth: "45%", backgroundColor: Colors.background, borderRadius: 14,
-    padding: 14, alignItems: "flex-end", gap: 4,
-  },
+  infoCell: { flex: 1, minWidth: "45%", backgroundColor: Colors.background, borderRadius: 14, padding: 14, alignItems: "flex-end", gap: 4 },
   infoCellValue: { fontSize: 14, fontWeight: "700", color: Colors.textPrimary, textAlign: "right" },
   infoCellLabel: { fontSize: 11, color: Colors.textMuted, textAlign: "right" },
   section: { marginBottom: 18 },
   sectionTitle: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, marginBottom: 10, textAlign: "right" },
   cityList: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  cityChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  cityChip: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
   cityChipText: { fontSize: 12, fontWeight: "600" },
-  featureRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, justifyContent: "flex-end" },
+  featureRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   featureText: { fontSize: 14, color: Colors.textSecondary },
-  trackingBtn: {
-    flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "center",
-    borderWidth: 1, borderColor: Colors.primary, borderRadius: 14, paddingVertical: 10, marginBottom: 16,
-  },
-  trackingBtnText: { fontSize: 14, fontWeight: "600", color: Colors.primary },
+  reviewCard: { backgroundColor: Colors.background, borderRadius: 12, padding: 12, marginBottom: 8, gap: 6 },
+  reviewTop: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 8 },
+  reviewDate: { fontSize: 11, color: Colors.textMuted },
+  reviewerBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  reviewerBadgeText: { fontSize: 10, fontWeight: "700" },
+  reviewComment: { fontSize: 13, color: Colors.textSecondary, textAlign: "right", lineHeight: 20 },
+  trackingBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1.5, borderRadius: 14, paddingVertical: 12, marginBottom: 16 },
+  trackingBtnText: { fontSize: 14, fontWeight: "700" },
   detailActions: { flexDirection: "row", gap: 10, marginBottom: 12 },
-  waBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: "#25D366", borderRadius: 14, paddingVertical: 12,
-  },
+  rateActionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#FEF3C7", borderRadius: 14, paddingVertical: 12 },
+  rateActionBtnText: { fontSize: 14, fontWeight: "700", color: "#D97706" },
+  waBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#25D366", borderRadius: 14, paddingVertical: 12 },
   waBtnText: { fontSize: 14, fontWeight: "700", color: "#fff" },
-  callBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 12,
-  },
+  callBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 14, paddingVertical: 12 },
   callBtnText: { fontSize: 14, fontWeight: "700", color: "#fff" },
-  setDefaultBtnLarge: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: "#FEF3C7", borderRadius: 14, paddingVertical: 12, marginBottom: 10,
-  },
-  setDefaultBtnLargeText: { fontSize: 14, fontWeight: "700", color: Colors.warning },
-  toggleBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    borderRadius: 14, paddingVertical: 12,
-  },
-  toggleBtnText: { fontSize: 14, fontWeight: "700" },
-  addModalHeader: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    padding: 20, borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  addModalTitle: { fontSize: 18, fontWeight: "800", color: Colors.textPrimary },
-  addForm: { padding: 20, gap: 8, paddingBottom: 40 },
-  fieldLabel: { fontSize: 14, fontWeight: "600", color: Colors.textSecondary, textAlign: "right", marginTop: 8 },
+  setDefaultBtnLarge: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#FEF3C7", borderRadius: 14, paddingVertical: 14, marginBottom: 10 },
+  setDefaultBtnLargeText: { fontSize: 15, fontWeight: "700", color: Colors.warning },
+  toggleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 14, marginBottom: 10 },
+  toggleBtnText: { fontSize: 15, fontWeight: "700" },
+  addModalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 20 },
+  addModalTitle: { fontSize: 17, fontWeight: "800", color: Colors.textPrimary },
+  addForm: { paddingHorizontal: 20, paddingBottom: 40, gap: 8 },
+  fieldLabel: { fontSize: 13, fontWeight: "700", color: Colors.textSecondary, textAlign: "right", marginTop: 8 },
   textInput: {
-    backgroundColor: Colors.background, borderRadius: 12, padding: 14,
-    fontSize: 15, color: Colors.textPrimary, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.surfaceAlt, borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: Colors.textPrimary,
   },
-  saveBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 14, marginTop: 16,
-  },
+  saveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 14, marginTop: 16 },
   saveBtnText: { fontSize: 15, fontWeight: "700", color: "#fff" },
 });
