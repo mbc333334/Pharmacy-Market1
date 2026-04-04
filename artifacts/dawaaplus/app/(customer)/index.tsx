@@ -40,10 +40,23 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <LanguageButton style={{ backgroundColor: "rgba(0,0,0,0.06)" }} />
         </View>
-        <View>
-          <Text style={styles.greeting}>أهلاً، {firstName} 👋</Text>
-          <Text style={styles.subGreeting}>تسوّق الأدوية بثقة وسهولة</Text>
+        <View style={{ flex: 1, alignItems: "flex-end" }}>
+          <Text style={styles.greeting}>
+            {user ? `أهلاً، ${firstName} 👋` : "تصفح الأدوية 👋"}
+          </Text>
+          <Text style={styles.subGreeting}>
+            {user ? "تسوّق الأدوية بثقة وسهولة" : "سجّل دخولك للشراء والطلب"}
+          </Text>
         </View>
+        {!user && (
+          <TouchableOpacity
+            onPress={() => router.replace("/(auth)/login")}
+            style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 4 }}
+          >
+            <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>تسجيل الدخول</Text>
+            <Ionicons name="log-in-outline" size={16} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>

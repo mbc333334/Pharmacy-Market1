@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const C = {
@@ -122,11 +122,151 @@ export default function App() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOGIN — ADMIN ONLY
 // ═══════════════════════════════════════════════════════════════════════════════
+function AdminRecoveryModal({ onClose }:{ onClose:()=>void }) {
+  const [tab, setTab] = useState<"super"|"supervisor">("super");
+  const [spStep, setSpStep] = useState<"info"|"otp"|"pass"|"done">("info");
+  const [supNew, setSupNew] = useState(""); const [supConfirm, setSupConfirm] = useState(""); const [supErr, setSupErr] = useState("");
+  const [spOtp, setSpOtp] = useState(""); const [spOtpIn, setSpOtpIn] = useState(""); const [spTimer, setSpTimer] = useState(0);
+  const spRef = useRef<any>(null);
+  useEffect(()=>{ if(spTimer<=0){ if(spRef.current){clearInterval(spRef.current);spRef.current=null;}return; }
+    spRef.current=setInterval(()=>setSpTimer(v=>v-1),1000); return()=>{ if(spRef.current){clearInterval(spRef.current);spRef.current=null;} }; },[spTimer]);
+  const genOtp=()=>String(Math.floor(100000+Math.random()*900000));
+  const startSpOtp=()=>{ const c=genOtp(); setSpOtp(c); setSpOtpIn(""); setSupErr(""); setSpTimer(60); setSpStep("otp"); };
+  const verifySpOtp=()=>{ if(spOtpIn!==spOtp){setSupErr("رمز التحقق غير صحيح");return;} setSupErr(""); setSpStep("pass"); };
+  const saveSpPass=()=>{ if(!supNew||supNew!==supConfirm){setSupErr("كلمتا المرور غير متطابقتين");return;}
+    wrLS("admin_super_password",supNew); setSupErr(""); setSpStep("done"); };
+  const resetSpToDefault=()=>{ localStorage.removeItem("admin_super_password"); setSpStep("done"); setSupErr(""); };
+
+  // Supervisor recovery
+  const [svPhone, setSvPhone] = useState(""); const [svErr, setSvErr] = useState(""); const [svFound, setSvFound] = useState<any>(null);
+  const [svNew, setSvNew] = useState(""); const [svConfirm, setSvConfirm] = useState(""); const [svSaved, setSvSaved] = useState(false);
+  const findSv=()=>{ const accs:any[]=rdLS("admin_accounts",[]); const a=accs.find((x:any)=>x.phone===svPhone.trim());
+    if(!a){setSvErr("لا يوجد مشرف بهذا الرقم في النظام");setSvFound(null);}else{setSvErr("");setSvFound(a);} };
+  const saveSvPass=()=>{ if(!svNew||svNew!==svConfirm){setSvErr("كلمتا المرور غير متطابقتين");return;}
+    const accs:any[]=rdLS("admin_accounts",[]); const updated=accs.map((x:any)=>x.phone===svFound.phone?{...x,password:svNew}:x);
+    wrLS("admin_accounts",updated); setSvSaved(true); setSvErr(""); };
+
+  const ov:React.CSSProperties={position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif"};
+  const card:React.CSSProperties={background:"#fff",borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:440,direction:"rtl",position:"relative",boxShadow:"0 20px 60px rgba(0,0,0,0.25)",maxHeight:"90vh",overflowY:"auto"};
+  const inp:React.CSSProperties={width:"100%",padding:"10px 14px",borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:14,textAlign:"right",outline:"none",boxSizing:"border-box",marginBottom:10};
+  const btn=(bg:string,op=1):React.CSSProperties=>({background:bg,color:"#fff",border:"none",borderRadius:10,padding:"12px 0",width:"100%",fontWeight:800,fontSize:14,cursor:"pointer",marginTop:6,opacity:op});
+  return (
+    <div style={ov} onClick={onClose}>
+      <div style={card} onClick={e=>e.stopPropagation()}>
+        <button onClick={onClose} style={{position:"absolute",top:14,left:14,background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#718096"}}>✕</button>
+        <div style={{textAlign:"center",marginBottom:18}}>
+          <div style={{fontSize:44,marginBottom:6}}>🛡️</div>
+          <h3 style={{margin:0,fontSize:18,fontWeight:900}}>استرداد بيانات الدخول</h3>
+          <p style={{margin:"4px 0 0",fontSize:12,color:"#718096"}}>اختر نوع الحساب</p>
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:20}}>
+          {([["super","مدير المنصة"],["supervisor","مشرف"]] as const).map(([k,l])=>(
+            <button key={k} onClick={()=>{setTab(k);setSpStep("info");setSvFound(null);setSvSaved(false);setSvPhone("");setSvErr("");setSupErr("");}}
+              style={{flex:1,padding:"10px 0",borderRadius:10,border:`2px solid ${tab===k?"#7C3AED":"#e2e8f0"}`,
+                background:tab===k?"#F3F0FF":"#fff",color:tab===k?"#7C3AED":"#718096",fontWeight:700,cursor:"pointer",fontSize:13}}>{l}</button>
+          ))}
+        </div>
+
+        {tab==="super" && <>
+          {spStep==="info" && <>
+            <div style={{background:"#F3F0FF",border:"1.5px solid #7C3AED40",borderRadius:14,padding:16,marginBottom:14}}>
+              <div style={{fontWeight:800,color:"#7C3AED",marginBottom:8,fontSize:14}}>🔐 بيانات مدير المنصة الافتراضية</div>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6,fontSize:13}}>
+                <span style={{background:"#e2e8f0",borderRadius:6,padding:"2px 10px",fontFamily:"monospace",fontWeight:700}}>admin</span>
+                <span style={{color:"#718096"}}>المعرّف:</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}>
+                <span style={{background:"#e2e8f0",borderRadius:6,padding:"2px 10px",fontFamily:"monospace",fontWeight:700}}>admin</span>
+                <span style={{color:"#718096"}}>كلمة المرور الافتراضية:</span>
+              </div>
+            </div>
+            <div style={{fontSize:12,color:"#718096",textAlign:"center",marginBottom:14}}>
+              إذا كنت قد غيّرت كلمة المرور وتريد إعادتها للافتراضية، اضغط هنا:
+            </div>
+            <button style={btn("#E53E3E")} onClick={resetSpToDefault}>↩ إعادة تعيين كلمة المرور للافتراضية (admin)</button>
+            <div style={{margin:"12px 0",textAlign:"center",fontSize:12,color:"#718096"}}>— أو أنشئ كلمة مرور جديدة —</div>
+            <button style={btn("#7C3AED")} onClick={startSpOtp}>📲 إرسال رمز التحقق لتعيين كلمة مرور جديدة</button>
+          </>}
+          {spStep==="otp" && <>
+            <div style={{background:"#FFFBEB",border:"1.5px solid #F6AD55",borderRadius:14,padding:14,textAlign:"center",marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#744210",marginBottom:4}}>📱 رمز التحقق التجريبي</div>
+              <div style={{fontSize:28,fontWeight:900,letterSpacing:8,color:"#744210"}}>{spOtp}</div>
+              <div style={{fontSize:10,color:"#92400E",marginTop:4}}>سيُرسَل عبر SMS في التطبيق الفعلي</div>
+            </div>
+            <input style={{...inp,textAlign:"center",fontSize:20,letterSpacing:8,fontWeight:800}} placeholder="• • • • • •" maxLength={6}
+              value={spOtpIn} onChange={e=>{setSupErr("");setSpOtpIn(e.target.value.replace(/\D/g,"").slice(0,6));}} />
+            {supErr&&<div style={{color:"#E53E3E",fontSize:12,marginBottom:8}}>⚠️ {supErr}</div>}
+            <div style={{textAlign:"left",marginBottom:10,fontSize:12}}>
+              {spTimer>0?<span style={{color:"#718096"}}>⏱ إعادة الإرسال بعد {spTimer}ث</span>
+                :<button onClick={()=>{const c=genOtp();setSpOtp(c);setSpOtpIn("");setSpTimer(60);}} style={{background:"none",border:"none",color:"#7C3AED",cursor:"pointer",textDecoration:"underline",padding:0,fontSize:12}}>إعادة الإرسال</button>}
+            </div>
+            <button style={btn("#7C3AED",spOtpIn.length<6?0.5:1)} onClick={verifySpOtp} disabled={spOtpIn.length<6}>✅ تحقق</button>
+            <button onClick={()=>{setSpStep("info");setSupErr("");}} style={{background:"none",border:"none",width:"100%",marginTop:10,color:"#718096",cursor:"pointer",fontSize:13,textDecoration:"underline"}}>← العودة</button>
+          </>}
+          {spStep==="pass" && <>
+            <input style={inp} type="password" placeholder="كلمة المرور الجديدة" value={supNew} onChange={e=>{setSupErr("");setSupNew(e.target.value);}} />
+            <input style={{...inp,borderColor:supConfirm&&supConfirm!==supNew?"#E53E3E":"#e2e8f0"}} type="password" placeholder="تأكيد كلمة المرور" value={supConfirm} onChange={e=>{setSupErr("");setSupConfirm(e.target.value);}} />
+            {supErr&&<div style={{color:"#E53E3E",fontSize:12,marginBottom:8}}>⚠️ {supErr}</div>}
+            <button style={btn("#7C3AED",(!supNew||supNew!==supConfirm)?0.5:1)} onClick={saveSpPass} disabled={!supNew||supNew!==supConfirm}>🔒 حفظ كلمة المرور الجديدة</button>
+          </>}
+          {spStep==="done" && <div style={{textAlign:"center",padding:"16px 0"}}>
+            <div style={{fontSize:56,marginBottom:8}}>✅</div>
+            <div style={{fontWeight:900,color:"#38A169",fontSize:16,marginBottom:6}}>تم بنجاح!</div>
+            <div style={{fontSize:12,color:"#718096",marginBottom:16}}>يمكنك الآن تسجيل الدخول بالبيانات الجديدة · المعرّف: admin</div>
+            <button style={btn("#7C3AED")} onClick={onClose}>العودة لتسجيل الدخول</button>
+          </div>}
+        </>}
+
+        {tab==="supervisor" && <>
+          {!svFound && !svSaved && <>
+            <p style={{fontSize:13,fontWeight:700,margin:"0 0 6px"}}>رقم هاتف المشرف</p>
+            <input style={inp} placeholder="07xxxxxxxxx" value={svPhone} onChange={e=>{setSvErr("");setSvPhone(e.target.value);}} />
+            {svErr&&<div style={{background:"#FFF5F5",border:"1px solid #FED7D7",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#E53E3E",marginBottom:8}}>⚠️ {svErr}</div>}
+            <button style={btn("#7C3AED")} onClick={findSv}>🔍 البحث عن الحساب</button>
+            <div style={{marginTop:14,background:"#FFFBEB",border:"1.5px solid #F6AD55",borderRadius:10,padding:12,fontSize:12,color:"#92400E"}}>
+              ملاحظة: إعادة تعيين كلمة مرور المشرف تتطلب صلاحيات مدير المنصة فقط. إذا لم يكن لديك وصول، تواصل مع مدير المنصة مباشرةً.
+            </div>
+          </>}
+          {svFound && !svSaved && <>
+            <div style={{background:"#F3F0FF",border:"1.5px solid #7C3AED40",borderRadius:14,padding:14,marginBottom:14}}>
+              <div style={{fontWeight:800,color:"#7C3AED",marginBottom:6}}>✅ تم العثور على الحساب</div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}>
+                <span style={{fontWeight:700}}>{svFound.name}</span><span style={{color:"#718096"}}>الاسم:</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}>
+                <span style={{fontFamily:"monospace",fontWeight:700}}>{svFound.phone}</span><span style={{color:"#718096"}}>رقم الهاتف:</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}>
+                <span style={{background:svFound.role==="superadmin"?"#7C3AED":"#3182CE",color:"#fff",borderRadius:6,padding:"2px 8px",fontSize:11}}>{svFound.role==="superadmin"?"مدير":"مشرف"}</span>
+                <span style={{color:"#718096"}}>الصلاحية:</span>
+              </div>
+            </div>
+            <p style={{fontSize:13,fontWeight:700,margin:"0 0 6px"}}>كلمة المرور الجديدة</p>
+            <input style={inp} type="password" placeholder="••••••••" value={svNew} onChange={e=>{setSvErr("");setSvNew(e.target.value);}} />
+            <p style={{fontSize:13,fontWeight:700,margin:"0 0 6px"}}>تأكيد كلمة المرور</p>
+            <input style={{...inp,borderColor:svConfirm&&svConfirm!==svNew?"#E53E3E":"#e2e8f0"}} type="password" placeholder="••••••••" value={svConfirm} onChange={e=>{setSvErr("");setSvConfirm(e.target.value);}} />
+            {svErr&&<div style={{color:"#E53E3E",fontSize:12,marginBottom:8}}>⚠️ {svErr}</div>}
+            <button style={btn("#7C3AED",(!svNew||svNew!==svConfirm)?0.5:1)} onClick={saveSvPass} disabled={!svNew||svNew!==svConfirm}>🔒 تعيين كلمة مرور جديدة</button>
+            <button onClick={()=>{setSvFound(null);setSvPhone("");setSvErr("");}} style={{background:"none",border:"none",width:"100%",marginTop:10,color:"#718096",cursor:"pointer",fontSize:13,textDecoration:"underline"}}>← البحث مجدداً</button>
+          </>}
+          {svSaved && <div style={{textAlign:"center",padding:"16px 0"}}>
+            <div style={{fontSize:56,marginBottom:8}}>✅</div>
+            <div style={{fontWeight:900,color:"#38A169",fontSize:16,marginBottom:6}}>تم تغيير كلمة المرور!</div>
+            <div style={{fontSize:12,color:"#718096",marginBottom:16}}>يمكن للمشرف الآن تسجيل الدخول بكلمة المرور الجديدة</div>
+            <button style={btn("#7C3AED")} onClick={onClose}>العودة لتسجيل الدخول</button>
+          </div>}
+        </>}
+      </div>
+    </div>
+  );
+}
+
 function LoginScreen({ onLogin }: { onLogin:(u:{name:string;role:string})=>void }) {
   const [phone, setPhone] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const [showRecovery, setShowRecovery] = useState(false);
   const handle = () => {
     const result = loginCheck(phone, pass);
     if (result) { setError(""); onLogin(result); }
@@ -134,6 +274,7 @@ function LoginScreen({ onLogin }: { onLogin:(u:{name:string;role:string})=>void 
   };
   return (
     <div dir="rtl" style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
+      {showRecovery && <AdminRecoveryModal onClose={()=>setShowRecovery(false)} />}
       <div style={{ background:`linear-gradient(135deg,${C.admin} 0%,#553C9A 100%)`, padding:"48px 24px 72px", textAlign:"center" }}>
         <div style={{ fontSize:56, marginBottom:8 }}>🛡️</div>
         <h1 style={{ color:"#fff", fontSize:32, fontWeight:900, margin:"8px 0 4px" }}>بوابة المدير</h1>
@@ -156,7 +297,10 @@ function LoginScreen({ onLogin }: { onLogin:(u:{name:string;role:string})=>void 
           <button onClick={handle} style={{ background:`linear-gradient(135deg,${C.admin},#553C9A)`, color:"#fff", border:"none", borderRadius:12, padding:"13px", fontWeight:800, cursor:"pointer", fontSize:15, width:"100%" }}>
             دخول المنصة →
           </button>
-          <div style={{ marginTop:16, background:"#F3F0FF", borderRadius:10, padding:"10px 14px", fontSize:12, color:C.admin }}>
+          <button onClick={()=>setShowRecovery(true)} style={{ background:"none", border:"none", width:"100%", marginTop:12, color:C.admin, cursor:"pointer", fontSize:13, fontWeight:700, textDecoration:"underline", textAlign:"center" }}>
+            🔑 نسيت بيانات الدخول؟
+          </button>
+          <div style={{ marginTop:12, background:"#F3F0FF", borderRadius:10, padding:"10px 14px", fontSize:12, color:C.admin }}>
             🔐 بوابة المدير والمشرفين · المشتركون يدخلون من بواباتهم الخاصة
           </div>
         </div>
