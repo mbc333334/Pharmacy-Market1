@@ -1104,15 +1104,27 @@ function AdminSettings({ currentUser }:{ currentUser:{name:string;role:string;ph
   };
   const deletePay = (id:string) => savePayAccounts(payAccounts.filter(a=>a.id!==id));
 
-  // ─── Admin Accounts ─────────────────────────────────────────────────────────
+  // ─── Admin Accounts (from DB) ────────────────────────────────────────────────
   const [accounts, setAccounts] = useState<any[]>(()=>getAdminAccounts());
+  const [accLoading, setAccLoading] = useState(false);
   const [accForm, setAccForm] = useState({ name:"", phone:"", password:"", role:"supervisor" });
   const [accErr, setAccErr] = useState("");
   const [accSaved, setAccSaved] = useState(false);
   const [showPass, setShowPass] = useState(false);
 
+  // Load accounts from DB on mount
+  useEffect(()=>{
+    if(tab!=="accounts") return;
+    setAccLoading(true);
+    api.getAdmins().then(rows=>{
+      if(rows?.length){ setAccounts(rows); wrLS("admin_accounts", rows); }
+      else { setAccounts(getAdminAccounts()); }
+    }).catch(()=>{ setAccounts(getAdminAccounts()); })
+    .finally(()=>setAccLoading(false));
+  },[tab]);
+
   // ─── Password Change ─────────────────────────────────────────────────────────
-  const [changingPassId, setChangingPassId] = useState<string|null>(null); // account id or "superadmin"
+  const [changingPassId, setChangingPassId] = useState<string|null>(null);
   const [passForm, setPassForm] = useState({ newPass:"", confirmPass:"" });
   const [showNewPass, setShowNewPass] = useState(false);
   const [passErr, setPassErr] = useState("");
@@ -1120,32 +1132,44 @@ function AdminSettings({ currentUser }:{ currentUser:{name:string;role:string;ph
 
   const openPassChange = (id:string) => { setChangingPassId(id); setPassForm({ newPass:"", confirmPass:"" }); setPassErr(""); };
   const closePassChange = () => { setChangingPassId(null); setPassForm({ newPass:"", confirmPass:"" }); setPassErr(""); };
-  const submitPassChange = () => {
+  const submitPassChange = async () => {
     setPassErr("");
     if (!passForm.newPass.trim()) { setPassErr("أدخل كلمة المرور الجديدة"); return; }
     if (passForm.newPass.length < 4) { setPassErr("كلمة المرور يجب أن تكون 4 أحرف على الأقل"); return; }
     if (passForm.newPass !== passForm.confirmPass) { setPassErr("كلمتا المرور غير متطابقتين"); return; }
     if (changingPassId === "superadmin") {
       wrLS("admin_super_password", passForm.newPass.trim());
+      await api.changePassword("admin", passForm.newPass.trim(), "admin").catch(()=>{});
     } else {
-      const updated = accounts.map(a=>a.id===changingPassId ? {...a, password:passForm.newPass.trim()} : a);
-      wrLS("admin_accounts", updated); setAccounts(updated);
+      const acc = accounts.find(a=>String(a.id)===String(changingPassId));
+      if(acc) {
+        await api.updateAdmin(Number(acc.id), { password: passForm.newPass.trim() }).catch(()=>{});
+        const updated = accounts.map(a=>String(a.id)===String(changingPassId)?{...a,password:passForm.newPass.trim()}:a);
+        wrLS("admin_accounts", updated); setAccounts(updated);
+      }
     }
     setPassSaved(true); setTimeout(()=>{ setPassSaved(false); closePassChange(); }, 1500);
   };
 
-  const saveAccounts = (accs:any[]) => { wrLS("admin_accounts", accs); setAccounts(accs); };
-  const addAccount = () => {
+  const addAccount = async () => {
     setAccErr("");
     if (!accForm.name.trim()||!accForm.phone.trim()||!accForm.password.trim()) { setAccErr("جميع الحقول مطلوبة"); return; }
     if (accForm.phone.trim()===SUPER_ADMIN.phone) { setAccErr("هذا المعرّف محجوز للمدير الرئيسي"); return; }
-    if (accounts.find(a=>a.phone===accForm.phone.trim())) { setAccErr("رقم الهاتف مسجّل مسبقاً"); return; }
-    const newAcc = { id:`ADM-${Date.now()}`, ...accForm, phone:accForm.phone.trim() };
-    saveAccounts([...accounts, newAcc]);
-    setAccForm({ name:"", phone:"", password:"", role:"supervisor" });
-    setAccSaved(true); setTimeout(()=>setAccSaved(false),2000);
+    try {
+      const created = await api.createAdmin({ ...accForm, phone:accForm.phone.trim() });
+      const updated = [...accounts, created];
+      wrLS("admin_accounts", updated); setAccounts(updated);
+      setAccForm({ name:"", phone:"", password:"", role:"supervisor" });
+      setAccSaved(true); setTimeout(()=>setAccSaved(false),2000);
+    } catch(e:any) {
+      setAccErr(e.message || "حدث خطأ أثناء إضافة الحساب");
+    }
   };
-  const deleteAccount = (id:string) => saveAccounts(accounts.filter(a=>a.id!==id));
+  const deleteAccount = async (id:string) => {
+    await api.deleteAdmin(Number(id)).catch(()=>{});
+    const updated = accounts.filter(a=>String(a.id)!==String(id));
+    wrLS("admin_accounts", updated); setAccounts(updated);
+  };
 
   const ICONS = ["💳","📱","⚡","🏦","💵","🔷","🟢","💰"];
   const COLORS = ["#8B1538","#0066CC","#004E87","#B45309","#38A169","#7C3AED","#D69E2E","#E53E3E"];
@@ -1224,6 +1248,10 @@ function AdminSettings({ currentUser }:{ currentUser:{name:string;role:string;ph
       {/* ── ADMIN ACCOUNTS ── */}
       {tab==="accounts"&&<div>
         {accSaved&&<div style={{ background:"#F0FFF4",border:"1px solid #38A169",borderRadius:8,padding:"8px 14px",fontSize:13,color:C.green,marginBottom:12 }}>✅ تمت إضافة الحساب بنجاح</div>}
+        <div style={{ background:"#F3F0FF", border:"1px solid #C4B5FD", borderRadius:10, padding:"10px 14px", marginBottom:16, fontSize:12, color:C.admin, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <span>👥 حسابات الإدارة والمشرفين — محفوظة في قاعدة البيانات</span>
+          {accLoading && <span style={{ fontSize:11, color:C.muted }}>⏳ جاري التحميل من قاعدة البيانات...</span>}
+        </div>
 
         {/* Existing accounts */}
         <div style={{ marginBottom:20 }}>
