@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { api } from "./api";
 
 function broadcastSync() {
   try { new BroadcastChannel("dawapl_sync").postMessage("update"); } catch {}
@@ -64,12 +65,23 @@ export default function App() {
     setTripsState(LS(`dc_trips_${dc.id}`, INIT_TRIPS));
     setProfile(LS(`dc_profile_${dc.id}`, dc));
     setSocialState(LS(`dc_social_${dc.id}`, { facebook:"", instagram:"", tiktok:"", website:"", whatsapp: dc.phone }));
+    // Sync from API
+    api.getCompany(dc.id).then(d=>{ if(d){ setProfile(d); localStorage.setItem(`dc_profile_${dc.id}`,JSON.stringify(d)); }}).catch(()=>{});
+    api.getDrivers(dc.id).then(rows=>{ if(rows?.length){ setDriversState(rows); localStorage.setItem(`dc_drivers_${dc.id}`,JSON.stringify(rows)); }}).catch(()=>{});
+    api.getTrips(dc.id).then(rows=>{ if(rows?.length){ setTripsState(rows); localStorage.setItem(`dc_trips_${dc.id}`,JSON.stringify(rows)); }}).catch(()=>{});
   }, [dc?.id]);
 
   const setDrivers = (v:any)=>{ setDriversState(v); if(dc){ localStorage.setItem(`dc_drivers_${dc.id}`,JSON.stringify(v)); broadcastSync(); } };
   const setTrips = (v:any)=>{ setTripsState(v); if(dc){ localStorage.setItem(`dc_trips_${dc.id}`,JSON.stringify(v)); broadcastSync(); } };
   const saveSocial = (v:any)=>{ setSocialState(v); if(dc){ localStorage.setItem(`dc_social_${dc.id}`,JSON.stringify(v)); broadcastSync(); } };
-  const saveProfile = (d:any)=>{ setProfile(d); if(dc){ localStorage.setItem(`dc_profile_${dc.id}`,JSON.stringify(d)); broadcastSync(); } };
+  const saveProfile = (d:any)=>{
+    setProfile(d);
+    if(dc){
+      localStorage.setItem(`dc_profile_${dc.id}`,JSON.stringify(d));
+      api.updateCompany(dc.id, d).catch(()=>{});
+      broadcastSync();
+    }
+  };
 
   const MENU = [{id:"dash",l:"لوحة التحكم",i:"📊"},{id:"acc",l:"حسابي",i:"👤"},{id:"trips",l:"الرحلات",i:"🗺️"},
     {id:"drivers",l:"السائقون",i:"👨‍✈️"},{id:"ratings",l:"التقييمات",i:"⭐"},{id:"sub",l:"الاشتراك",i:"💎"},
@@ -170,9 +182,18 @@ function ForgotModal({ onClose, color, data, passKey }:{ onClose:()=>void; color
 }
 
 function Login({ onLogin }:{ onLogin:(c:any)=>void }) {
-  const [phone,setPhone]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState("");
+  const [phone,setPhone]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
   const [showFp,setShowFp]=useState(false);
-  const login=()=>{ const c=COMPANIES.find(c=>c.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`dc_pass_${c.id}`)||c.pass)); c?onLogin(c):setErr("رقم الهاتف أو كلمة المرور غير صحيحة"); };
+  const login=async()=>{
+    setLoading(true); setErr("");
+    try {
+      const res = await api.login(phone.trim(), pass.trim());
+      if(res?.user) { onLogin(res.user); return; }
+    } catch {}
+    const c=COMPANIES.find(c=>c.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`dc_pass_${c.id}`)||c.pass));
+    c ? onLogin(c) : setErr("رقم الهاتف أو كلمة المرور غير صحيحة");
+    setLoading(false);
+  };
   return (
     <div dir="rtl" style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
       {showFp && <ForgotModal onClose={()=>setShowFp(false)} color={C.primary} data={COMPANIES} passKey={id=>`dc_pass_${id}`} />}

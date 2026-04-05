@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import LandingPage from "./pages/LandingPage";
+import { api } from "./api";
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const C = {
@@ -100,13 +101,31 @@ export default function App() {
   const [db, setDB] = useState(() => readLiveDB());
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString("ar-IQ"));
 
-  const refreshDB = useCallback(() => {
-    setDB(readLiveDB());
+  const refreshDB = useCallback(async () => {
+    const local = readLiveDB();
+    setDB(local);
     setLastSync(new Date().toLocaleTimeString("ar-IQ"));
+    // Also sync from API
+    try {
+      const [phs, whs, dcs] = await Promise.all([
+        api.getPharmacies(),
+        api.getWarehouses(),
+        api.getDeliveryCompanies(),
+      ]);
+      if (phs?.length || whs?.length || dcs?.length) {
+        setDB(prev => ({
+          ...prev,
+          ...(phs?.length ? { pharmacies: phs } : {}),
+          ...(whs?.length ? { warehouses: whs } : {}),
+          ...(dcs?.length ? { deliveries: dcs } : {}),
+        }));
+      }
+    } catch {}
   }, []);
 
   useEffect(() => {
     if (!user) return;
+    refreshDB();
     let bc: BroadcastChannel | null = null;
     try { bc = new BroadcastChannel("dawapl_sync"); bc.onmessage = () => refreshDB(); } catch {}
     const interval = setInterval(refreshDB, 15000);
@@ -276,10 +295,17 @@ function LoginScreen({ onLogin, onBack }: { onLogin:(u:{name:string;role:string}
   const [error, setError] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
-  const handle = () => {
+  const [loading, setLoading] = React.useState(false);
+  const handle = async () => {
+    setLoading(true); setError("");
+    try {
+      const res = await api.login(phone.trim(), pass.trim());
+      if(res?.user) { setLoading(false); onLogin(res.user); return; }
+    } catch {}
     const result = loginCheck(phone, pass);
     if (result) { setError(""); onLogin(result); }
     else setError("رقم الهاتف أو كلمة المرور غير صحيحة");
+    setLoading(false);
   };
   return (
     <div dir="rtl" style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>

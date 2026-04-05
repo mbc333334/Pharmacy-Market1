@@ -1,133 +1,81 @@
-# صيدليتي + Workspace
+# دواء+ (Dawaplus) Workspace
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. داواپلاس is a pharmacy & medicine platform for Kurdistan Region and Iraq, supporting pharmacies, customers, and warehouses.
+pnpm workspace monorepo using TypeScript. **دواء+** is a pharmacy & medicine platform for the Kurdistan Region and Iraq, supporting pharmacies, warehouses, delivery companies, and customers.
 
-## App Features
+## Platform Components
 
-- **App Name**: صيدليتي + (Saydaliti+) — "صيدليتي" = My Pharmacy in Arabic/Kurdish
-- **3 Languages**: Arabic (العربية), Kurdish (کوردی), English — switchable from welcome screen
-- **User Types**: Customer, Pharmacy, Warehouse, Admin (مدير التطبيق)
-- **Pharmacy Database Integration**: CSV/Excel import, REST API, MySQL/PostgreSQL — full import screen for pharmacies at `(pharmacy)/import.tsx` with barcode scan, database connect, and auto-sync log
-- **Delivery Company Rating**: Both pharmacies and warehouses can rate delivery companies (1-5 stars + comment), ratings shown on cards and in detail modal with review history
-- **Shared Delivery Screen**: `components/SharedDeliveryScreen.tsx` — single component used by both `(pharmacy)/delivery.tsx` and `(warehouse)/delivery.tsx`; parameterized by accentColor, reviewerType, banner text, WhatsApp message, and default values for new company
-- **Shared DashboardStatCard**: `components/DashboardStatCard.tsx` — used in pharmacy/index and warehouse/index; badge support, accent color border
-- **Inventory Auto-Sync (InventoryContext)**: `contexts/InventoryContext.tsx` — when a customer order is completed → pharmacy stock decrements automatically; when warehouse ships to pharmacy → pharmacy stock increments; full sync event log with settings
-- **Warehouse Accounts**: Linked only to participating pharmacies, full dashboard with inventory/orders/pharmacies management
-- **Default Region**: Iraq (العراق, +964)
-- **Subscription System**: 3 tiers (Free/Standard/Premium) for pharmacies and warehouses, pricing in د.ع
-- **Admin Panel**: Full subscription management (pending requests queue, approve/reject, plan change, block/unblock), advertisements, subscriber list, settings
-- **Admin Settings (⚙️)**: superadmin-only section — manage payment/collection accounts (add/edit/delete with icon & color picker), manage admin+supervisor accounts (phone login, role-based access)
-- **Multi-user Admin Login**: superadmin (admin/admin) + registered accounts by phone number; supervisors see all data but cannot access payment settings or admin account management
-- **localStorage keys**: `admin_accounts` (registered users), `platform_payment_accounts` (override payment numbers), `sub_requests` (upgrade request queue)
-- **Pharmacy Offers**: Pharmacies on Standard/Premium plans can create time-limited discount offers
-- **Quick Demo Login**: 4 demo buttons on login screen (customer/pharmacy/warehouse/admin)
-- **Admin Login**: +9647700000001 via the phone field
+| Component | Path | URL | Color |
+|-----------|------|-----|-------|
+| Admin Portal | `artifacts/dawaaplus-web` | `/dawaaplus-web` | `#7C3AED` |
+| Pharmacy Portal | `artifacts/dawaaplus-pharmacies` | `/dawaaplus-pharmacies` | `#1A9E6E` |
+| Warehouse Portal | `artifacts/dawaaplus-warehouses` | `/dawaaplus-warehouses` | `#0D7A54` |
+| Delivery Portal | `artifacts/dawaaplus-delivery` | `/dawaaplus-delivery` | `#D69E2E` |
+| Mobile App (Expo) | `artifacts/dawaaplus` | `/dawaaplus` | `#3B82F6` |
+| API Server | `artifacts/api-server` | `/api` | — |
 
-## i18n System
+## API Server
 
-- Translations: `artifacts/dawaaplus/constants/translations.ts` — 70+ keys in 6 languages (ar/ku/en/fa/tr/fr) via `getTranslations(langCode)`
-- Hook: `artifacts/dawaaplus/i18n.ts` — `useTranslation()` returns `{ t(), lang, isRtl }` — t() accepts any key from Translations interface
-- Context: `artifacts/dawaaplus/contexts/SettingsContext.tsx` — `SettingsProvider` exposes `{ language, country, setLanguage, setCountry, t: Translations }`
-- Languages list: `artifacts/dawaaplus/data/locales.ts` — 70+ languages with rtl flag, country list
-- Applied: customer tab bar labels (home/browse/pharmacies/cart/profile) + pharmacy/warehouse sidebar labels
+- Express 5 API running on port 8080 at `/api/...`
+- Routes: `auth`, `pharmacies`, `warehouses`, `delivery`, `products`, `orders`, `otp`, `admin`
+- All portals have `src/api.ts` client that calls the API with localStorage fallback
 
-## Web Portals
+## Login Credentials
 
-- **Pharmacy portal** (`dawaaplus-pharmacies`): WelcomeShareModal on login, TopBar with WhatsApp + copy-link, delivery company assignment on orders
-- **Warehouse portal** (`dawaaplus-warehouses`): WelcomeShareModal on login, TopBar with WhatsApp + copy-link, delivery company assignment on orders
-- **Delivery portal** (`dawaaplus-delivery`): WelcomeShareModal on login, TopBar with WhatsApp + copy-link
-- **Admin portal** (`dawaaplus-web`): reads subscriber data via shared localStorage + BroadcastChannel `dawapl_sync`
-- **Shared localStorage schema**: `ph_profile_${id}`, `wh_profile_${id}`, `dc_profile_${id}`, `dc_companies_list`
+| Type | Phone/ID | Password |
+|------|----------|----------|
+| Admin | `admin` | `admin` |
+| Pharmacy | `07501234567` (ph1) | `123456` |
+| Warehouse | `07501111111` (wh1) | `123456` |
+| Delivery | `07501222222` (dc1) | `123456` |
+
+## Admin Portal Access
+
+- **Hidden** — not accessible from the landing page directly
+- Access via: **5 taps** on the دواء+ logo OR **Ctrl+Shift+A**
+- Landing page at `/dawaaplus-web` shows public marketing page
+
+## Database
+
+- **PostgreSQL** via Replit managed DB (DATABASE_URL env var)
+- **Drizzle ORM** schema at `lib/db/src/schema/index.ts`
+- 12 tables: `admins`, `pharmacies`, `warehouses`, `delivery_companies`, `customers`, `products`, `orders`, `order_items`, `drivers`, `trips`, `announcements`, `otp_codes`, `payments`
+- Seed data: 1 admin, 4 pharmacies, 4 warehouses, 4 delivery companies
+
+## Data Sync Architecture
+
+Each portal:
+1. On login → loads data from localStorage (fast/offline)
+2. After login → syncs fresh data from API (overwrites localStorage cache)
+3. On save → writes to both localStorage AND API
+4. Admin portal → polls API every 15s + BroadcastChannel sync
+
+## Subscription Plans
+
+- **Free** — basic features
+- **Standard** — `40,000 د.ع/month` (pharmacies/warehouses) or `40,000 د.ع/month` (delivery)
+- **Premium** — `75,000–80,000 د.ع/month` — full features, ads, priority listing
+
+## i18n (Mobile App)
+
+- Translations: `artifacts/dawaaplus/constants/translations.ts` — 70+ keys
+- Languages: ar, ku, en, fa, tr, fr, de, es, ru, zh, ko, ja, ur (13 total)
+- Use `indexOf()` instead of `Set.has()` for Hermes JS engine compatibility
 
 ## Stack
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+- **Monorepo**: pnpm workspaces
+- **Node.js**: 24
+- **TypeScript**: 5.9
+- **API**: Express 5 + PostgreSQL + Drizzle ORM
+- **Frontend**: React + Vite (portals), Expo + React Native (mobile)
+- **Build**: esbuild (API), Vite (portals)
 
-## Structure
+## Important Notes
 
-```text
-artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
-```
-
-## TypeScript & Composite Projects
-
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
-
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
-
-## Root Scripts
-
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
-
-## Packages
-
-### `artifacts/api-server` (`@workspace/api-server`)
-
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
-
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
-
-### `lib/db` (`@workspace/db`)
-
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
-
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
-
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
-
-### `lib/api-spec` (`@workspace/api-spec`)
-
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
-
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
-
-### `lib/api-zod` (`@workspace/api-zod`)
-
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
-
-### `lib/api-client-react` (`@workspace/api-client-react`)
-
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
-
-### `scripts` (`@workspace/scripts`)
-
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+- All 4 portals share the same domain → **localStorage is shared across portals**
+- Admin portal reads subscriber data from shared localStorage + API
+- API server handles `change-password` via `/api/auth/change-password`
+- OTP flow: `/api/otp/send` generates 6-digit code, `/api/otp/verify` checks it
+- Warehouse = **مذخر** (singular), **مذاخر** (plural)

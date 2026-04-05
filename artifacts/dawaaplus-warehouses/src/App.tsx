@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { api } from "./api";
 
 function broadcastSync() {
   try { new BroadcastChannel("dawapl_sync").postMessage("update"); } catch {}
@@ -87,12 +88,22 @@ export default function App() {
     setProfile(LS(`wh_profile_${wh.id}`, wh));
     setSocialState(LS(`wh_social_${wh.id}`, { facebook:"", instagram:"", tiktok:"", website:"", whatsapp: wh.phone }));
     setLinkedPharmacies(LS(`wh_pharmacies_${wh.id}`, LINKED_PHARMACIES));
+    // Sync from API
+    api.getWarehouse(wh.id).then(d=>{ if(d){ setProfile(d); localStorage.setItem(`wh_profile_${wh.id}`,JSON.stringify(d)); }}).catch(()=>{});
+    api.getProducts(wh.id).then(rows=>{ if(rows?.length){ setProductsState(rows); localStorage.setItem(`wh_products_${wh.id}`,JSON.stringify(rows)); }}).catch(()=>{});
   }, [wh?.id]);
 
   const setProducts = (v:any)=>{ setProductsState(v); if(wh){ localStorage.setItem(`wh_products_${wh.id}`,JSON.stringify(v)); broadcastSync(); } };
   const setOrders = (v:any)=>{ setOrdersState(v); if(wh){ localStorage.setItem(`wh_orders_${wh.id}`,JSON.stringify(v)); broadcastSync(); } };
   const saveSocial = (v:any)=>{ setSocialState(v); if(wh){ localStorage.setItem(`wh_social_${wh.id}`,JSON.stringify(v)); broadcastSync(); } };
-  const saveProfile = (d:any)=>{ setProfile(d); if(wh){ localStorage.setItem(`wh_profile_${wh.id}`,JSON.stringify(d)); broadcastSync(); } };
+  const saveProfile = (d:any)=>{
+    setProfile(d);
+    if(wh){
+      localStorage.setItem(`wh_profile_${wh.id}`,JSON.stringify(d));
+      api.updateWarehouse(wh.id, d).catch(()=>{});
+      broadcastSync();
+    }
+  };
 
   const MENU = [{id:"dash",l:"لوحة التحكم",i:"📊"},{id:"acc",l:"حسابي",i:"👤"},{id:"inv",l:"المخزون",i:"📦"},
     {id:"pharm",l:"الصيدليات",i:"💊"},{id:"orders",l:"الطلبات",i:"🛒"},{id:"sub",l:"الاشتراك",i:"💎"},
@@ -193,9 +204,18 @@ function ForgotModal({ onClose, color, data, passKey }:{ onClose:()=>void; color
 }
 
 function Login({ onLogin }:{ onLogin:(w:any)=>void }) {
-  const [phone,setPhone]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState("");
+  const [phone,setPhone]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
   const [showFp,setShowFp]=useState(false);
-  const login=()=>{ const w=WAREHOUSES.find(w=>w.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`wh_pass_${w.id}`)||w.pass)); w?onLogin(w):setErr("رقم الهاتف أو كلمة المرور غير صحيحة"); };
+  const login=async()=>{
+    setLoading(true); setErr("");
+    try {
+      const res = await api.login(phone.trim(), pass.trim());
+      if(res?.user) { onLogin(res.user); return; }
+    } catch {}
+    const w=WAREHOUSES.find(w=>w.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`wh_pass_${w.id}`)||w.pass));
+    w ? onLogin(w) : setErr("رقم الهاتف أو كلمة المرور غير صحيحة");
+    setLoading(false);
+  };
   return (
     <div dir="rtl" style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
       {showFp && <ForgotModal onClose={()=>setShowFp(false)} color={C.primary} data={WAREHOUSES} passKey={id=>`wh_pass_${id}`} />}
