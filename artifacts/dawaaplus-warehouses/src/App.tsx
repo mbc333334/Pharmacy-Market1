@@ -203,7 +203,65 @@ function ForgotModal({ onClose, color, data, passKey }:{ onClose:()=>void; color
   );
 }
 
+function RegisterForm({ color, onBack }:{ color:string; onBack:()=>void }) {
+  const [f,setF]=useState({ name:"", city:"", phone:"", password:"", confirm:"", email:"", address:"", license:"" });
+  const [err,setErr]=useState(""); const [loading,setLoading]=useState(false); const [done,setDone]=useState(false);
+  const upd=(k:string)=>(e:React.ChangeEvent<HTMLInputElement|HTMLSelectElement>)=>setF(v=>({...v,[k]:e.target.value}));
+  const CITIES=["أربيل","السليمانية","دهوك","كركوك","الموصل","بغداد","البصرة","أخرى"];
+  const inp:React.CSSProperties={width:"100%",padding:"10px 14px",borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:14,textAlign:"right",outline:"none",boxSizing:"border-box",marginBottom:10};
+  const submit=async()=>{
+    setErr("");
+    if(!f.name.trim()||!f.phone.trim()||!f.password.trim()) return setErr("الاسم ورقم الهاتف وكلمة المرور مطلوبة");
+    if(f.password!==f.confirm) return setErr("كلمتا المرور غير متطابقتين");
+    if(f.password.length<6) return setErr("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
+    setLoading(true);
+    try {
+      await api.register({ name:f.name.trim(), city:f.city, phone:f.phone.trim(), password:f.password.trim(), email:f.email.trim()||undefined, address:f.address.trim()||undefined, license:f.license.trim()||undefined });
+      setDone(true);
+    } catch(e:any){ setErr(e.message||"حدث خطأ. حاول مرة أخرى"); }
+    setLoading(false);
+  };
+  if(done) return (
+    <div style={{ textAlign:"center", padding:"32px 20px" }}>
+      <div style={{ fontSize:64, marginBottom:12 }}>✅</div>
+      <h3 style={{ fontWeight:900, fontSize:20, color:color, margin:"0 0 10px" }}>تم إرسال طلبك!</h3>
+      <p style={{ fontSize:14, color:"#4A5568", lineHeight:1.7 }}>سيتم مراجعة بياناتك من قبل فريق دواء+.<br/>ستُبلَّغ بالموافقة عبر رقم هاتفك.</p>
+      <div style={{ background:"#F0FFF4",border:"1px solid #9AE6B4",borderRadius:12,padding:"12px 16px",marginTop:16,fontSize:13,color:"#276749" }}>⏱ المراجعة تستغرق عادةً 24-48 ساعة</div>
+      <button onClick={onBack} style={{ background:color,color:"#fff",border:"none",borderRadius:10,padding:"12px 32px",fontWeight:800,fontSize:15,cursor:"pointer",marginTop:20 }}>العودة لتسجيل الدخول</button>
+    </div>
+  );
+  return (
+    <>
+      <h2 style={{ textAlign:"center",fontSize:17,fontWeight:800,margin:"0 0 18px" }}>📋 طلب تسجيل مذخر جديد</h2>
+      <label style={{ fontSize:12,fontWeight:700,display:"block",marginBottom:4 }}>اسم المذخر *</label>
+      <input style={inp} placeholder="مثال: مذخر الشمال" value={f.name} onChange={upd("name")} />
+      <label style={{ fontSize:12,fontWeight:700,display:"block",marginBottom:4 }}>المدينة</label>
+      <select style={{ ...inp,background:"#fff" }} value={f.city} onChange={upd("city")}>
+        <option value="">اختر المدينة</option>
+        {CITIES.map(c=><option key={c} value={c}>{c}</option>)}
+      </select>
+      <label style={{ fontSize:12,fontWeight:700,display:"block",marginBottom:4 }}>رقم الهاتف *</label>
+      <input style={inp} placeholder="07xxxxxxxxx" value={f.phone} onChange={upd("phone")} />
+      <label style={{ fontSize:12,fontWeight:700,display:"block",marginBottom:4 }}>كلمة المرور *</label>
+      <input style={inp} type="password" placeholder="6 أحرف على الأقل" value={f.password} onChange={upd("password")} />
+      <label style={{ fontSize:12,fontWeight:700,display:"block",marginBottom:4 }}>تأكيد كلمة المرور *</label>
+      <input style={inp} type="password" placeholder="أعد كتابة كلمة المرور" value={f.confirm} onChange={upd("confirm")} />
+      <label style={{ fontSize:12,fontWeight:700,display:"block",marginBottom:4 }}>رقم رخصة المذخر</label>
+      <input style={inp} placeholder="مثال: WH-2024-001 (اختياري)" value={f.license} onChange={upd("license")} />
+      <label style={{ fontSize:12,fontWeight:700,display:"block",marginBottom:4 }}>البريد الإلكتروني</label>
+      <input style={inp} placeholder="example@email.com (اختياري)" value={f.email} onChange={upd("email")} />
+      <label style={{ fontSize:12,fontWeight:700,display:"block",marginBottom:4 }}>العنوان التفصيلي</label>
+      <input style={inp} placeholder="الشارع والحي (اختياري)" value={f.address} onChange={upd("address")} />
+      {err && <div style={{ background:"#FFF5F5",border:"1px solid #FED7D7",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#E53E3E",marginBottom:10 }}>⚠️ {err}</div>}
+      <button onClick={submit} disabled={loading} style={{ background:color,color:"#fff",border:"none",borderRadius:10,padding:"12px 0",width:"100%",fontWeight:800,fontSize:15,cursor:loading?"not-allowed":"pointer",opacity:loading?0.7:1 }}>
+        {loading?"⏳ جاري الإرسال...":"📨 إرسال طلب التسجيل"}
+      </button>
+    </>
+  );
+}
+
 function Login({ onLogin }:{ onLogin:(w:any)=>void }) {
+  const [tab,setTab]=useState<"login"|"register">("login");
   const [phone,setPhone]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
   const [showFp,setShowFp]=useState(false);
   const login=async()=>{
@@ -211,11 +269,14 @@ function Login({ onLogin }:{ onLogin:(w:any)=>void }) {
     try {
       const res = await api.login(phone.trim(), pass.trim());
       if(res?.user) { onLogin(res.user); return; }
-    } catch {}
+    } catch(e:any) {
+      if(e.message) { setErr(e.message); setLoading(false); return; }
+    }
     const w=WAREHOUSES.find(w=>w.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`wh_pass_${w.id}`)||w.pass));
     w ? onLogin(w) : setErr("رقم الهاتف أو كلمة المرور غير صحيحة");
     setLoading(false);
   };
+  const tabStyle=(active:boolean):React.CSSProperties=>({ flex:1,padding:"10px 0",border:"none",borderRadius:10,fontWeight:800,fontSize:14,cursor:"pointer",transition:"all .2s",background:active?C.primary:"transparent",color:active?"#fff":C.muted });
   return (
     <div dir="rtl" style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
       {showFp && <ForgotModal onClose={()=>setShowFp(false)} color={C.primary} data={WAREHOUSES} passKey={id=>`wh_pass_${id}`} />}
@@ -225,25 +286,30 @@ function Login({ onLogin }:{ onLogin:(w:any)=>void }) {
         <p style={{ color:"rgba(255,255,255,0.8)", fontSize:14, margin:"8px 0 0" }}>دواء+ — منصة إدارة المذخر</p>
       </div>
       <div style={{ maxWidth:440, margin:"-32px auto 0", padding:"0 20px 40px" }}>
-        <div style={{ background:C.surface, borderRadius:20, padding:"28px 24px", boxShadow:"0 8px 40px rgba(0,0,0,0.12)", marginBottom:18 }}>
-          <h2 style={{ textAlign:"center", fontSize:18, fontWeight:800, margin:"0 0 20px" }}>تسجيل الدخول</h2>
-          <Inp label="رقم الهاتف" val={phone} set={setPhone} ph="07xxxxxxxxx" />
-          <Inp label="كلمة المرور" val={pass} set={setPass} ph="••••••" type="password" />
-          {err && <div style={{ background:"#FFF5F5", border:"1px solid #FED7D7", borderRadius:8, padding:"8px 12px", fontSize:12, color:C.red, marginBottom:10 }}>{err}</div>}
-          <Btn label="دخول →" color={C.primary} onClick={login} full />
-          <button onClick={()=>setShowFp(true)} style={{ background:"none",border:"none",width:"100%",marginTop:10,color:C.primary,cursor:"pointer",fontSize:13,fontWeight:700,textDecoration:"underline",textAlign:"center" }}>🔑 نسيت كلمة المرور؟</button>
+        <div style={{ background:C.surface, borderRadius:20, padding:"20px 24px 28px", boxShadow:"0 8px 40px rgba(0,0,0,0.12)", marginBottom:18 }}>
+          <div style={{ display:"flex",background:"#f0f4f8",borderRadius:12,padding:4,marginBottom:20,gap:4 }}>
+            <button style={tabStyle(tab==="login")} onClick={()=>{setTab("login");setErr("");}}>🔑 تسجيل الدخول</button>
+            <button style={tabStyle(tab==="register")} onClick={()=>{setTab("register");setErr("");}}>📋 تسجيل جديد</button>
+          </div>
+          {tab==="login" ? <>
+            <Inp label="رقم الهاتف" val={phone} set={setPhone} ph="07xxxxxxxxx" />
+            <Inp label="كلمة المرور" val={pass} set={setPass} ph="••••••" type="password" />
+            {err && <div style={{ background:"#FFF5F5",border:"1px solid #FED7D7",borderRadius:8,padding:"8px 12px",fontSize:12,color:C.red,marginBottom:10 }}>{err}</div>}
+            <Btn label={loading?"جاري الدخول...":"دخول →"} color={C.primary} onClick={login} full />
+            <button onClick={()=>setShowFp(true)} style={{ background:"none",border:"none",width:"100%",marginTop:10,color:C.primary,cursor:"pointer",fontSize:13,fontWeight:700,textDecoration:"underline",textAlign:"center" }}>🔑 نسيت كلمة المرور؟</button>
+          </> : <RegisterForm color={C.primary} onBack={()=>setTab("login")} />}
         </div>
-        <div style={{ background:C.surface, borderRadius:16, padding:"16px 18px", boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
-          <div style={{ fontSize:12, color:C.muted, textAlign:"center", marginBottom:10 }}>🔑 مذاخر مسجّلة — اضغط للدخول</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+        {tab==="login" && <div style={{ background:C.surface,borderRadius:16,padding:"16px 18px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
+          <div style={{ fontSize:12,color:C.muted,textAlign:"center",marginBottom:10 }}>🔑 مذاخر مسجّلة — اضغط للدخول</div>
+          <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
             {WAREHOUSES.map(w=>(
-              <button key={w.id} onClick={()=>onLogin(w)} style={{ background:C.light, border:`1px solid ${C.primary}30`, borderRadius:10, padding:"10px 14px", cursor:"pointer", textAlign:"right", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <span style={{ fontWeight:700, color:C.primary, fontSize:13 }}>🏭 {w.name}</span>
-                <span style={{ fontSize:11, color:C.muted }}>{w.city} · {w.phone}</span>
+              <button key={w.id} onClick={()=>onLogin(w)} style={{ background:C.light,border:`1px solid ${C.primary}30`,borderRadius:10,padding:"10px 14px",cursor:"pointer",textAlign:"right",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+                <span style={{ fontWeight:700,color:C.primary,fontSize:13 }}>🏭 {w.name}</span>
+                <span style={{ fontSize:11,color:C.muted }}>{w.city} · {w.phone}</span>
               </button>
             ))}
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );

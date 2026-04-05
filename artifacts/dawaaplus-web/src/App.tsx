@@ -357,6 +357,7 @@ function LoginScreen({ onLogin, onBack }: { onLogin:(u:{name:string;role:string}
 // ═══════════════════════════════════════════════════════════════════════════════
 const BASE_MENU = [
   {id:"dash",    label:"لوحة التحكم",    icon:"📊", roles:["superadmin","supervisor"]},
+  {id:"pending", label:"طلبات الانضمام", icon:"🔔", roles:["superadmin","supervisor"]},
   {id:"pharms",  label:"الصيدليات",       icon:"💊", roles:["superadmin","supervisor"]},
   {id:"wares",   label:"المذاخر",         icon:"🏭", roles:["superadmin","supervisor"]},
   {id:"deliv",   label:"شركات التوصيل",  icon:"🚛", roles:["superadmin","supervisor"]},
@@ -528,6 +529,7 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastS
         </div>
         <div style={{ flex:1, overflowY:"auto", padding:20 }}>
           {sec==="dash"     && <AdminDash    db={db} />}
+          {sec==="pending"  && <PendingApprovals onRefresh={onRefresh} />}
           {sec==="pharms"   && <AdminPharms  db={db} />}
           {sec==="wares"    && <AdminWares   db={db} />}
           {sec==="deliv"    && <AdminDeliv   db={db} />}
@@ -538,6 +540,155 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastS
           {sec==="settings" && isSuperAdmin && <AdminSettings currentUser={user} />}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PENDING APPROVALS
+// ═══════════════════════════════════════════════════════════════════════════════
+function PendingApprovals({ onRefresh }:{ onRefresh:()=>void }) {
+  const [data, setData] = useState<{pharmacies:any[];warehouses:any[];deliveries:any[]}|null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [rejModal, setRejModal] = useState<{item:any;type:string}|null>(null);
+  const [rejReason, setRejReason] = useState("");
+  const [actionMsg, setActionMsg] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr("");
+    try { const d = await api.getPendingRequests(); setData(d); }
+    catch(e:any) { setErr(e.message||"تعذّر تحميل الطلبات"); }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const approve = async (type:string, id:string) => {
+    try {
+      await api.approveSubscriber(type, id);
+      setActionMsg("✅ تمت الموافقة بنجاح");
+      load(); onRefresh();
+    } catch(e:any) { setActionMsg("❌ "+e.message); }
+    setTimeout(()=>setActionMsg(""),3000);
+  };
+
+  const reject = async () => {
+    if(!rejModal) return;
+    try {
+      await api.rejectSubscriber(rejModal.type, rejModal.item.id, rejReason);
+      setActionMsg("🚫 تم الرفض");
+      setRejModal(null); setRejReason("");
+      load(); onRefresh();
+    } catch(e:any) { setActionMsg("❌ "+e.message); }
+    setTimeout(()=>setActionMsg(""),3000);
+  };
+
+  const typeLabel: Record<string,{icon:string;label:string;color:string}> = {
+    pharmacy: { icon:"💊", label:"صيدلية", color:C.pharmacy },
+    warehouse: { icon:"🏭", label:"مذخر", color:C.warehouse },
+    delivery: { icon:"🚛", label:"شركة توصيل", color:C.delivery },
+  };
+
+  const allPending = [
+    ...(data?.pharmacies||[]).map(p=>({...p,_type:"pharmacy"})),
+    ...(data?.warehouses||[]).map(w=>({...w,_type:"warehouse"})),
+    ...(data?.deliveries||[]).map(d=>({...d,_type:"delivery"})),
+  ];
+
+  return (
+    <div>
+      <SyncNote text="طلبات التسجيل الجديدة — راجع البيانات بعناية قبل الموافقة أو الرفض" />
+      {actionMsg && <div style={{ background: actionMsg.startsWith("✅")?"#F0FFF4":actionMsg.startsWith("🚫")?"#FFF5F5":"#FFF5F5", border:`1px solid ${actionMsg.startsWith("✅")?"#9AE6B4":"#FED7D7"}`, borderRadius:10, padding:"10px 16px", marginBottom:14, fontWeight:700, fontSize:13 }}>{actionMsg}</div>}
+      {loading && <div style={{ textAlign:"center",padding:40,color:C.muted }}>⏳ جاري تحميل الطلبات...</div>}
+      {err && <div style={{ background:"#FFF5F5",border:"1px solid #FED7D7",borderRadius:10,padding:14,color:C.red }}>{err}</div>}
+      {!loading && !err && allPending.length === 0 && (
+        <div style={{ textAlign:"center",padding:"60px 20px" }}>
+          <div style={{ fontSize:64,marginBottom:12 }}>✅</div>
+          <h3 style={{ fontWeight:900,fontSize:20,margin:"0 0 8px" }}>لا توجد طلبات معلّقة</h3>
+          <p style={{ color:C.muted,fontSize:14 }}>جميع طلبات التسجيل تمت معالجتها</p>
+          <button onClick={load} style={{ background:C.admin,color:"#fff",border:"none",borderRadius:10,padding:"10px 24px",fontWeight:800,cursor:"pointer",marginTop:12 }}>🔄 تحديث</button>
+        </div>
+      )}
+      {!loading && allPending.length > 0 && (
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+            <h3 style={{ margin:0, fontWeight:900, fontSize:16 }}>🔔 طلبات الانضمام المعلّقة ({allPending.length})</h3>
+            <button onClick={load} style={{ background:"#f0f4f8",border:"none",borderRadius:8,padding:"6px 14px",cursor:"pointer",fontSize:13,fontWeight:700 }}>🔄 تحديث</button>
+          </div>
+          <div style={{ display:"flex",flexDirection:"column",gap:16 }}>
+            {allPending.map((item:any)=>{
+              const t = typeLabel[item._type];
+              return (
+                <div key={item.id} style={{ background:C.surface,borderRadius:16,boxShadow:"0 2px 12px rgba(0,0,0,0.08)",overflow:"hidden" }}>
+                  {/* Header */}
+                  <div style={{ background:`${t.color}15`,borderBottom:`3px solid ${t.color}`,padding:"14px 18px",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+                    <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+                      <div style={{ fontSize:32 }}>{t.icon}</div>
+                      <div>
+                        <div style={{ fontWeight:900,fontSize:17 }}>{item.name}</div>
+                        <div style={{ fontSize:12,color:C.muted,marginTop:2 }}>{t.label} — طلب جديد</div>
+                      </div>
+                    </div>
+                    <span style={{ background:"#FFFBEB",color:"#92400E",border:"1px solid #F6AD55",borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:800 }}>⏳ معلّق</span>
+                  </div>
+                  {/* Data grid */}
+                  <div style={{ padding:"14px 18px" }}>
+                    <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10,marginBottom:14 }}>
+                      {[
+                        { l:"📱 رقم الهاتف", v:item.phone },
+                        { l:"🏙️ المدينة", v:item.city||"—" },
+                        { l:"📋 رقم الرخصة", v:item.license||"—" },
+                        { l:"📧 البريد الإلكتروني", v:item.email||"—" },
+                        { l:"📍 العنوان", v:item.address||"—" },
+                        { l:"📅 تاريخ التسجيل", v:item.joined||new Date(item.createdAt).toLocaleDateString("ar-IQ")||"—" },
+                      ].map(({l,v})=>(
+                        <div key={l} style={{ background:"#f8fafc",borderRadius:8,padding:"8px 12px" }}>
+                          <div style={{ fontSize:10,color:C.muted,fontWeight:700,marginBottom:2 }}>{l}</div>
+                          <div style={{ fontWeight:700,fontSize:13 }}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Approval notice */}
+                    <div style={{ background:"#FFFBEB",border:"1px solid #F6AD55",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#744210",marginBottom:14 }}>
+                      ⚠️ <strong>تنبيه:</strong> تأكد من صحة رقم الرخصة وبيانات المنشأة قبل الموافقة. الموافقة تُفعّل حساب المشترك فوراً وتتيح له الدخول للمنصة.
+                    </div>
+                    {/* Actions */}
+                    <div style={{ display:"flex",gap:10 }}>
+                      <button onClick={()=>approve(item._type,item.id)} style={{ flex:1,background:C.green,color:"#fff",border:"none",borderRadius:10,padding:"11px 0",fontWeight:800,fontSize:14,cursor:"pointer" }}>
+                        ✅ موافقة — تفعيل الحساب
+                      </button>
+                      <button onClick={()=>{ setRejModal({item,type:item._type}); setRejReason(""); }} style={{ flex:1,background:"#FFF5F5",color:C.red,border:`1.5px solid ${C.red}`,borderRadius:10,padding:"11px 0",fontWeight:800,fontSize:14,cursor:"pointer" }}>
+                        ❌ رفض الطلب
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {/* Rejection reason modal */}
+      {rejModal && (
+        <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20 }}>
+          <div style={{ background:"#fff",borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:440,direction:"rtl",boxShadow:"0 20px 60px rgba(0,0,0,0.25)" }}>
+            <div style={{ textAlign:"center",marginBottom:20 }}>
+              <div style={{ fontSize:48,marginBottom:8 }}>❌</div>
+              <h3 style={{ fontWeight:900,fontSize:18,margin:"0 0 4px" }}>رفض طلب الانضمام</h3>
+              <p style={{ fontSize:13,color:C.muted,margin:0 }}>{rejModal.item.name}</p>
+            </div>
+            <label style={{ fontSize:12,fontWeight:700,display:"block",marginBottom:6 }}>سبب الرفض (اختياري — سيُعرض للمتقدم)</label>
+            <textarea value={rejReason} onChange={e=>setRejReason(e.target.value)}
+              placeholder="مثال: الرخصة منتهية الصلاحية، أو البيانات غير مكتملة..."
+              style={{ width:"100%",padding:"10px 14px",borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:14,resize:"vertical",minHeight:90,direction:"rtl",boxSizing:"border-box",outline:"none",marginBottom:14 }} />
+            <div style={{ display:"flex",gap:10 }}>
+              <button onClick={reject} style={{ flex:1,background:C.red,color:"#fff",border:"none",borderRadius:10,padding:"12px 0",fontWeight:800,fontSize:15,cursor:"pointer" }}>🚫 تأكيد الرفض</button>
+              <button onClick={()=>setRejModal(null)} style={{ flex:1,background:"#f0f4f8",color:C.text,border:"none",borderRadius:10,padding:"12px 0",fontWeight:700,fontSize:14,cursor:"pointer" }}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

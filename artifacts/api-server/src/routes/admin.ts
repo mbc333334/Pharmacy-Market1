@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, admins, pharmacies, warehouses, deliveryCompanies, orders, announcements, payments } from "@workspace/db";
-import { eq, count } from "drizzle-orm";
+import { eq, count, or } from "drizzle-orm";
 
 const router = Router();
 
@@ -102,6 +102,55 @@ router.delete("/announcements/:id", async (req, res) => {
   try {
     await db.update(announcements).set({ active: false }).where(eq(announcements.id, Number(req.params.id)));
     return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: "server error" });
+  }
+});
+
+// ── APPROVAL / REGISTRATION REQUESTS ──────────────────────────
+
+// GET /api/admin/pending — list all pending subscriber requests
+router.get("/admin/pending", async (_req, res) => {
+  try {
+    const ph = await db.select().from(pharmacies).where(eq(pharmacies.approvalStatus, "pending"));
+    const wh = await db.select().from(warehouses).where(eq(warehouses.approvalStatus, "pending"));
+    const dc = await db.select().from(deliveryCompanies).where(eq(deliveryCompanies.approvalStatus, "pending"));
+    return res.json({
+      pharmacies: ph.map(r => { const { password: _p, ...s } = r; return { ...s, _type: "pharmacy" }; }),
+      warehouses: wh.map(r => { const { password: _p, ...s } = r; return { ...s, _type: "warehouse" }; }),
+      deliveries: dc.map(r => { const { password: _p, ...s } = r; return { ...s, _type: "delivery" }; }),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "server error" });
+  }
+});
+
+// PATCH /api/admin/approve/:type/:id — approve a subscriber
+router.patch("/admin/approve/:type/:id", async (req, res) => {
+  const { type, id } = req.params;
+  const tableMap: Record<string, any> = { pharmacy: pharmacies, warehouse: warehouses, delivery: deliveryCompanies };
+  const table = tableMap[type];
+  if (!table) return res.status(400).json({ error: "invalid type" });
+  try {
+    const [updated] = await db.update(table).set({ approvalStatus: "approved", active: true, rejectionReason: null }).where(eq((table as any).id, id)).returning();
+    if (!updated) return res.status(404).json({ error: "not found" });
+    return res.json({ success: true, data: updated });
+  } catch (err) {
+    return res.status(500).json({ error: "server error" });
+  }
+});
+
+// PATCH /api/admin/reject/:type/:id — reject a subscriber
+router.patch("/admin/reject/:type/:id", async (req, res) => {
+  const { type, id } = req.params;
+  const { reason } = req.body;
+  const tableMap: Record<string, any> = { pharmacy: pharmacies, warehouse: warehouses, delivery: deliveryCompanies };
+  const table = tableMap[type];
+  if (!table) return res.status(400).json({ error: "invalid type" });
+  try {
+    const [updated] = await db.update(table).set({ approvalStatus: "rejected", active: false, rejectionReason: reason || null }).where(eq((table as any).id, id)).returning();
+    if (!updated) return res.status(404).json({ error: "not found" });
+    return res.json({ success: true, data: updated });
   } catch (err) {
     return res.status(500).json({ error: "server error" });
   }

@@ -46,6 +46,10 @@ export const api = {
   // Payments
   getPayments:        () => req("GET", "/payments"),
   updatePaymentStatus:(id: number, status: string) => req("PATCH", `/payments/${id}/status`, { status }),
+  // Pending approvals
+  getPendingRequests: () => req("GET", "/admin/pending"),
+  approveSubscriber:  (type: string, id: string) => req("PATCH", `/admin/approve/${type}/${id}`, {}),
+  rejectSubscriber:   (type: string, id: string, reason: string) => req("PATCH", `/admin/reject/${type}/${id}`, { reason }),
   // OTP
   sendOtp:            (phone: string) => req("POST", "/otp/send", { phone }),
   verifyOtp:          (phone: string, code: string) => req("POST", "/otp/verify", { phone, code }),
