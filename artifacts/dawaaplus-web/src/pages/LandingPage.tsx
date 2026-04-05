@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from "react";
-
-const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
+import React, { useState, useEffect, useRef } from "react";
 
 const C = {
   primary: "#7C3AED",
   pharmacy: "#1A9E6E",
   warehouse: "#0D7A54",
   delivery: "#D69E2E",
-  customer: "#3B82F6",
   text: "#1a202c",
   muted: "#64748b",
   bg: "#f8fafc",
@@ -42,15 +39,6 @@ const PORTALS = [
     bg: "#FFFBEB",
     href: `${DOMAIN}/dawaaplus-delivery/`,
   },
-  {
-    icon: "🛡️",
-    title: "بوابة الإدارة",
-    desc: "لوحة تحكم المنصة — للمشرفين فقط",
-    color: C.primary,
-    bg: "#F5F3FF",
-    href: null,
-    isAdmin: true,
-  },
 ];
 
 const FEATURES = [
@@ -72,6 +60,34 @@ const STATS = [
 export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void }) {
   const [scrolled, setScrolled] = useState(false);
 
+  // ── SECRET ADMIN ACCESS ──────────────────────────────────────────
+  // Click logo 5 times rapidly → admin login (invisible to users)
+  const tapCount = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLogoTap = () => {
+    tapCount.current += 1;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    if (tapCount.current >= 5) {
+      tapCount.current = 0;
+      onAdminLogin();
+      return;
+    }
+    tapTimer.current = setTimeout(() => { tapCount.current = 0; }, 2000);
+  };
+
+  // Keyboard shortcut: Ctrl + Shift + A → admin login
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === "A") {
+        e.preventDefault();
+        onAdminLogin();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onAdminLogin]);
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", onScroll);
@@ -91,7 +107,11 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
         transition: "all 0.3s",
         display: "flex", alignItems: "center", justifyContent: "space-between", height: 64,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {/* Logo — clicking 5 times rapidly reveals admin login */}
+        <div
+          onClick={handleLogoTap}
+          style={{ display: "flex", alignItems: "center", gap: 10, cursor: "default", userSelect: "none" }}
+        >
           <div style={{
             width: 36, height: 36, borderRadius: 10, background: C.primary,
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -102,13 +122,12 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <a href="#features" style={{ color: scrolled ? C.muted : "rgba(255,255,255,0.85)", textDecoration: "none", fontSize: 14, padding: "6px 12px" }}>المميزات</a>
           <a href="#portals" style={{ color: scrolled ? C.muted : "rgba(255,255,255,0.85)", textDecoration: "none", fontSize: 14, padding: "6px 12px" }}>البوابات</a>
-          <button
-            onClick={onAdminLogin}
-            style={{
-              background: C.primary, color: "#fff", border: "none", borderRadius: 10,
-              padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer",
-            }}
-          >دخول الإدارة</button>
+          <a href="#download" style={{
+            background: scrolled ? C.primary : "rgba(255,255,255,0.15)",
+            color: "#fff", borderRadius: 10, padding: "8px 18px", fontSize: 13,
+            fontWeight: 700, textDecoration: "none",
+            border: scrolled ? "none" : "1.5px solid rgba(255,255,255,0.35)",
+          }}>حمّل التطبيق</a>
         </div>
       </nav>
 
@@ -119,7 +138,6 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
         flexDirection: "column", textAlign: "center", padding: "100px 24px 80px",
         position: "relative", overflow: "hidden",
       }}>
-        {/* Background blobs */}
         <div style={{ position: "absolute", top: "15%", right: "10%", width: 300, height: 300, borderRadius: "50%", background: "rgba(255,255,255,0.05)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: "10%", left: "5%", width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.07)", pointerEvents: "none" }} />
 
@@ -132,12 +150,17 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
           🇮🇶 منصة الصحة الرقمية في كردستان والعراق
         </div>
 
-        <div style={{
-          width: 96, height: 96, borderRadius: 26, background: "rgba(255,255,255,0.15)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 52, marginBottom: 24, backdropFilter: "blur(8px)",
-          border: "2px solid rgba(255,255,255,0.3)",
-        }}>💊</div>
+        {/* App icon — also secret tap zone */}
+        <div
+          onClick={handleLogoTap}
+          style={{
+            width: 96, height: 96, borderRadius: 26, background: "rgba(255,255,255,0.15)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 52, marginBottom: 24, backdropFilter: "blur(8px)",
+            border: "2px solid rgba(255,255,255,0.3)",
+            cursor: "default", userSelect: "none",
+          }}
+        >💊</div>
 
         <h1 style={{ fontSize: "clamp(36px, 7vw, 64px)", fontWeight: 900, color: "#fff", margin: "0 0 16px", lineHeight: 1.15 }}>
           دواء+
@@ -164,7 +187,6 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
           </a>
         </div>
 
-        {/* Stats bar */}
         <div style={{
           display: "flex", gap: 0, marginTop: 64, background: "rgba(255,255,255,0.12)",
           borderRadius: 20, overflow: "hidden", backdropFilter: "blur(8px)",
@@ -197,9 +219,7 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
           </p>
         </div>
 
-        <div style={{
-          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20,
-        }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
           {FEATURES.map((f, i) => (
             <div key={i} style={{
               background: C.surface, borderRadius: 18, padding: "28px 24px",
@@ -229,7 +249,7 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
         </div>
       </section>
 
-      {/* ── PORTALS ── */}
+      {/* ── PORTALS (subscribers only — no admin card) ── */}
       <section id="portals" style={{ padding: "60px 24px 80px", background: "#F8F5FF" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 52 }}>
@@ -244,11 +264,11 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20 }}>
             {PORTALS.map((p, i) => (
               <div
                 key={i}
-                onClick={() => p.isAdmin ? onAdminLogin() : p.href && window.open(p.href, "_blank")}
+                onClick={() => p.href && window.open(p.href, "_blank")}
                 style={{
                   background: p.bg, borderRadius: 22, padding: "32px 24px", textAlign: "center",
                   border: `2px solid ${p.color}22`, cursor: "pointer",
@@ -278,7 +298,7 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
                   background: p.color, color: "#fff", borderRadius: 10,
                   padding: "8px 20px", fontSize: 13, fontWeight: 700,
                 }}>
-                  {p.isAdmin ? "دخول" : "الانتقال للبوابة"} →
+                  الانتقال للبوابة →
                 </div>
               </div>
             ))}
@@ -326,11 +346,13 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
       </section>
 
       {/* ── FOOTER ── */}
-      <footer style={{
-        background: "#0F0A1E", padding: "48px 24px 32px", textAlign: "center",
-      }}>
+      <footer style={{ background: "#0F0A1E", padding: "48px 24px 32px", textAlign: "center" }}>
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 16 }}>
+          {/* Footer logo — also secret tap zone (5 taps) */}
+          <div
+            onClick={handleLogoTap}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 16, cursor: "default", userSelect: "none" }}
+          >
             <div style={{
               width: 40, height: 40, borderRadius: 12, background: C.primary,
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -338,18 +360,23 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
             }}>د</div>
             <span style={{ fontSize: 22, fontWeight: 900, color: "#fff" }}>دواء+</span>
           </div>
+
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", marginBottom: 24, lineHeight: 1.7 }}>
             منصة صحية رقمية متكاملة لكردستان والعراق<br />
             تربط الصيدليات والمذاخر وشركات التوصيل والمستخدمين
           </p>
 
           <div style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap", marginBottom: 28 }}>
-            {["بوابة الصيدليات", "بوابة المذاخر", "بوابة التوصيل"].map((link, i) => (
-              <a key={i} href="#portals" style={{ color: "rgba(255,255,255,0.55)", textDecoration: "none", fontSize: 13 }}>{link}</a>
+            {[
+              { label: "بوابة الصيدليات", href: `${DOMAIN}/dawaaplus-pharmacies/` },
+              { label: "بوابة المذاخر",   href: `${DOMAIN}/dawaaplus-warehouses/` },
+              { label: "بوابة التوصيل",   href: `${DOMAIN}/dawaaplus-delivery/` },
+            ].map((link, i) => (
+              <a key={i} href={link.href} target="_blank" rel="noreferrer"
+                style={{ color: "rgba(255,255,255,0.55)", textDecoration: "none", fontSize: 13 }}>
+                {link.label}
+              </a>
             ))}
-            <button onClick={onAdminLogin} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.55)", cursor: "pointer", fontSize: 13 }}>
-              بوابة الإدارة
-            </button>
           </div>
 
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 20, fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
