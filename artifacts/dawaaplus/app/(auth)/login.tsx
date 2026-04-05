@@ -10,7 +10,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/i18n";
 
-type TabType = "customer" | "pharmacy" | "warehouse";
+type TabType = "customer" | "pharmacy" | "warehouse" | "delivery";
 
 const ADMIN_PHONE = "+9647700000001";
 
@@ -42,12 +42,21 @@ const DEMO_ACCOUNTS = [
     bg: "#0D7A5410",
     border: "#0D7A5430",
   },
+  {
+    type: "delivery" as const,
+    label: "شركة توصيل",
+    sub: "لوحة تحكم التوصيل",
+    icon: "bicycle" as const,
+    color: "#D69E2E",
+    bg: "#D69E2E10",
+    border: "#D69E2E30",
+  },
 ];
 
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { login, loginDemo } = useAuth();
+  const { login, loginDemo, loginDelivery } = useAuth();
   const { t } = useTranslation();
   const [tab, setTab] = useState<TabType>("customer");
   const [phone, setPhone] = useState("");
@@ -119,7 +128,12 @@ export default function LoginScreen() {
     setError("");
     setLoading(true);
     try {
-      const ok = await login(phone, password, tab);
+      let ok = false;
+      if (tab === "delivery") {
+        ok = await loginDelivery(phone, password);
+      } else {
+        ok = await login(phone, password, tab);
+      }
       if (!ok) setError(t("wrongCredentials"));
     } catch {
       setError(t("wrongCredentials"));
@@ -128,7 +142,7 @@ export default function LoginScreen() {
     }
   };
 
-  const handleDemoLogin = async (type: "customer" | "pharmacy" | "warehouse") => {
+  const handleDemoLogin = async (type: "customer" | "pharmacy" | "warehouse" | "delivery") => {
     setDemoLoading(type);
     await new Promise(r => setTimeout(r, 400));
     loginDemo(type);
@@ -136,12 +150,16 @@ export default function LoginScreen() {
   };
 
   const tabs: { key: TabType; icon: any; label: string }[] = [
-    { key: "customer", icon: "person-outline", label: t("customer") },
-    { key: "pharmacy", icon: "storefront-outline", label: t("pharmacy") },
-    { key: "warehouse", icon: "cube-outline", label: t("warehouse") },
+    { key: "customer",  icon: "person-outline",    label: t("customer") },
+    { key: "pharmacy",  icon: "storefront-outline", label: t("pharmacy") },
+    { key: "warehouse", icon: "cube-outline",       label: t("warehouse") },
+    { key: "delivery",  icon: "bicycle-outline",    label: "توصيل" },
   ];
 
-  const activeColor = tab === "warehouse" ? "#0D7A54" : Colors.primary;
+  const activeColor =
+    tab === "warehouse" ? "#0D7A54" :
+    tab === "delivery"  ? "#D69E2E" :
+    Colors.primary;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -213,12 +231,12 @@ export default function LoginScreen() {
                 name={tabItem.icon}
                 size={15}
                 color={tab === tabItem.key
-                  ? (tabItem.key === "warehouse" ? "#0D7A54" : Colors.primary)
+                  ? (tabItem.key === "warehouse" ? "#0D7A54" : tabItem.key === "delivery" ? "#D69E2E" : Colors.primary)
                   : Colors.textMuted}
               />
               <Text style={[
                 styles.tabText,
-                tab === tabItem.key && { color: tabItem.key === "warehouse" ? "#0D7A54" : Colors.primary },
+                tab === tabItem.key && { color: tabItem.key === "warehouse" ? "#0D7A54" : tabItem.key === "delivery" ? "#D69E2E" : Colors.primary },
               ]}>
                 {tabItem.label}
               </Text>
@@ -296,10 +314,7 @@ export default function LoginScreen() {
               </TouchableOpacity>
               <Text style={styles.registerRowText}>{t("noAccount")}</Text>
             </View>
-            <TouchableOpacity
-              style={styles.guestBtn}
-              onPress={() => router.replace("/(customer)")}
-            >
+            <TouchableOpacity style={styles.guestBtn} onPress={() => router.replace("/(customer)")}>
               <Ionicons name="eye-outline" size={15} color={Colors.textMuted} />
               <Text style={styles.guestBtnText}>تصفح بدون تسجيل</Text>
             </TouchableOpacity>
@@ -311,12 +326,19 @@ export default function LoginScreen() {
             </TouchableOpacity>
             <Text style={styles.registerRowText}>{t("newPharmacy")}</Text>
           </View>
-        ) : (
+        ) : tab === "warehouse" ? (
           <View style={styles.registerRow}>
             <TouchableOpacity onPress={() => router.push("/(auth)/warehouse-register")}>
               <Text style={[styles.registerLink, { color: "#0D7A54" }]}>{t("registerNow")}</Text>
             </TouchableOpacity>
             <Text style={styles.registerRowText}>{t("warehouse")} {t("noAccount")}</Text>
+          </View>
+        ) : (
+          <View style={styles.registerRow}>
+            <TouchableOpacity onPress={() => router.push("/(auth)/delivery-register" as any)}>
+              <Text style={[styles.registerLink, { color: "#D69E2E" }]}>سجّل شركتك الآن</Text>
+            </TouchableOpacity>
+            <Text style={styles.registerRowText}>شركتك غير مسجّلة؟</Text>
           </View>
         )}
 
