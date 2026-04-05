@@ -322,19 +322,31 @@ export default function LandingPage({ onAdminLogin }: { onAdminLogin: () => void
           </p>
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             {[
-              { store: "App Store", icon: "🍎", sub: "تحميل من" },
-              { store: "Google Play", icon: "▶️", sub: "تحميل من" },
+              { store: "App Store",      icon: "🍎", sub: "تحميل من",  color: "#A8B8C8" },
+              { store: "Google Play",    icon: "▶️", sub: "تحميل من",  color: "#A8C8A8" },
+              { store: "AppGallery",     icon: "🌸", sub: "تحميل من",  color: "#E8A0A0" },
+              { store: "APK مباشر",      icon: "📦", sub: "تنزيل",     color: "#C8B8F0" },
             ].map((btn, i) => (
               <div key={i} style={{
-                background: "rgba(255,255,255,0.12)", borderRadius: 16,
-                padding: "14px 28px", border: "1.5px solid rgba(255,255,255,0.25)",
+                background: "rgba(255,255,255,0.10)", borderRadius: 16,
+                padding: "14px 22px", border: "1.5px solid rgba(255,255,255,0.2)",
                 display: "flex", alignItems: "center", gap: 12, cursor: "pointer",
                 backdropFilter: "blur(8px)",
-              }}>
-                <span style={{ fontSize: 28 }}>{btn.icon}</span>
+                transition: "background 0.2s, transform 0.15s",
+              }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.18)";
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.10)";
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                }}
+              >
+                <span style={{ fontSize: 26 }}>{btn.icon}</span>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", marginBottom: 2 }}>{btn.sub}</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>{btn.store}</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", marginBottom: 2 }}>{btn.sub}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>{btn.store}</div>
                 </div>
               </div>
             ))}
