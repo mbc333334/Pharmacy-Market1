@@ -544,8 +544,8 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastS
 
 function AdminDash({ db }:{ db:any }) {
   const totalRev = [...db.pharmacies,...db.warehouses,...db.deliveries].reduce((s:number,a:any)=>s+a.revenue,0);
-  const totalProducts = db.pharmacies.reduce((s:number,p:any)=>s+p.products.length,0) + db.warehouses.reduce((s:number,w:any)=>s+w.products.length,0);
-  const totalOrders = db.pharmacies.reduce((s:number,p:any)=>s+p.orders.length,0) + db.warehouses.reduce((s:number,w:any)=>s+w.orders.length,0);
+  const totalProducts = db.pharmacies.reduce((s:number,p:any)=>s+(p.products?.length||0),0) + db.warehouses.reduce((s:number,w:any)=>s+(w.products?.length||0),0);
+  const totalOrders = db.pharmacies.reduce((s:number,p:any)=>s+(p.orders?.length||0),0) + db.warehouses.reduce((s:number,w:any)=>s+(w.orders?.length||0),0);
   return (
     <div>
       <SyncNote text="البيانات تتحدث تلقائياً من بوابات المشتركين — ما يغيّره المشترك يظهر هنا فوراً" />
@@ -562,7 +562,7 @@ function AdminDash({ db }:{ db:any }) {
           <H icon="💊" title="الصيدليات" />
           {db.pharmacies.map((p:any)=>(
             <div key={p.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${C.border}`, alignItems:"center" }}>
-              <div><div style={{ fontWeight:700, fontSize:12 }}>{p.name}</div><div style={{ fontSize:10, color:C.muted }}>{p.city} · {p.products.length} منتج · {p.orders.length} طلب</div></div>
+              <div><div style={{ fontWeight:700, fontSize:12 }}>{p.name}</div><div style={{ fontSize:10, color:C.muted }}>{p.city} · {p.products?.length||0} منتج · {p.orders?.length||0} طلب</div></div>
               <Bdg {...planBadge(p.plan)} />
             </div>
           ))}
@@ -571,7 +571,7 @@ function AdminDash({ db }:{ db:any }) {
           <H icon="🏭" title="المذاخر" />
           {db.warehouses.map((w:any)=>(
             <div key={w.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${C.border}`, alignItems:"center" }}>
-              <div><div style={{ fontWeight:700, fontSize:12 }}>{w.name}</div><div style={{ fontSize:10, color:C.muted }}>{w.city} · {w.products.length} صنف · {w.linkedPharmacies} صيدلية</div></div>
+              <div><div style={{ fontWeight:700, fontSize:12 }}>{w.name}</div><div style={{ fontSize:10, color:C.muted }}>{w.city} · {w.products?.length||0} صنف · {w.linkedPharmacies||0} صيدلية</div></div>
               <Bdg {...planBadge(w.plan)} />
             </div>
           ))}
@@ -665,7 +665,7 @@ function AdminWares({ db }:{ db:any }) {
                   <span>{p.name}</span><span style={{ color:p.qty<20?C.red:C.green, fontWeight:700 }}>{p.qty} {p.unit}</span>
                 </div>
               ))}
-              {wh.products.length > 5 && <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>+ {wh.products.length-5} أصناف أخرى</div>}
+              {(wh.products?.length||0) > 5 && <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>+ {(wh.products?.length||0)-5} أصناف أخرى</div>}
             </>}
           </Card>
         </div>}
