@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import LandingPage from "./pages/LandingPage";
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const C = {
@@ -95,6 +96,7 @@ function loginCheck(phone:string, pass:string): { name:string; role:string; phon
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
   const [user, setUser] = useState<{name:string;role:string;phone?:string}|null>(null);
+  const [showLogin, setShowLogin] = useState(false);
   const [db, setDB] = useState(() => readLiveDB());
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString("ar-IQ"));
 
@@ -111,12 +113,19 @@ export default function App() {
     return () => { bc?.close(); clearInterval(interval); };
   }, [refreshDB, user]);
 
-  if (!user) return <LoginScreen onLogin={(u) => setUser(u)} />;
-  return (
+  if (user) return (
     <div dir="rtl" style={{ fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif", minHeight:"100vh", background:C.bg }}>
       <AdminPortal db={db} lastSync={lastSync} onRefresh={refreshDB} onLogout={()=>setUser(null)} user={user} />
     </div>
   );
+
+  if (showLogin) return (
+    <div dir="rtl" style={{ fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif", minHeight:"100vh", background:C.bg }}>
+      <LoginScreen onLogin={(u) => { setUser(u); setShowLogin(false); }} onBack={() => setShowLogin(false)} />
+    </div>
+  );
+
+  return <LandingPage onAdminLogin={() => setShowLogin(true)} />;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -261,7 +270,7 @@ function AdminRecoveryModal({ onClose }:{ onClose:()=>void }) {
   );
 }
 
-function LoginScreen({ onLogin }: { onLogin:(u:{name:string;role:string})=>void }) {
+function LoginScreen({ onLogin, onBack }: { onLogin:(u:{name:string;role:string})=>void; onBack?:()=>void }) {
   const [phone, setPhone] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
@@ -275,7 +284,15 @@ function LoginScreen({ onLogin }: { onLogin:(u:{name:string;role:string})=>void 
   return (
     <div dir="rtl" style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
       {showRecovery && <AdminRecoveryModal onClose={()=>setShowRecovery(false)} />}
-      <div style={{ background:`linear-gradient(135deg,${C.admin} 0%,#553C9A 100%)`, padding:"48px 24px 72px", textAlign:"center" }}>
+      <div style={{ background:`linear-gradient(135deg,${C.admin} 0%,#553C9A 100%)`, padding:"48px 24px 72px", textAlign:"center", position:"relative" }}>
+        {onBack && (
+          <button onClick={onBack} style={{
+            position:"absolute", top:20, right:20, background:"rgba(255,255,255,0.15)",
+            border:"1.5px solid rgba(255,255,255,0.3)", borderRadius:10,
+            color:"#fff", padding:"7px 16px", fontSize:13, fontWeight:700, cursor:"pointer",
+            display:"flex", alignItems:"center", gap:6,
+          }}>← الصفحة الرئيسية</button>
+        )}
         <div style={{ fontSize:56, marginBottom:8 }}>🛡️</div>
         <h1 style={{ color:"#fff", fontSize:32, fontWeight:900, margin:"8px 0 4px" }}>بوابة المدير</h1>
         <p style={{ color:"rgba(255,255,255,0.8)", fontSize:14, margin:0 }}>دواء+ — منظومة إدارة المنصة المتكاملة</p>
