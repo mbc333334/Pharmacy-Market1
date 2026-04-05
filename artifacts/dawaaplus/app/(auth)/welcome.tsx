@@ -23,7 +23,7 @@ export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const { language, setLanguage } = useSettings();
   const { t, rawCode } = useTranslation();
-  const { loginDemo } = useAuth();
+  const { loginDemo, loginDelivery } = useAuth();
 
   const [showLangModal, setShowLangModal] = useState(false);
   const [langSearch, setLangSearch] = useState("");
@@ -31,6 +31,12 @@ export default function WelcomeScreen() {
   const [adminPassword, setAdminPassword] = useState("");
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
+
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [deliveryPhone, setDeliveryPhone] = useState("");
+  const [deliveryPass, setDeliveryPass] = useState("");
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [deliveryError, setDeliveryError] = useState("");
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -56,6 +62,15 @@ export default function WelcomeScreen() {
     loginDemo("admin");
     setAdminLoading(false);
     setShowAdminModal(false);
+  };
+
+  const handleDeliveryLogin = async () => {
+    if (!deliveryPhone || !deliveryPass) { setDeliveryError("يرجى إدخال رقم الهاتف وكلمة المرور"); return; }
+    setDeliveryLoading(true);
+    const ok = await loginDelivery(deliveryPhone, deliveryPass);
+    setDeliveryLoading(false);
+    if (!ok) { setDeliveryError("رقم الهاتف أو كلمة المرور غير صحيحة"); return; }
+    setShowDeliveryModal(false);
   };
 
   const allLangs = LANGUAGES || [];
@@ -158,6 +173,30 @@ export default function WelcomeScreen() {
               onPress={() => router.push("/(auth)/delivery-register" as any)}
             />
           </View>
+
+          {/* ── DELIVERY QUICK ACCESS ── */}
+          <View style={styles.deliverySection}>
+            <View style={styles.deliverySectionHeader}>
+              <View style={styles.deliverySectionDot} />
+              <Text style={styles.deliverySectionTitle}>شركات التوصيل المسجّلة</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.deliveryLoginBtn}
+              onPress={() => { setDeliveryPhone(""); setDeliveryPass(""); setDeliveryError(""); setShowDeliveryModal(true); }}
+              activeOpacity={0.85}
+            >
+              <View style={styles.deliveryLoginLeft}>
+                <View style={styles.deliveryLoginIcon}>
+                  <Ionicons name="bicycle" size={18} color="#D69E2E" />
+                </View>
+                <View>
+                  <Text style={styles.deliveryLoginLabel}>دخول بوابة التوصيل</Text>
+                  <Text style={styles.deliveryLoginSub}>للشركات المسجّلة فقط</Text>
+                </View>
+              </View>
+              <Ionicons name="arrow-back" size={18} color="#D69E2E" />
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
@@ -246,6 +285,74 @@ export default function WelcomeScreen() {
 
               <View style={{ height: 24 }} />
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── DELIVERY LOGIN MODAL ── */}
+      <Modal visible={showDeliveryModal} transparent animationType="slide" onRequestClose={() => setShowDeliveryModal(false)}>
+        <View style={styles.langOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowDeliveryModal(false)} />
+          <View style={styles.deliveryModal}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.deliveryModalHeader}>
+              <TouchableOpacity onPress={() => setShowDeliveryModal(false)} style={styles.sheetClose}>
+                <Ionicons name="close" size={20} color={Colors.textMuted} />
+              </TouchableOpacity>
+              <View style={styles.sheetTitleWrap}>
+                <View style={styles.deliveryModalIcon}>
+                  <Ionicons name="bicycle" size={18} color="#D69E2E" />
+                </View>
+                <Text style={styles.sheetTitle}>دخول شركة التوصيل</Text>
+              </View>
+            </View>
+
+            <View style={{ paddingHorizontal: 20, paddingBottom: 28, gap: 12 }}>
+              <Text style={styles.deliveryModalHint}>أدخل رقم هاتف الشركة وكلمة المرور المسجّلة</Text>
+
+              <View style={styles.deliveryInputRow}>
+                <TextInput
+                  style={styles.deliveryInput}
+                  placeholder="رقم هاتف الشركة"
+                  value={deliveryPhone}
+                  onChangeText={v => { setDeliveryPhone(v); setDeliveryError(""); }}
+                  keyboardType="phone-pad"
+                  textAlign="right"
+                  placeholderTextColor={Colors.textMuted}
+                />
+                <Ionicons name="call-outline" size={18} color={Colors.textMuted} />
+              </View>
+
+              <View style={styles.deliveryInputRow}>
+                <TextInput
+                  style={styles.deliveryInput}
+                  placeholder="كلمة المرور"
+                  value={deliveryPass}
+                  onChangeText={v => { setDeliveryPass(v); setDeliveryError(""); }}
+                  secureTextEntry
+                  textAlign="right"
+                  placeholderTextColor={Colors.textMuted}
+                />
+                <Ionicons name="lock-closed-outline" size={18} color={Colors.textMuted} />
+              </View>
+
+              {deliveryError ? <Text style={styles.deliveryError}>{deliveryError}</Text> : null}
+
+              <TouchableOpacity
+                style={[styles.deliverySubmitBtn, deliveryLoading && { opacity: 0.7 }]}
+                onPress={handleDeliveryLogin}
+                disabled={deliveryLoading}
+              >
+                {deliveryLoading
+                  ? <ActivityIndicator color="#fff" />
+                  : <><Ionicons name="bicycle" size={18} color="#fff" /><Text style={styles.deliverySubmitText}>دخول</Text></>
+                }
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.deliveryRegisterLink} onPress={() => { setShowDeliveryModal(false); router.push("/(auth)/delivery-register" as any); }}>
+                <Text style={styles.deliveryRegisterLinkText}>شركتك غير مسجّلة؟ <Text style={{ color: "#D69E2E", fontWeight: "700" }}>سجّل الآن</Text></Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -511,4 +618,47 @@ const styles = StyleSheet.create({
   adminError: { fontSize: 12, color: Colors.error, textAlign: "right" },
   adminBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 14 },
   adminBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+
+  deliverySection: { marginTop: 14, marginBottom: 4, gap: 8 },
+  deliverySectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  deliverySectionDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#D69E2E" },
+  deliverySectionTitle: { fontSize: 11, fontWeight: "700", color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 },
+  deliveryLoginBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    backgroundColor: "#FFFFF0", borderRadius: 14, padding: 14,
+    borderWidth: 1.5, borderColor: "#D69E2E40",
+  },
+  deliveryLoginLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  deliveryLoginIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: "#D69E2E18", alignItems: "center", justifyContent: "center",
+  },
+  deliveryLoginLabel: { fontSize: 14, fontWeight: "700", color: "#92600A" },
+  deliveryLoginSub: { fontSize: 11, color: "#B7791F", marginTop: 2 },
+
+  deliveryModal: { backgroundColor: "#fff", borderTopLeftRadius: 28, borderTopRightRadius: 28 },
+  deliveryModalHeader: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: "#F0F0F0",
+  },
+  deliveryModalIcon: {
+    width: 30, height: 30, borderRadius: 8,
+    backgroundColor: "#D69E2E18", alignItems: "center", justifyContent: "center",
+  },
+  deliveryModalHint: { fontSize: 13, color: Colors.textMuted, textAlign: "right", marginBottom: 4 },
+  deliveryInputRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: Colors.surfaceAlt, borderRadius: 12,
+    borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 14,
+  },
+  deliveryInput: { flex: 1, paddingVertical: 13, fontSize: 15, color: Colors.textPrimary },
+  deliveryError: { fontSize: 12, color: Colors.error, textAlign: "right" },
+  deliverySubmitBtn: {
+    backgroundColor: "#D69E2E", borderRadius: 14, paddingVertical: 14,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 4,
+  },
+  deliverySubmitText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  deliveryRegisterLink: { alignItems: "center", paddingVertical: 4 },
+  deliveryRegisterLinkText: { fontSize: 13, color: Colors.textMuted },
 });

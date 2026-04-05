@@ -25,21 +25,41 @@ export interface WarehouseProfile {
   subscriptionExpiry: string;
 }
 
+export interface DeliveryProfile {
+  companyName: string;
+  licenseNumber: string;
+  city: string;
+  address: string;
+  phone: string;
+  totalDrivers: number;
+  totalTrips: number;
+  subscription: SubscriptionPlan;
+  subscriptionExpiry: string;
+}
+
 export interface User {
   id: string;
   name: string;
   phone: string;
   email?: string;
-  type: 'customer' | 'pharmacy' | 'warehouse' | 'admin';
+  type: 'customer' | 'pharmacy' | 'warehouse' | 'admin' | 'delivery';
   pharmacy?: PharmacyProfile;
   warehouse?: WarehouseProfile;
+  delivery?: DeliveryProfile;
 }
+
+const DELIVERY_ACCOUNTS = [
+  { id: 'dc1', name: 'شركة الإسراع للتوصيل', phone: '07501222222', pass: '123456', city: 'أربيل',       license: 'DL-2024-001', drivers: 14, trips: 142, plan: 'premium'  as SubscriptionPlan },
+  { id: 'dc2', name: 'توصيل الخليج',          phone: '07701222223', pass: '123456', city: 'السليمانية', license: 'DL-2024-002', drivers: 9,  trips: 98,  plan: 'standard' as SubscriptionPlan },
+  { id: 'dc3', name: 'شركة السهم السريع',      phone: '07601222224', pass: '123456', city: 'دهوك',       license: 'DL-2024-003', drivers: 21, trips: 210, plan: 'premium'  as SubscriptionPlan },
+  { id: 'dc4', name: 'نجوم التوصيل',           phone: '07801222225', pass: '123456', city: 'كركوك',      license: 'DL-2024-004', drivers: 4,  trips: 31,  plan: 'free'     as SubscriptionPlan },
+];
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (phone: string, password: string, type: 'customer' | 'pharmacy' | 'warehouse' | 'admin') => Promise<boolean>;
-  loginDemo: (type: 'customer' | 'pharmacy' | 'warehouse' | 'admin') => void;
+  login: (phone: string, password: string, type: 'customer' | 'pharmacy' | 'warehouse' | 'admin' | 'delivery') => Promise<boolean>;
+  loginDemo: (type: 'customer' | 'pharmacy' | 'warehouse' | 'admin' | 'delivery') => void;
   registerCustomer: (name: string, phone: string, password: string) => Promise<boolean>;
   registerPharmacy: (data: {
     ownerName: string; phone: string; password: string;
@@ -49,6 +69,7 @@ interface AuthContextType {
     ownerName: string; phone: string; password: string;
     warehouseName: string; licenseNumber: string; city: string; address: string;
   }) => Promise<boolean>;
+  loginDelivery: (phone: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -105,26 +126,75 @@ const DEMO_ADMIN: User = {
   type: 'admin',
 };
 
+const DEMO_DELIVERY: User = {
+  id: 'dc1',
+  name: 'شركة الإسراع للتوصيل',
+  phone: '07501222222',
+  type: 'delivery',
+  delivery: {
+    companyName: 'شركة الإسراع للتوصيل',
+    licenseNumber: 'DL-2024-001',
+    city: 'أربيل',
+    address: 'شارع 60',
+    phone: '07501222222',
+    totalDrivers: 14,
+    totalTrips: 142,
+    subscription: 'premium',
+    subscriptionExpiry: '2026-12-31',
+  },
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading] = useState(false);
 
-  const loginDemo = useCallback((type: 'customer' | 'pharmacy' | 'warehouse' | 'admin') => {
+  const loginDemo = useCallback((type: 'customer' | 'pharmacy' | 'warehouse' | 'admin' | 'delivery') => {
     if (type === 'customer') setUser(DEMO_CUSTOMER);
     else if (type === 'pharmacy') setUser(DEMO_PHARMACY);
     else if (type === 'warehouse') setUser(DEMO_WAREHOUSE);
+    else if (type === 'delivery') setUser(DEMO_DELIVERY);
     else setUser(DEMO_ADMIN);
   }, []);
 
   const login = useCallback(async (
-    _phone: string, _password: string,
-    type: 'customer' | 'pharmacy' | 'warehouse' | 'admin'
+    phone: string, password: string,
+    type: 'customer' | 'pharmacy' | 'warehouse' | 'admin' | 'delivery'
   ): Promise<boolean> => {
     await new Promise(r => setTimeout(r, 800));
+    if (type === 'delivery') {
+      const acc = DELIVERY_ACCOUNTS.find(a => a.phone === phone.trim() && a.pass === password.trim());
+      if (!acc) return false;
+      setUser({
+        id: acc.id, name: acc.name, phone: acc.phone, type: 'delivery',
+        delivery: {
+          companyName: acc.name, licenseNumber: acc.license,
+          city: acc.city, address: '', phone: acc.phone,
+          totalDrivers: acc.drivers, totalTrips: acc.trips,
+          subscription: acc.plan, subscriptionExpiry: '2026-12-31',
+        },
+      });
+      return true;
+    }
     if (type === 'customer') setUser(DEMO_CUSTOMER);
     else if (type === 'pharmacy') setUser(DEMO_PHARMACY);
     else if (type === 'warehouse') setUser(DEMO_WAREHOUSE);
     else setUser(DEMO_ADMIN);
+    return true;
+  }, []);
+
+  const loginDelivery = useCallback(async (phone: string, password: string): Promise<boolean> => {
+    await new Promise(r => setTimeout(r, 800));
+    const acc = DELIVERY_ACCOUNTS.find(a => a.phone === phone.trim() && a.pass === password.trim());
+    if (!acc) return false;
+    setUser({
+      id: acc.id, name: acc.name, phone: acc.phone, type: 'delivery',
+      delivery: {
+        companyName: acc.name, licenseNumber: acc.license,
+        city: acc.city, address: '', phone: acc.phone,
+        totalDrivers: acc.drivers, totalTrips: acc.trips,
+        subscription: acc.plan, subscriptionExpiry: '2026-12-31',
+      },
+    });
     return true;
   }, []);
 
@@ -169,7 +239,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => { setUser(null); }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, loginDemo, registerCustomer, registerPharmacy, registerWarehouse, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, loginDemo, registerCustomer, registerPharmacy, registerWarehouse, loginDelivery, logout }}>
       {children}
     </AuthContext.Provider>
   );

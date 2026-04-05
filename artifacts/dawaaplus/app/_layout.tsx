@@ -40,6 +40,7 @@ function RootLayoutNav() {
     const inCustomer = seg0 === "(customer)";
     const inWarehouse = seg0 === "(warehouse)";
     const inAdmin = seg0 === "(admin)";
+    const inDelivery = seg0 === "(delivery)";
 
     if (!user) {
       // Guests are allowed in (auth) and (customer) — browsing without registration
@@ -50,6 +51,8 @@ function RootLayoutNav() {
       if (!inPharmacy) router.replace("/(pharmacy)");
     } else if (user.type === "warehouse") {
       if (!inWarehouse) router.replace("/(warehouse)");
+    } else if (user.type === "delivery") {
+      if (!inDelivery) router.replace("/(delivery)");
     } else {
       if (!inCustomer) router.replace("/(customer)");
     }
@@ -62,6 +65,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(pharmacy)" />
       <Stack.Screen name="(warehouse)" />
       <Stack.Screen name="(admin)" />
+      <Stack.Screen name="(delivery)" />
     </Stack>
   );
 }
