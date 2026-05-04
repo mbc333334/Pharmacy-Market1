@@ -94,8 +94,9 @@ export default function App() {
     setSocialState(LS(`wh_social_${wh.id}`, { facebook:"", instagram:"", tiktok:"", website:"", whatsapp: wh.phone }));
     setLinkedPharmacies(LS(`wh_pharmacies_${wh.id}`, LINKED_PHARMACIES));
     // Sync from API
-    api.getWarehouse(wh.id).then(d=>{ if(d){ setProfile(d); localStorage.setItem(`wh_profile_${wh.id}`,JSON.stringify(d)); }}).catch(()=>{});
+    api.getWarehouse(wh.id).then(d=>{ if(d){ setProfile(d); localStorage.setItem(`wh_profile_${wh.id}`,JSON.stringify(d)); setWh(prev=>prev?{...prev, plan:d.plan||prev.plan, revenue:d.revenue!=null?d.revenue:prev.revenue, name:d.name||prev.name, city:d.city||prev.city}:prev); if(d.linkedPharmacies?.length){ const linked=d.linkedPharmacies.map((lp:any)=>({ id:lp.pharmacyId||lp.id, name:lp.pharmacyName||lp.name||"صيدلية", city:lp.pharmacyCity||lp.city||"", linkedDate:lp.linkedDate||"", status:lp.status||"active" })); setLinkedPharmacies(linked); localStorage.setItem(`wh_pharmacies_${wh.id}`,JSON.stringify(linked)); } }}).catch(()=>{});
     api.getProducts(wh.id).then(rows=>{ if(rows?.length){ setProductsState(rows); localStorage.setItem(`wh_products_${wh.id}`,JSON.stringify(rows)); }}).catch(()=>{});
+    api.listDelivery().then((rows:any[])=>{ if(rows?.length){ const list=rows.filter((r:any)=>r.active!==false); localStorage.setItem("dc_companies_cache",JSON.stringify(list)); }}).catch(()=>{});
   }, [wh?.id]);
 
   const setProducts = (v:any)=>{ setProductsState(v); if(wh){ localStorage.setItem(`wh_products_${wh.id}`,JSON.stringify(v)); broadcastSync(); } };
@@ -269,6 +270,10 @@ function Login({ onLogin }:{ onLogin:(w:any)=>void }) {
   const [tab,setTab]=useState<"login"|"register">("login");
   const [phone,setPhone]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
   const [showFp,setShowFp]=useState(false);
+  const [apiList, setApiList]=useState<any[]>(WAREHOUSES);
+  useEffect(()=>{
+    api.listAll().then((rows:any[])=>{ if(rows?.length) setApiList(rows.filter((r:any)=>r.active!==false)); }).catch(()=>{});
+  },[]);
   const login=async()=>{
     setLoading(true); setErr("");
     try {
@@ -277,14 +282,14 @@ function Login({ onLogin }:{ onLogin:(w:any)=>void }) {
     } catch(e:any) {
       if(e.message) { setErr(e.message); setLoading(false); return; }
     }
-    const w=WAREHOUSES.find(w=>w.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`wh_pass_${w.id}`)||w.pass));
+    const w=apiList.find(w=>w.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`wh_pass_${w.id}`)||w.pass||"123456"));
     w ? onLogin(w) : setErr("رقم الهاتف أو كلمة المرور غير صحيحة");
     setLoading(false);
   };
   const tabStyle=(active:boolean):React.CSSProperties=>({ flex:1,padding:"10px 0",border:"none",borderRadius:10,fontWeight:800,fontSize:14,cursor:"pointer",transition:"all .2s",background:active?C.primary:"transparent",color:active?"#fff":C.muted });
   return (
     <div dir="rtl" style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
-      {showFp && <ForgotModal onClose={()=>setShowFp(false)} color={C.primary} data={WAREHOUSES} passKey={id=>`wh_pass_${id}`} />}
+      {showFp && <ForgotModal onClose={()=>setShowFp(false)} color={C.primary} data={apiList} passKey={id=>`wh_pass_${id}`} />}
       <div style={{ background:`linear-gradient(135deg,${C.primary},${C.dark})`, padding:"48px 24px 70px", textAlign:"center" }}>
         <div style={{ fontSize:56, marginBottom:8 }}>🏭</div>
         <h1 style={{ color:"#fff", fontSize:32, fontWeight:900, margin:0 }}>بوابة المذاخر</h1>
@@ -307,7 +312,7 @@ function Login({ onLogin }:{ onLogin:(w:any)=>void }) {
         {tab==="login" && <div style={{ background:C.surface,borderRadius:16,padding:"16px 18px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
           <div style={{ fontSize:12,color:C.muted,textAlign:"center",marginBottom:10 }}>🔑 مذاخر مسجّلة — اضغط للدخول</div>
           <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
-            {WAREHOUSES.map(w=>(
+            {apiList.map(w=>(
               <button key={w.id} onClick={()=>onLogin(w)} style={{ background:C.light,border:`1px solid ${C.primary}30`,borderRadius:10,padding:"10px 14px",cursor:"pointer",textAlign:"right",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
                 <span style={{ fontWeight:700,color:C.primary,fontSize:13 }}>🏭 {w.name}</span>
                 <span style={{ fontSize:11,color:C.muted }}>{w.city} · {w.phone}</span>
@@ -531,7 +536,8 @@ function Pharmacies({ pharmacies, color }:any) {
 }
 
 function Orders({ orders, onUpdate, color }:any) {
-  const [companies] = useState(()=>getDeliveryCompanies());
+  const [companies, setCompanies] = useState<any[]>(()=>{ try{ const c=localStorage.getItem("dc_companies_cache"); return c?JSON.parse(c):getDeliveryCompanies(); }catch{ return getDeliveryCompanies(); } });
+  useEffect(()=>{ api.listDelivery().then((rows:any[])=>{ if(rows?.length){ setCompanies(rows.filter((r:any)=>r.active!==false)); localStorage.setItem("dc_companies_cache",JSON.stringify(rows.filter((r:any)=>r.active!==false))); } }).catch(()=>{}); },[]);
   const updateStatus=(id:string,status:string)=>onUpdate(orders.map((o:any)=>o.id===id?{...o,status}:o));
   const updateDc=(id:string,dcId:string)=>onUpdate(orders.map((o:any)=>o.id===id?{...o,dcId}:o));
   return (

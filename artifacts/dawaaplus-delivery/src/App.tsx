@@ -71,7 +71,7 @@ export default function App() {
     setProfile(LS(`dc_profile_${dc.id}`, dc));
     setSocialState(LS(`dc_social_${dc.id}`, { facebook:"", instagram:"", tiktok:"", website:"", whatsapp: dc.phone }));
     // Sync from API
-    api.getCompany(dc.id).then(d=>{ if(d){ setProfile(d); localStorage.setItem(`dc_profile_${dc.id}`,JSON.stringify(d)); }}).catch(()=>{});
+    api.getCompany(dc.id).then(d=>{ if(d){ setProfile(d); localStorage.setItem(`dc_profile_${dc.id}`,JSON.stringify(d)); setDc(prev=>prev?{...prev, plan:d.plan||prev.plan, revenue:d.revenue!=null?d.revenue:prev.revenue, name:d.name||prev.name, city:d.city||prev.city}:prev); }}).catch(()=>{});
     api.getDrivers(dc.id).then(rows=>{ if(rows?.length){ setDriversState(rows); localStorage.setItem(`dc_drivers_${dc.id}`,JSON.stringify(rows)); }}).catch(()=>{});
     api.getTrips(dc.id).then(rows=>{ if(rows?.length){ setTripsState(rows); localStorage.setItem(`dc_trips_${dc.id}`,JSON.stringify(rows)); }}).catch(()=>{});
   }, [dc?.id]);
@@ -247,6 +247,10 @@ function Login({ onLogin }:{ onLogin:(c:any)=>void }) {
   const [tab,setTab]=useState<"login"|"register">("login");
   const [phone,setPhone]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
   const [showFp,setShowFp]=useState(false);
+  const [apiList, setApiList]=useState<any[]>(COMPANIES);
+  useEffect(()=>{
+    api.listAll().then((rows:any[])=>{ if(rows?.length) setApiList(rows.filter((r:any)=>r.active!==false)); }).catch(()=>{});
+  },[]);
   const login=async()=>{
     setLoading(true); setErr("");
     try {
@@ -255,14 +259,14 @@ function Login({ onLogin }:{ onLogin:(c:any)=>void }) {
     } catch(e:any) {
       if(e.message) { setErr(e.message); setLoading(false); return; }
     }
-    const c=COMPANIES.find(c=>c.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`dc_pass_${c.id}`)||c.pass));
+    const c=apiList.find(c=>c.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`dc_pass_${c.id}`)||c.pass||"123456"));
     c ? onLogin(c) : setErr("رقم الهاتف أو كلمة المرور غير صحيحة");
     setLoading(false);
   };
   const tabStyle=(active:boolean):React.CSSProperties=>({ flex:1,padding:"10px 0",border:"none",borderRadius:10,fontWeight:800,fontSize:14,cursor:"pointer",transition:"all .2s",background:active?C.primary:"transparent",color:active?"#fff":C.muted });
   return (
     <div dir="rtl" style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
-      {showFp && <ForgotModal onClose={()=>setShowFp(false)} color={C.primary} data={COMPANIES} passKey={id=>`dc_pass_${id}`} />}
+      {showFp && <ForgotModal onClose={()=>setShowFp(false)} color={C.primary} data={apiList} passKey={id=>`dc_pass_${id}`} />}
       <div style={{ background:`linear-gradient(135deg,${C.primary},${C.dark})`, padding:"48px 24px 70px", textAlign:"center" }}>
         <div style={{ fontSize:56, marginBottom:8 }}>🚚</div>
         <h1 style={{ color:"#fff", fontSize:32, fontWeight:900, margin:0 }}>بوابة شركات التوصيل</h1>
@@ -285,7 +289,7 @@ function Login({ onLogin }:{ onLogin:(c:any)=>void }) {
         {tab==="login" && <div style={{ background:C.surface,borderRadius:16,padding:"16px 18px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
           <div style={{ fontSize:12,color:C.muted,textAlign:"center",marginBottom:10 }}>🔑 شركات مسجّلة — اضغط للدخول</div>
           <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
-            {COMPANIES.map(c=>(
+            {apiList.map(c=>(
               <button key={c.id} onClick={()=>onLogin(c)} style={{ background:C.light,border:`1px solid ${C.primary}30`,borderRadius:10,padding:"10px 14px",cursor:"pointer",textAlign:"right",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
                 <span style={{ fontWeight:700,color:C.dark,fontSize:13 }}>🚚 {c.name}</span>
                 <span style={{ fontSize:11,color:C.muted }}>{c.city} · {c.phone}</span>

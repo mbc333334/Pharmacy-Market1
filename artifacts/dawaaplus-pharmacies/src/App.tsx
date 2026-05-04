@@ -87,9 +87,10 @@ export default function App() {
     setProfile(LS(`ph_profile_${ph.id}`, ph));
     setSocialState(LS(`ph_social_${ph.id}`, { facebook:"", instagram:"", tiktok:"", website:"", whatsapp: ph.phone }));
     // Sync from API
-    api.getPharmacy(ph.id).then(d=>{ if(d){ setProfile(d); localStorage.setItem(`ph_profile_${ph.id}`,JSON.stringify(d)); }}).catch(()=>{});
+    api.getPharmacy(ph.id).then(d=>{ if(d){ setProfile(d); localStorage.setItem(`ph_profile_${ph.id}`,JSON.stringify(d)); setPh(prev=>prev?{...prev, plan:d.plan||prev.plan, revenue:d.revenue!=null?d.revenue:prev.revenue, name:d.name||prev.name, city:d.city||prev.city}:prev); }}).catch(()=>{});
     api.getProducts(ph.id).then(rows=>{ if(rows?.length){ setProductsState(rows); localStorage.setItem(`ph_products_${ph.id}`,JSON.stringify(rows)); }}).catch(()=>{});
     api.getOrders(ph.id).then(rows=>{ if(rows?.length){ setOrdersState(rows); localStorage.setItem(`ph_orders_${ph.id}`,JSON.stringify(rows)); }}).catch(()=>{});
+    api.listDelivery().then((rows:any[])=>{ if(rows?.length){ const list=rows.filter((r:any)=>r.active!==false); localStorage.setItem("dc_companies_cache",JSON.stringify(list)); }}).catch(()=>{});
   }, [ph?.id]);
 
   const setProducts = (v:any)=>{ setProductsState(v); if(ph){ localStorage.setItem(`ph_products_${ph.id}`,JSON.stringify(v)); broadcastSync(); } };
@@ -264,24 +265,26 @@ function Login({ onLogin }:{ onLogin:(p:any)=>void }) {
   const [tab,setTab]=useState<"login"|"register">("login");
   const [phone,setPhone]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
   const [showFp,setShowFp]=useState(false);
+  const [apiList, setApiList]=useState<any[]>(PHARMACIES);
+  useEffect(()=>{
+    api.listAll().then((rows:any[])=>{ if(rows?.length) setApiList(rows.filter((r:any)=>r.active!==false)); }).catch(()=>{});
+  },[]);
   const login=async()=>{
     setLoading(true); setErr("");
     try {
       const res = await api.login(phone.trim(), pass.trim());
       if(res?.user) { onLogin(res.user); return; }
     } catch(e:any) {
-      // Check for specific error codes from API
       if(e.message) { setErr(e.message); setLoading(false); return; }
     }
-    // fallback: local check
-    const p=PHARMACIES.find(p=>p.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`ph_pass_${p.id}`)||p.pass));
+    const p=apiList.find(p=>p.phone===phone.trim()&&pass.trim()===(localStorage.getItem(`ph_pass_${p.id}`)||p.pass||"123456"));
     p ? onLogin(p) : setErr("رقم الهاتف أو كلمة المرور غير صحيحة");
     setLoading(false);
   };
   const tabStyle=(active:boolean):React.CSSProperties=>({ flex:1, padding:"10px 0", border:"none", borderRadius:10, fontWeight:800, fontSize:14, cursor:"pointer", transition:"all .2s", background:active?C.primary:"transparent", color:active?"#fff":C.muted });
   return (
     <div dir="rtl" style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Segoe UI',Tahoma,Arial,sans-serif" }}>
-      {showFp && <ForgotModal onClose={()=>setShowFp(false)} color={C.primary} data={PHARMACIES} passKey={id=>`ph_pass_${id}`} />}
+      {showFp && <ForgotModal onClose={()=>setShowFp(false)} color={C.primary} data={apiList} passKey={id=>`ph_pass_${id}`} />}
       <div style={{ background:`linear-gradient(135deg,${C.primary},${C.dark})`, padding:"48px 24px 70px", textAlign:"center" }}>
         <div style={{ fontSize:56, marginBottom:8 }}>💊</div>
         <h1 style={{ color:"#fff", fontSize:32, fontWeight:900, margin:0 }}>بوابة الصيدليات</h1>
@@ -305,7 +308,7 @@ function Login({ onLogin }:{ onLogin:(p:any)=>void }) {
         {tab==="login" && <div style={{ background:C.surface, borderRadius:16, padding:"16px 18px", boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
           <div style={{ fontSize:12, color:C.muted, textAlign:"center", marginBottom:10 }}>🔑 صيدليات مسجّلة — اضغط للدخول</div>
           <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-            {PHARMACIES.map(p=>(
+            {apiList.map(p=>(
               <button key={p.id} onClick={()=>onLogin(p)} style={{ background:C.light, border:`1px solid ${C.primary}30`, borderRadius:10, padding:"10px 14px", cursor:"pointer", textAlign:"right", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                 <span style={{ fontWeight:700, color:C.primary, fontSize:13 }}>💊 {p.name}</span>
                 <span style={{ fontSize:11, color:C.muted }}>{p.city} · {p.phone}</span>
@@ -510,7 +513,8 @@ function Inventory({ products, onUpdate, color }:any) {
 }
 
 function Orders({ orders, onUpdate, color }:any) {
-  const [companies] = useState(()=>getDeliveryCompanies());
+  const [companies, setCompanies] = useState<any[]>(()=>{ try{ const c=localStorage.getItem("dc_companies_cache"); return c?JSON.parse(c):getDeliveryCompanies(); }catch{ return getDeliveryCompanies(); } });
+  useEffect(()=>{ api.listDelivery().then((rows:any[])=>{ if(rows?.length){ setCompanies(rows.filter((r:any)=>r.active!==false)); localStorage.setItem("dc_companies_cache",JSON.stringify(rows.filter((r:any)=>r.active!==false))); } }).catch(()=>{}); },[]);
   const updateStatus=(id:string,status:string)=>onUpdate(orders.map((o:any)=>o.id===id?{...o,status}:o));
   const updateDc=(id:string,dcId:string)=>onUpdate(orders.map((o:any)=>o.id===id?{...o,dcId}:o));
   return (

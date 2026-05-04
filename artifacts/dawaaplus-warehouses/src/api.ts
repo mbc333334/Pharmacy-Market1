@@ -16,6 +16,9 @@ async function req<T = any>(method: string, path: string, body?: any): Promise<T
 export const api = {
   login:            (phone: string, password: string) => req("POST", "/auth/login", { phone, password, type: "warehouse" }),
   register:         (data: any) => req("POST", "/auth/register/warehouse", data),
+  listAll:          () => req("GET", "/warehouses"),
+  listDelivery:     () => req("GET", "/delivery-companies"),
+  listPharmacies:   () => req("GET", "/pharmacies"),
   getWarehouse:     (id: string) => req("GET", `/warehouses/${id}`),
   updateWarehouse:  (id: string, data: any) => req("PUT", `/warehouses/${id}`, data),
   getProducts:      (ownerId: string) => req("GET", `/products?ownerId=${ownerId}`),
