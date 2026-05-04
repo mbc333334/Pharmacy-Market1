@@ -40,7 +40,7 @@ pnpm workspace monorepo using TypeScript. **دواء+** is a pharmacy & medicine
 
 - **PostgreSQL** via Replit managed DB (DATABASE_URL env var)
 - **Drizzle ORM** schema at `lib/db/src/schema/index.ts`
-- 12 tables: `admins`, `pharmacies`, `warehouses`, `delivery_companies`, `customers`, `products`, `orders`, `order_items`, `drivers`, `trips`, `announcements`, `otp_codes`, `payments`
+- 13 tables: `admins`, `pharmacies`, `warehouses`, `delivery_companies`, `customers`, `products`, `orders`, `order_items`, `drivers`, `trips`, `announcements`, `otp_codes`, `payments`, `subscription_plans`
 - Seed data: 1 admin, 4 pharmacies, 4 warehouses, 4 delivery companies
 
 ## Data Sync Architecture
@@ -53,9 +53,21 @@ Each portal:
 
 ## Subscription Plans
 
-- **Free** — basic features
-- **Standard** — `40,000 د.ع/month` (pharmacies/warehouses) or `40,000 د.ع/month` (delivery)
-- **Premium** — `75,000–80,000 د.ع/month` — full features, ads, priority listing
+- Plans stored in **`subscription_plans` DB table** (seeded automatically on first API call if empty)
+- **9 default plans**: 3 types (pharmacy/warehouse/delivery) × 3 tiers (free/standard/premium)
+- Admin can **CRUD** plans via `📋 خطط الاشتراك` section (superadmin only)
+- Portals (pharmacy/warehouse/delivery) **fetch plans from API** on subscription page load with local fallback
+- Plan change approval in AdminSubs now calls `/api/admin/subscriber-plan/:type/:id` to persist in DB
+- Payment approval via `PATCH /api/payments/:id/status` auto-updates subscriber's plan in DB
+
+## API Routes (admin.ts)
+
+- `GET /api/subscription-plans?type=pharmacy|warehouse|delivery` — fetch plans (seeds defaults if empty)
+- `POST /api/subscription-plans` — create plan
+- `PUT /api/subscription-plans/:id` — update plan
+- `DELETE /api/subscription-plans/:id` — soft-delete (sets active=false)
+- `PATCH /api/admin/subscriber-plan/:type/:id` — directly change subscriber plan in DB
+- `PATCH /api/payments/:id/status` — approve/reject payment (auto-updates subscriber plan when approved)
 
 ## i18n (Mobile App)
 

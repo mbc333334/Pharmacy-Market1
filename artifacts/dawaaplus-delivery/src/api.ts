@@ -30,4 +30,5 @@ export const api = {
   changePassword:    (phone: string, newPassword: string) => req("POST", "/auth/change-password", { phone, newPassword, type: "delivery" }),
   getAnnouncements:  () => req("GET", "/announcements?target=delivery"),
   submitPayment:     (data: any) => req("POST", "/payments", data),
+  getPlans:          () => req("GET", "/subscription-plans?type=delivery"),
 };

@@ -54,4 +54,11 @@ export const api = {
   sendOtp:            (phone: string) => req("POST", "/otp/send", { phone }),
   verifyOtp:          (phone: string, code: string) => req("POST", "/otp/verify", { phone, code }),
   changePassword:     (phone: string, newPassword: string, type: string) => req("POST", "/auth/change-password", { phone, newPassword, type }),
+  // Subscription Plans
+  getPlans:           (type?: string) => req("GET", `/subscription-plans${type ? `?type=${type}` : ""}`),
+  createPlan:         (data: any) => req("POST", "/subscription-plans", data),
+  updatePlan:         (id: number, data: any) => req("PUT", `/subscription-plans/${id}`, data),
+  deletePlan:         (id: number) => req("DELETE", `/subscription-plans/${id}`),
+  // Update subscriber plan directly
+  updateSubscriberPlan: (type: string, id: string, plan: string) => req("PATCH", `/admin/subscriber-plan/${type}/${id}`, { plan }),
 };

@@ -197,6 +197,24 @@ export const otpCodes = pgTable("otp_codes", {
   createdAt:  timestamp("created_at").defaultNow(),
 });
 
+// ── SUBSCRIPTION PLANS ──────────────────────────────────────────
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id:             serial("id").primaryKey(),
+  subscriberType: varchar("subscriber_type", { length: 20 }).notNull(),
+  planId:         varchar("plan_id", { length: 20 }).notNull(),
+  nameAr:         varchar("name_ar", { length: 100 }).notNull(),
+  price:          integer("price").notNull().default(0),
+  features:       text("features").notNull().default("[]"),
+  maxItems:       integer("max_items").notNull().default(0),
+  maxAds:         integer("max_ads").notNull().default(0),
+  hasOffers:      boolean("has_offers").notNull().default(false),
+  hasAnalytics:   boolean("has_analytics").notNull().default(false),
+  priority:       boolean("priority").notNull().default(false),
+  active:         boolean("active").notNull().default(true),
+  updatedAt:      timestamp("updated_at").defaultNow(),
+});
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+
 // ── PAYMENTS ────────────────────────────────────────────────────
 export const payments = pgTable("payments", {
   id:              serial("id").primaryKey(),

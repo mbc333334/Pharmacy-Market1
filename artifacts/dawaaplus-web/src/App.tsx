@@ -362,6 +362,7 @@ const BASE_MENU = [
   {id:"wares",   label:"المذاخر",         icon:"🏭", roles:["superadmin","supervisor"]},
   {id:"deliv",   label:"شركات التوصيل",  icon:"🚛", roles:["superadmin","supervisor"]},
   {id:"subs",    label:"الاشتراكات",     icon:"💎", roles:["superadmin","supervisor"]},
+  {id:"plans",   label:"خطط الاشتراك",   icon:"📋", roles:["superadmin"]},
   {id:"finance", label:"الإدارة المالية", icon:"💰", roles:["superadmin","supervisor"]},
   {id:"announce",label:"الإعلانات",       icon:"📢", roles:["superadmin","supervisor"]},
   {id:"social",  label:"وسائل التواصل",  icon:"📱", roles:["superadmin","supervisor"]},
@@ -534,6 +535,7 @@ function AdminPortal({ db, lastSync, onRefresh, onLogout, user }:{ db:any; lastS
           {sec==="wares"    && <AdminWares   db={db} />}
           {sec==="deliv"    && <AdminDeliv   db={db} />}
           {sec==="subs"     && <AdminSubs    db={db} />}
+          {sec==="plans"    && isSuperAdmin && <AdminPlans />}
           {sec==="finance"  && <AdminFin     db={db} />}
           {sec==="announce" && <AdminAnn />}
           {sec==="social"   && <AdminSocial  db={db} />}
@@ -873,6 +875,7 @@ function AdminSubs({ db }:{ db:any }) {
   const [tab, setTab] = useState<"pending"|"all">("pending");
   const [changePlanModal, setChangePlanModal] = useState<any>(null);
   const [newPlan, setNewPlan] = useState("standard");
+  const [actionMsg, setActionMsg] = useState("");
 
   const pending = reqs.filter(r=>r.status==="pending");
   const all = [
@@ -881,12 +884,14 @@ function AdminSubs({ db }:{ db:any }) {
     ...db.deliveries.map((d:any)=>({...d,_type:"delivery",_label:"شركة توصيل",_icon:"🚛",_color:C.delivery,_lsKey:`dc_profile_${d.id}`})),
   ];
 
+  const showMsg = (m:string) => { setActionMsg(m); setTimeout(()=>setActionMsg(""),3500); };
+
   const updateReqs = (newReqs:any[]) => {
     localStorage.setItem("sub_requests", JSON.stringify(newReqs));
     setReqs(newReqs);
     try{ new BroadcastChannel("dawapl_sync").postMessage("update"); }catch{}
   };
-  const updateSubscriberPlan = (lsKey:string, defData:any, plan:string, active?:boolean) => {
+  const updateSubscriberPlanLS = (lsKey:string, defData:any, plan:string, active?:boolean) => {
     const cur = rdLS(lsKey, defData);
     const updated = { ...cur, plan, ...(active!==undefined?{active}:{}) };
     localStorage.setItem(lsKey, JSON.stringify(updated));
@@ -894,26 +899,35 @@ function AdminSubs({ db }:{ db:any }) {
   };
   const findSubByReq = (req:any) => all.find(a=>a.id===req.subscriberId);
 
-  const approveReq = (req:any) => {
+  const approveReq = async (req:any) => {
     const sub = findSubByReq(req);
-    if (sub) updateSubscriberPlan(sub._lsKey, sub, req.requestedPlan);
+    if (sub) {
+      updateSubscriberPlanLS(sub._lsKey, sub, req.requestedPlan);
+      api.updateSubscriberPlan(sub._type, sub.id, req.requestedPlan).catch(()=>{});
+    }
     const updated = reqs.map(r=>r.id===req.id ? {...r, status:"approved", approvedAt:new Date().toISOString().slice(0,10)} : r);
     updateReqs(updated);
-    window.location.reload();
+    showMsg("✅ تمت الموافقة وتفعيل خطة الاشتراك في قاعدة البيانات");
+    setTimeout(()=>window.location.reload(), 1200);
   };
   const rejectReq = (req:any) => {
     const updated = reqs.map(r=>r.id===req.id ? {...r, status:"rejected", rejectedAt:new Date().toISOString().slice(0,10)} : r);
     updateReqs(updated);
+    showMsg("🚫 تم رفض الطلب");
   };
-  const applyPlanChange = () => {
+  const applyPlanChange = async () => {
     if (!changePlanModal) return;
-    updateSubscriberPlan(changePlanModal._lsKey, changePlanModal, newPlan);
+    updateSubscriberPlanLS(changePlanModal._lsKey, changePlanModal, newPlan);
+    api.updateSubscriberPlan(changePlanModal._type, changePlanModal.id, newPlan)
+      .then(()=>showMsg("✅ تم تحديث خطة الاشتراك في قاعدة البيانات"))
+      .catch(()=>showMsg("⚠️ خُزِّن محلياً — تعذّر الاتصال بالخادم"));
     setChangePlanModal(null);
-    window.location.reload();
+    setTimeout(()=>window.location.reload(), 1200);
   };
   const toggleBlock = (sub:any) => {
-    updateSubscriberPlan(sub._lsKey, sub, sub.plan, !sub.active);
-    window.location.reload();
+    updateSubscriberPlanLS(sub._lsKey, sub, sub.plan, !sub.active);
+    showMsg(sub.active?"🚫 تم حظر المشترك":"✅ تم رفع الحظر");
+    setTimeout(()=>window.location.reload(), 800);
   };
 
   const planPills = [
@@ -928,6 +942,7 @@ function AdminSubs({ db }:{ db:any }) {
 
   return (
     <div>
+      {actionMsg&&<div style={{ background:actionMsg.startsWith("✅")?"#F0FFF4":actionMsg.startsWith("🚫")?"#FFF5F5":"#FFFDE7", border:`1px solid ${actionMsg.startsWith("✅")?"#9AE6B4":actionMsg.startsWith("🚫")?"#FED7D7":"#F6AD55"}`, borderRadius:10, padding:"10px 16px", marginBottom:14, fontWeight:700, fontSize:13 }}>{actionMsg}</div>}
       {/* ── Stats Bar ── */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:10, marginBottom:18 }}>
         {[
@@ -1492,6 +1507,219 @@ function AdminSettings({ currentUser }:{ currentUser:{name:string;role:string;ph
           {accForm.role==="supervisor"&&<div style={{ background:"#FFFDE7", border:"1px dashed #D69E2E", borderRadius:8, padding:"8px 12px", fontSize:11, color:"#92400E", marginBottom:10 }}>⚠️ المشرف يملك صلاحية قراءة جميع البيانات وإدارة الاشتراكات، لكن بدون الوصول إلى إعدادات الدفع وحسابات الإدارة</div>}
           {accErr&&<div style={{ background:"#FFF5F5",border:"1px solid #FED7D7",borderRadius:8,padding:"8px 12px",fontSize:12,color:C.red,marginBottom:10 }}>{accErr}</div>}
           <button onClick={addAccount} style={{ width:"100%", background:`linear-gradient(135deg,${C.admin},#553C9A)`, color:"#fff", border:"none", borderRadius:10, padding:"12px", fontWeight:800, cursor:"pointer", fontSize:13 }}>✅ إضافة الحساب</button>
+        </div>
+      </div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADMIN PLANS — manage subscription plan offers from the admin portal
+// ═══════════════════════════════════════════════════════════════════════════════
+const PLAN_TYPES = [
+  { id:"pharmacy",  label:"الصيدليات",       icon:"💊", color:C.pharmacy  },
+  { id:"warehouse", label:"المذاخر",          icon:"🏭", color:C.warehouse },
+  { id:"delivery",  label:"شركات التوصيل",   icon:"🚛", color:C.delivery  },
+];
+const PLAN_IDS = [
+  { id:"free",     label:"مجاني",     icon:"🆓", color:"#718096" },
+  { id:"standard", label:"أساسي",     icon:"⭐", color:"#3182CE" },
+  { id:"premium",  label:"مميز",      icon:"👑", color:"#7C3AED" },
+];
+function emptyPlanForm(subscriberType:string, planId:string) {
+  return { subscriberType, planId, nameAr:"", price:"0", maxItems:"", maxAds:"0", hasOffers:false, hasAnalytics:false, priority:false, features:[""] };
+}
+function AdminPlans() {
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [selType, setSelType] = useState("pharmacy");
+  const [editModal, setEditModal] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+  const [confirmDel, setConfirmDel] = useState<any>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr("");
+    try { const rows = await api.getPlans(); setPlans(rows); }
+    catch(e:any) { setErr("تعذّر تحميل الخطط: " + e.message); }
+    setLoading(false);
+  }, []);
+  useEffect(()=>{ load(); },[load]);
+
+  const showSaved = (m:string) => { setSavedMsg(m); setTimeout(()=>setSavedMsg(""),3500); };
+
+  const openNew = (subscriberType:string, planId:string) => {
+    setEditModal({ _new:true, ...emptyPlanForm(subscriberType, planId) });
+  };
+  const openEdit = (p:any) => {
+    setEditModal({ ...p, features: Array.isArray(p.features) ? [...p.features] : [""], price: String(p.price), maxItems: String(p.maxItems||""), maxAds: String(p.maxAds||0) });
+  };
+
+  const save = async () => {
+    if (!editModal) return;
+    setSaving(true);
+    const feats = (editModal.features as string[]).filter((f:string)=>f.trim());
+    const payload = { ...editModal, price: Number(editModal.price)||0, maxItems: Number(editModal.maxItems)||0, maxAds: Number(editModal.maxAds)||0, features: feats };
+    try {
+      if (editModal._new) {
+        await api.createPlan(payload);
+        showSaved("✅ تمت إضافة الخطة");
+      } else {
+        await api.updatePlan(editModal.id, payload);
+        showSaved("✅ تم تحديث الخطة");
+      }
+      setEditModal(null);
+      load();
+    } catch(e:any) { showSaved("❌ خطأ: " + e.message); }
+    setSaving(false);
+  };
+
+  const deletePlan = async (p:any) => {
+    try {
+      await api.deletePlan(p.id);
+      showSaved("🗑️ تم حذف الخطة");
+      setConfirmDel(null);
+      load();
+    } catch(e:any) { showSaved("❌ خطأ: " + e.message); }
+  };
+
+  const typePlans = plans.filter(p=>p.subscriberType===selType);
+  const cur = PLAN_TYPES.find(t=>t.id===selType)!;
+
+  const setFeat = (idx:number, val:string) => {
+    setEditModal((prev:any)=>{ const f=[...prev.features]; f[idx]=val; return {...prev,features:f}; });
+  };
+  const addFeat = () => setEditModal((prev:any)=>({...prev,features:[...prev.features,""]}));
+  const delFeat = (idx:number) => setEditModal((prev:any)=>{ const f=prev.features.filter((_:any,i:number)=>i!==idx); return {...prev,features:f.length?f:[""]}; });
+
+  return (
+    <div>
+      <SyncNote text="خطط الاشتراك مشتركة عبر جميع البوابات — أي تعديل يظهر فوراً للمشتركين" />
+      {savedMsg&&<div style={{ background:savedMsg.startsWith("✅")||savedMsg.startsWith("🗑️")?"#F0FFF4":"#FFF5F5", border:`1px solid ${savedMsg.startsWith("✅")||savedMsg.startsWith("🗑️")?"#9AE6B4":"#FED7D7"}`, borderRadius:10, padding:"10px 16px", marginBottom:14, fontWeight:700, fontSize:13 }}>{savedMsg}</div>}
+
+      {/* Type Tabs */}
+      <div style={{ display:"flex", gap:10, marginBottom:20 }}>
+        {PLAN_TYPES.map(t=>(
+          <button key={t.id} onClick={()=>setSelType(t.id)} style={{ padding:"10px 22px", borderRadius:12, border:`2px solid ${selType===t.id?t.color:C.border}`, background:selType===t.id?t.color:"#fff", color:selType===t.id?"#fff":C.text, fontWeight:700, cursor:"pointer", fontSize:13, display:"flex", alignItems:"center", gap:7 }}>
+            <span>{t.icon}</span>{t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div style={{ textAlign:"center", padding:40, color:C.muted }}>⏳ جاري تحميل الخطط...</div>}
+      {err && <div style={{ background:"#FFF5F5", border:"1px solid #FED7D7", borderRadius:10, padding:"12px 16px", color:C.red, marginBottom:14 }}>{err}</div>}
+
+      {!loading && !err && (
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16 }}>
+          {PLAN_IDS.map(pid=>{
+            const p = typePlans.find(x=>x.planId===pid.id);
+            return (
+              <div key={pid.id} style={{ background:"#fff", borderRadius:18, border:`2px solid ${p?pid.color:C.border}`, overflow:"hidden", boxShadow:"0 2px 10px #0001" }}>
+                <div style={{ background:p?`linear-gradient(135deg,${pid.color}22,${pid.color}08)`:"#F7FAFC", padding:"14px 18px", borderBottom:`1px solid ${pid.color}22`, display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{ fontSize:22 }}>{pid.icon}</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:900, fontSize:15, color:p?pid.color:C.muted }}>{p?p.nameAr:pid.label}</div>
+                    <div style={{ fontSize:11, color:C.muted }}>{pid.label} · {cur.label}</div>
+                  </div>
+                  {p && <div style={{ fontWeight:900, fontSize:18, color:pid.color }}>{p.price===0?"مجاني":`${Number(p.price).toLocaleString()} د.ع`}</div>}
+                </div>
+                {p ? (
+                  <div style={{ padding:"14px 18px" }}>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:12, fontSize:12 }}>
+                      <div style={{ background:C.bg, borderRadius:8, padding:"8px 10px" }}><div style={{ color:C.muted, fontSize:10 }}>الحد الأقصى من المنتجات</div><div style={{ fontWeight:800 }}>{p.maxItems>=9999?"غير محدود":p.maxItems}</div></div>
+                      <div style={{ background:C.bg, borderRadius:8, padding:"8px 10px" }}><div style={{ color:C.muted, fontSize:10 }}>الإعلانات/شهر</div><div style={{ fontWeight:800 }}>{p.maxAds}</div></div>
+                      <div style={{ background:p.hasOffers?"#F0FFF4":"#F7FAFC", borderRadius:8, padding:"8px 10px" }}><div style={{ color:C.muted, fontSize:10 }}>العروض الترويجية</div><div style={{ fontWeight:800, color:p.hasOffers?C.green:C.muted }}>{p.hasOffers?"✓ متاح":"—"}</div></div>
+                      <div style={{ background:p.hasAnalytics?"#EBF8FF":"#F7FAFC", borderRadius:8, padding:"8px 10px" }}><div style={{ color:C.muted, fontSize:10 }}>التحليلات</div><div style={{ fontWeight:800, color:p.hasAnalytics?C.blue:C.muted }}>{p.hasAnalytics?"✓ متاح":"—"}</div></div>
+                    </div>
+                    <div style={{ marginBottom:12 }}>
+                      {(Array.isArray(p.features)?p.features:[]).slice(0,4).map((f:string,i:number)=>(
+                        <div key={i} style={{ fontSize:12, display:"flex", gap:6, marginBottom:4 }}><span style={{ color:C.green }}>✓</span>{f}</div>
+                      ))}
+                      {(p.features?.length||0)>4&&<div style={{ fontSize:11, color:C.muted }}>+{p.features.length-4} ميزات أخرى</div>}
+                    </div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button onClick={()=>openEdit(p)} style={{ flex:1, background:`${pid.color}15`, color:pid.color, border:`1px solid ${pid.color}40`, borderRadius:9, padding:"8px 0", fontWeight:700, cursor:"pointer", fontSize:12 }}>✏️ تعديل</button>
+                      <button onClick={()=>setConfirmDel(p)} style={{ background:"#FFF5F5", color:C.red, border:"none", borderRadius:9, padding:"8px 14px", fontWeight:700, cursor:"pointer", fontSize:12 }}>🗑️</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding:"24px 18px", textAlign:"center" }}>
+                    <div style={{ color:C.muted, fontSize:13, marginBottom:12 }}>لا توجد خطة {pid.label} لـ {cur.label}</div>
+                    <button onClick={()=>openNew(selType, pid.id)} style={{ background:`${pid.color}15`, color:pid.color, border:`2px dashed ${pid.color}50`, borderRadius:10, padding:"10px 20px", fontWeight:700, cursor:"pointer", fontSize:13 }}>➕ إنشاء خطة {pid.label}</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Edit / Create Modal */}
+      {editModal&&<div style={{ position:"fixed", inset:0, background:"#00000055", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }} onClick={()=>setEditModal(null)}>
+        <div dir="rtl" style={{ background:"#fff", borderRadius:20, padding:"28px 24px", width:"100%", maxWidth:520, boxShadow:"0 20px 60px #0005", maxHeight:"90vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+          <div style={{ fontWeight:900, fontSize:17, marginBottom:4 }}>{editModal._new?"➕ إنشاء خطة جديدة":"✏️ تعديل الخطة"}</div>
+          <div style={{ fontSize:12, color:C.muted, marginBottom:18 }}>
+            {PLAN_TYPES.find(t=>t.id===editModal.subscriberType)?.icon} {PLAN_TYPES.find(t=>t.id===editModal.subscriberType)?.label} — {PLAN_IDS.find(p=>p.id===editModal.planId)?.icon} {PLAN_IDS.find(p=>p.id===editModal.planId)?.label}
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>اسم الخطة بالعربية</label>
+              <input value={editModal.nameAr} onChange={e=>setEditModal((p:any)=>({...p,nameAr:e.target.value}))} placeholder="مثال: مميز" style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>السعر (د.ع/شهر) — 0 للمجاني</label>
+              <input type="number" value={editModal.price} onChange={e=>setEditModal((p:any)=>({...p,price:e.target.value}))} style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box", direction:"ltr" }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>الحد الأقصى للمنتجات (9999 = غير محدود)</label>
+              <input type="number" value={editModal.maxItems} onChange={e=>setEditModal((p:any)=>({...p,maxItems:e.target.value}))} style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box", direction:"ltr" }} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:4 }}>عدد الإعلانات الشهرية</label>
+              <input type="number" value={editModal.maxAds} onChange={e=>setEditModal((p:any)=>({...p,maxAds:e.target.value}))} style={{ width:"100%", border:`1.5px solid ${C.border}`, borderRadius:9, padding:"9px 12px", fontSize:13, boxSizing:"border-box", direction:"ltr" }} />
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:16, marginBottom:16 }}>
+            {[
+              {k:"hasOffers",    l:"العروض الترويجية",  color:"#38A169"},
+              {k:"hasAnalytics", l:"التحليلات المتقدمة", color:C.blue},
+              {k:"priority",     l:"أولوية البحث",       color:"#7C3AED"},
+            ].map(f=>(
+              <div key={f.k} onClick={()=>setEditModal((p:any)=>({...p,[f.k]:!p[f.k]}))} style={{ flex:1, border:`2px solid ${editModal[f.k]?f.color:C.border}`, borderRadius:10, padding:"10px 8px", cursor:"pointer", textAlign:"center", background:editModal[f.k]?`${f.color}10`:"#fff" }}>
+                <div style={{ fontSize:18, marginBottom:4 }}>{editModal[f.k]?"✅":"⬜"}</div>
+                <div style={{ fontSize:11, fontWeight:700, color:editModal[f.k]?f.color:C.muted }}>{f.l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:C.muted, display:"block", marginBottom:6 }}>مزايا الخطة (سطر لكل ميزة)</label>
+            {editModal.features.map((feat:string, idx:number)=>(
+              <div key={idx} style={{ display:"flex", gap:6, marginBottom:6 }}>
+                <input value={feat} onChange={e=>setFeat(idx,e.target.value)} placeholder={`ميزة ${idx+1}...`} style={{ flex:1, border:`1.5px solid ${C.border}`, borderRadius:9, padding:"8px 12px", fontSize:13, boxSizing:"border-box" }} />
+                <button onClick={()=>delFeat(idx)} style={{ background:"#FFF5F5", color:C.red, border:"none", borderRadius:8, padding:"8px 10px", cursor:"pointer", fontSize:13 }}>×</button>
+              </div>
+            ))}
+            <button onClick={addFeat} style={{ background:`${C.admin}10`, color:C.admin, border:`1px dashed ${C.admin}50`, borderRadius:8, padding:"7px 14px", cursor:"pointer", fontSize:12, fontWeight:700 }}>+ إضافة ميزة</button>
+          </div>
+          <div style={{ display:"flex", gap:10 }}>
+            <button onClick={()=>setEditModal(null)} style={{ flex:1, padding:"11px", borderRadius:10, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontWeight:700 }}>إلغاء</button>
+            <button onClick={save} disabled={saving||!editModal.nameAr.trim()} style={{ flex:2, padding:"11px", borderRadius:10, border:"none", background:editModal.nameAr.trim()?`linear-gradient(135deg,${C.admin},#5B21B6)`:"#ccc", color:"#fff", cursor:editModal.nameAr.trim()?"pointer":"not-allowed", fontWeight:800, fontSize:14 }}>
+              {saving?"⏳ جاري الحفظ...":"💾 حفظ الخطة"}
+            </button>
+          </div>
+        </div>
+      </div>}
+
+      {/* Confirm Delete */}
+      {confirmDel&&<div style={{ position:"fixed", inset:0, background:"#00000055", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={()=>setConfirmDel(null)}>
+        <div dir="rtl" style={{ background:"#fff", borderRadius:16, padding:"28px 24px", width:360, boxShadow:"0 20px 60px #0005" }} onClick={e=>e.stopPropagation()}>
+          <div style={{ fontWeight:900, fontSize:16, marginBottom:8 }}>🗑️ حذف الخطة</div>
+          <p style={{ color:C.muted, fontSize:13, marginBottom:20 }}>سيتم إخفاء خطة <strong>{confirmDel.nameAr}</strong> عن المشتركين. المشتركون الحاليون على هذه الخطة لن يتأثروا.</p>
+          <div style={{ display:"flex", gap:10 }}>
+            <button onClick={()=>setConfirmDel(null)} style={{ flex:1, padding:"10px", borderRadius:10, border:`1px solid ${C.border}`, background:"#fff", cursor:"pointer", fontWeight:700 }}>إلغاء</button>
+            <button onClick={()=>deletePlan(confirmDel)} style={{ flex:1, padding:"10px", borderRadius:10, border:"none", background:`linear-gradient(135deg,${C.red},#C53030)`, color:"#fff", cursor:"pointer", fontWeight:800 }}>🗑️ حذف</button>
+          </div>
         </div>
       </div>}
     </div>

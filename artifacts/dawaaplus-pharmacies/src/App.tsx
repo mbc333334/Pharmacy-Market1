@@ -50,12 +50,17 @@ const INIT_ORDERS = [
 const LS = (key:string,def:any)=>{ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch{ return def; } };
 const planBadge = (p:string)=>p==="premium"?{l:"بريميوم ✨",c:"#7C3AED",b:"#F3F0FF"}:p==="standard"?{l:"ستاندرد",c:C.blue,b:"#EBF8FF"}:{l:"مجاني",c:C.muted,b:"#EDF2F7"};
 
-// ─── Subscription Plans (Pharmacy) ────────────────────────────────────────────
-const PH_PLANS = [
+// ─── Subscription Plans (Pharmacy) — defaults (overridden by API) ─────────────
+const PH_PLANS_DEFAULT = [
   { id:"free",     icon:"🆓", name:"مجاني",      price:0,      color:"#718096", features:["حتى 50 منتج في المخزون","ظهور أساسي في التطبيق","دعم واتساب","بدون عروض أو إعلانات"] },
-  { id:"standard", icon:"⭐", name:"ستاندرد",    price:35000,  color:"#3182CE", recommended:true, features:["حتى 500 منتج في المخزون","ظهور محسّن في نتائج البحث","إنشاء عروض وتخفيضات","إعلان واحد شهرياً في التطبيق","تقارير مبيعات أساسية","دعم أولوية"] },
+  { id:"standard", icon:"⭐", name:"ستاندرد",    price:25000,  color:"#3182CE", recommended:true, features:["حتى 500 منتج في المخزون","ظهور محسّن في نتائج البحث","إنشاء عروض وتخفيضات","إعلان واحد شهرياً في التطبيق","تقارير مبيعات أساسية","دعم أولوية"] },
   { id:"premium",  icon:"👑", name:"بريميوم ✨",  price:75000,  color:"#7C3AED", features:["منتجات غير محدودة","أولوية قصوى في البحث","عروض وتخفيضات غير محدودة","3 إعلانات شهرياً في التطبيق","تحليلات مبيعات متقدمة","مدير حساب خاص","دعم 24/7 عبر واتساب"] },
 ];
+function apiPlanToUi(p: any) {
+  const icons: Record<string, string> = { free:"🆓", standard:"⭐", premium:"👑" };
+  const colors: Record<string, string> = { free:"#718096", standard:"#3182CE", premium:"#7C3AED" };
+  return { id: p.planId, icon: icons[p.planId]||"💎", name: p.nameAr, price: p.price, color: colors[p.planId]||"#7C3AED", features: Array.isArray(p.features) ? p.features : [], recommended: p.planId==="standard" };
+}
 // ─── Platform Payment Accounts ────────────────────────────────────────────────
 const PLATFORM_ACCOUNTS = [
   { id:"zainCash",   label:"زين كاش",     icon:"📱", color:"#8B1538", num:"07501000001", hint:"أرسل المبلغ ثم ضع رقم العملية هنا" },
@@ -551,6 +556,10 @@ function SubPage({ ph, plan, color }:any) {
   const [payMethod, setPayMethod] = useState("zainCash");
   const [txRef, setTxRef] = useState("");
   const [myReqs, setMyReqs] = useState<any[]>(()=>{ try{ return (JSON.parse(localStorage.getItem("sub_requests")||"[]")).filter((r:any)=>r.subscriberId===ph.id); }catch{ return []; } });
+  const [PH_PLANS, setPHPlans] = useState<any[]>(PH_PLANS_DEFAULT);
+  useEffect(()=>{
+    api.getPlans().then((rows:any[])=>{ if(rows?.length) setPHPlans(rows.map(apiPlanToUi)); }).catch(()=>{});
+  },[]);
   const pendingReq = myReqs.find((r:any)=>r.status==="pending");
   const selPlan = PH_PLANS.find(p=>p.id===selPlanId);
   const acct = PLATFORM_ACCOUNTS.find(a=>a.id===payMethod)||PLATFORM_ACCOUNTS[0];

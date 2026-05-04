@@ -56,11 +56,16 @@ const INIT_ORDERS = [
 
 const LS = (key:string,def:any)=>{ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):def; }catch{ return def; } };
 
-const WH_PLANS = [
+const WH_PLANS_DEFAULT = [
   { id:"free",     icon:"🆓", name:"مجاني",      price:0,       color:"#718096", features:["حتى 200 منتج","ربط 3 صيدليات كحد أقصى","دعم واتساب","بدون إعلانات"] },
-  { id:"standard", icon:"⭐", name:"ستاندرد",    price:65000,   color:"#3182CE", recommended:true, features:["حتى 2000 منتج","ربط حتى 20 صيدلية","إعلان واحد شهرياً في التطبيق","تقارير شهرية","دعم أولوية"] },
+  { id:"standard", icon:"⭐", name:"ستاندرد",    price:50000,   color:"#3182CE", recommended:true, features:["حتى 2000 منتج","ربط حتى 20 صيدلية","إعلان واحد شهرياً في التطبيق","تقارير شهرية","دعم أولوية"] },
   { id:"premium",  icon:"👑", name:"بريميوم ✨",  price:150000,  color:"#7C3AED", features:["منتجات وصيدليات غير محدودة","أولوية في نتائج البحث","3 إعلانات شهرياً في التطبيق","تحليلات متقدمة","مدير حساب خاص","دعم 24/7 عبر واتساب"] },
 ];
+function apiPlanToUi(p: any) {
+  const icons: Record<string, string> = { free:"🆓", standard:"⭐", premium:"👑" };
+  const colors: Record<string, string> = { free:"#718096", standard:"#3182CE", premium:"#7C3AED" };
+  return { id: p.planId, icon: icons[p.planId]||"💎", name: p.nameAr, price: p.price, color: colors[p.planId]||"#7C3AED", features: Array.isArray(p.features) ? p.features : [], recommended: p.planId==="standard" };
+}
 const PLATFORM_ACCOUNTS = [
   { id:"zainCash",   label:"زين كاش",     icon:"📱", color:"#8B1538", num:"07501000001", hint:"أرسل المبلغ ثم ضع رقم العملية هنا" },
   { id:"fastPay",    label:"فاست باي",    icon:"⚡", color:"#0066CC", num:"07509000001", hint:"احتفظ بصورة الإيصال" },
@@ -572,6 +577,10 @@ function SubPage({ wh, plan, color }:any) {
   const [payMethod, setPayMethod] = useState("zainCash");
   const [txRef, setTxRef] = useState("");
   const [myReqs, setMyReqs] = useState<any[]>(()=>{ try{ return (JSON.parse(localStorage.getItem("sub_requests")||"[]")).filter((r:any)=>r.subscriberId===wh.id); }catch{ return []; } });
+  const [WH_PLANS, setWHPlans] = useState<any[]>(WH_PLANS_DEFAULT);
+  useEffect(()=>{
+    api.getPlans().then((rows:any[])=>{ if(rows?.length) setWHPlans(rows.map(apiPlanToUi)); }).catch(()=>{});
+  },[]);
   const pendingReq = myReqs.find((r:any)=>r.status==="pending");
   const selPlan = WH_PLANS.find(p=>p.id===selPlanId);
   const acct = PLATFORM_ACCOUNTS.find(a=>a.id===payMethod)||PLATFORM_ACCOUNTS[0];
